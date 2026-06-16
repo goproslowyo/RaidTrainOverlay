@@ -1,0 +1,7 @@
+.DS_Store
+node_modules/
+# Throwaway headless-verification wrappers (not part of the project): _shot.html, _drive_*.html, etc.
+_*.html
+# Architecture decision records — kept out of the published repo (headed for the
+# project wiki). CONTEXT.md carries the domain model that ships.
+docs/adr/

@@ -1,0 +1,13 @@
+{
+  "name": "raidtrainoverlay",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/goproslowyo/RaidTrainOverlay.git"
+  },
+  "scripts": {
+    "test": "node --test"
+  }
+}
