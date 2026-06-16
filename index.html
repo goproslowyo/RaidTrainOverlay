@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RaidTrainOverlay</title>
+  <meta name="description" content="A stream overlay that turns a RaidPal raid train into an animated train of streamer cars for OBS.">
+  <style>
+    :root {
+      --bg: #0e1116; --panel: #161b22; --ink: #e6edf3; --muted: #9aa7b4;
+      --line: #2a313b; --accent: #f4c430; --accent2: #22d3ee; --rail: #6b7280;
+      font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; background: var(--bg); color: var(--ink); }
+    body { line-height: 1.6; }
+    a { color: var(--accent2); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .wrap { max-width: 760px; margin: 0 auto; padding: 48px 24px 64px; }
+    header { text-align: center; margin-bottom: 8px; }
+    h1 { font-size: 2.1rem; margin: 0 0 6px; letter-spacing: -0.5px; }
+    h1 .a { color: var(--accent); }
+    .tag { color: var(--muted); font-size: 1.05rem; margin: 0; }
+    /* A tiny CSS train motif rolling on a rail. */
+    .train { display: flex; align-items: flex-end; gap: 6px; justify-content: center; height: 60px; margin: 26px 0 2px; }
+    .car { width: 54px; height: 38px; border-radius: 6px; position: relative; border: 2px solid #0006; }
+    .car::after { content: ""; position: absolute; left: 8px; right: 8px; bottom: -7px; height: 10px;
+      background: radial-gradient(circle at 9px 3px, #222 3px, transparent 4px), radial-gradient(circle at calc(100% - 9px) 3px, #222 3px, transparent 4px); }
+    .loco { width: 60px; background: #b45309; border-color: var(--accent); }
+    .c1 { background: #1e3a5f; } .c2 { background: #5b2a78; } .c3 { background: #14361f; border-color: #37b24d; }
+    .rail { height: 4px; background: var(--rail); border-radius: 2px; max-width: 320px; margin: 0 auto 30px; }
+    .cta { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin: 26px 0 8px; }
+    .btn { display: inline-block; padding: 11px 20px; border-radius: 8px; font-weight: 700; border: 1px solid var(--line); }
+    .btn.primary { background: var(--accent); color: #1f2937; border-color: var(--accent); }
+    .btn.ghost { background: var(--panel); color: var(--ink); }
+    section { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 20px 22px; margin: 22px 0; }
+    h2 { font-size: 1.15rem; margin: 0 0 12px; }
+    ol { margin: 0; padding-left: 20px; } ol li { margin: 8px 0; }
+    code, pre { font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+    code { background: #0c0f14; border: 1px solid var(--line); border-radius: 5px; padding: 1px 6px; font-size: 0.92em; }
+    pre { background: #0c0f14; border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; overflow-x: auto; font-size: 0.9rem; }
+    .muted { color: var(--muted); }
+    .themes { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+    .chip { font-family: inherit; font-size: 0.85rem; background: #0c0f14; border: 1px solid var(--line); border-radius: 999px; padding: 5px 12px; color: var(--muted); cursor: pointer; line-height: 1.5; transition: color .12s, background-color .12s, border-color .12s; }
+    .chip:hover { color: var(--ink); border-color: var(--accent); }
+    .chip.active { background: var(--accent); color: #1f2937; border-color: var(--accent); }
+    .chip:focus-visible { outline: 2px solid var(--accent2); outline-offset: 2px; }
+    .chip code { background: transparent; border: 0; padding: 0 0 0 5px; color: var(--accent); font-size: 0.95em; }
+    .chip.active code { color: #1f2937; }
+    .url-box { display: flex; gap: 8px; margin-top: 12px; }
+    .url-box input { flex: 1; min-width: 0; background: #0c0f14; border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; color: var(--ink); font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.82rem; }
+    .url-box button { padding: 10px 16px; border-radius: 8px; border: 1px solid var(--accent); background: var(--accent); color: #1f2937; font-family: inherit; font-weight: 700; cursor: pointer; white-space: nowrap; }
+    .url-box button:hover { filter: brightness(1.06); }
+    .url-note { font-size: 0.85rem; margin-top: 8px; }
+    .credit { margin-top: 9px; }
+    .credit a { color: var(--accent); }
+    .ver { margin-top: 6px; font-size: 0.8rem; opacity: 0.7; }
+    .ver a { color: var(--muted); font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+    footer { text-align: center; color: var(--muted); margin-top: 34px; font-size: 0.9rem; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="train" aria-hidden="true">
+        <div class="car loco"></div><div class="car c1"></div><div class="car c2"></div><div class="car c3"></div>
+      </div>
+      <div class="rail" aria-hidden="true"></div>
+      <h1>RaidTrain<span class="a">Overlay</span></h1>
+      <p class="tag">Your <a href="https://raidpal.com">RaidPal</a> raid train, as an animated train of streamer cars — for OBS.</p>
+    </header>
+
+    <div class="cta">
+      <a class="btn primary" href="./configurator.html">Build your overlay</a>
+      <a class="btn ghost" href="./preview.html">Preview the overlay</a>
+    </div>
+    <p class="muted" style="text-align:center; font-size:0.88rem;">A built-in demo lineup — no event needed. Build yours with your own slug.</p>
+
+    <section>
+      <h2>How it works</h2>
+      <ol>
+        <li><strong>Open the <a href="./configurator.html">Configurator</a>.</strong> Paste your event's RaidPal
+          link — the whole URL is fine, it grabs the event for you — then pick a theme and options and copy the overlay URL.</li>
+        <li><strong>Add it to OBS.</strong> In OBS: <em>Sources → + → Browser</em>, paste the URL, and size the source
+          to your canvas. The overlay background is transparent.</li>
+      </ol>
+    </section>
+
+    <section>
+      <h2>Ten themes</h2>
+      <p class="muted">Click a theme to drop it into your overlay URL (Shuffle cycles them all):</p>
+      <div class="themes">
+        <button class="chip" data-theme="classic">Classic Americana <code>classic</code></button>
+        <button class="chip" data-theme="flat">Flat <code>flat</code></button>
+        <button class="chip" data-theme="synthwave">Synthwave <code>synthwave</code></button>
+        <button class="chip" data-theme="ticket">Vintage Ticket <code>ticket</code></button>
+        <button class="chip" data-theme="wood">Wooden Toy <code>wood</code></button>
+        <button class="chip" data-theme="comic">Comic <code>comic</code></button>
+        <button class="chip" data-theme="departures">Departures Board <code>departures</code></button>
+        <button class="chip" data-theme="paper">Construction Paper <code>paper</code></button>
+        <button class="chip" data-theme="tron">Tron <code>tron</code></button>
+        <button class="chip" data-theme="pixel">16-bit Pixel <code>pixel</code></button>
+        <button class="chip" data-theme="shuffle">🔀 Shuffle <code>shuffle</code></button>
+      </div>
+      <div class="url-box">
+        <input type="text" id="overlay-url" readonly aria-label="Overlay URL for the selected theme">
+        <button type="button" id="overlay-copy">Copy</button>
+      </div>
+      <p class="muted url-note">Swap <code>your-event-slug</code> for your event — everything else has a sensible default. Or build the full link in the <a href="./configurator.html">Configurator</a>.</p>
+    </section>
+
+    <footer>
+      <a href="https://github.com/goproslowyo/RaidTrainOverlay#readme">README</a> &middot;
+      <a href="https://github.com/goproslowyo/RaidTrainOverlay/blob/main/docs/authoring-a-theme.md">Author a theme</a> &middot;
+      <a href="https://github.com/goproslowyo/RaidTrainOverlay">Source</a> &middot;
+      MIT licensed
+      <div class="credit">Built with ❤️ by a streamer, for streamers &middot; by <a href="https://github.com/goproslowyo">goproslowyo</a></div>
+      <div class="ver"><span id="ver">v0.1.0</span><span id="sha"></span></div>
+    </footer>
+  </div>
+  <script>
+    // Theme chips → the overlay URL. Clicking a chip drops its theme into the minimal
+    // URL (classic is the default, so it stays omitted); Copy copies it. The base
+    // resolves to wherever this page lives (Pages, a custom domain, or local dev), so
+    // the copied link is always a working absolute URL — just swap in your event slug.
+    (function () {
+      const base = new URL('overlay.html', location.href).href;
+      const out = document.getElementById('overlay-url');
+      const chips = [...document.querySelectorAll('.chip[data-theme]')];
+      function pick(theme) {
+        for (const c of chips) c.classList.toggle('active', c.dataset.theme === theme);
+        out.value = base + '?event=your-event-slug' + (theme === 'classic' ? '' : '&theme=' + theme);
+      }
+      for (const c of chips) c.addEventListener('click', () => pick(c.dataset.theme));
+      pick('classic'); // classic is the default theme → the plain minimal URL
+      const copy = document.getElementById('overlay-copy');
+      copy.addEventListener('click', async () => {
+        try { await navigator.clipboard.writeText(out.value); }
+        catch { out.select(); document.execCommand('copy'); }
+        const orig = copy.textContent; copy.textContent = 'Copied!';
+        setTimeout(() => { copy.textContent = orig; }, 1500);
+      });
+    })();
+
+    // Stamp the footer with the live deployed commit (fetched from the GitHub API) next
+    // to the version, so you can tell exactly what's running. Fails silently offline.
+    fetch('https://api.github.com/repos/goproslowyo/RaidTrainOverlay/commits/main')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((c) => {
+        if (c && c.sha) document.getElementById('sha').innerHTML =
+          ' &middot; <a href="' + c.html_url + '" title="deployed commit">' + c.sha.slice(0, 7) + '</a>';
+      })
+      .catch(() => {});
+  </script>
+</body>
+</html>

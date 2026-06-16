@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RaidTrainOverlay — Preview</title>
+  <!--
+    A standalone showcase of the Overlay running the built-in demo lineup
+    (event=demo, no RaidPal fetch). Click any of the eleven theme chips (ten Themes +
+    Shuffle) to preview it; a framed preview component (src/preview-frame.js) gives the
+    same still, centred showcase + Roll → Freeze → Resume + Recenter controls as the
+    Configurator's hero preview. Each pick updates the copyable overlay URL below.
+    Defaults to Shuffle so it cycles the whole roster on its own. The overlay logic
+    itself lives in overlay.html — this page is just the chips + the framed component.
+  -->
+  <style>
+    :root {
+      --bg: #14161a; --panel-2: #232732; --ink: #e7ecf3;
+      --muted: #9aa7b8; --accent: #9ad; --accent-strong: #57b6ff; --line: #2c313c;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; }
+    body { background: var(--bg); color: var(--ink); font: 15px/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; padding: 24px; }
+    a { color: var(--accent-strong); }
+    code { background: var(--panel-2); padding: 1px 5px; border-radius: 4px; font-size: 13px; }
+    .wrap { max-width: 1000px; margin: 0 auto; }
+    h1 { font-size: 22px; margin: 0 0 4px; }
+    .sub { color: var(--muted); margin: 0 0 18px; }
+
+    /* Clickable theme chips. */
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+    .chip {
+      padding: 7px 13px; border-radius: 999px; border: 1px solid var(--line);
+      background: var(--panel-2); color: var(--muted); font: inherit; font-size: 13px;
+      font-weight: 600; cursor: pointer; transition: color .12s, background-color .12s, border-color .12s;
+    }
+    .chip:hover { color: var(--ink); border-color: var(--accent); }
+    .chip.active { background: var(--accent-strong); color: #08121c; border-color: var(--accent-strong); }
+    .chip:focus-visible { outline: 2px solid var(--accent-strong); outline-offset: 2px; }
+
+    /* The framed preview — same look as the Configurator's hero preview. */
+    .preview-frame {
+      width: 100%; aspect-ratio: 16 / 9; border: 1px solid var(--line); border-radius: 8px;
+      overflow: hidden; position: relative;
+      /* Checkerboard = "this is transparent" (what OBS composites over your scene). */
+      background-color: #0e0f12;
+      background-image:
+        linear-gradient(45deg, #20242c 25%, transparent 25%, transparent 75%, #20242c 75%),
+        linear-gradient(45deg, #20242c 25%, transparent 25%, transparent 75%, #20242c 75%);
+      background-size: 28px 28px; background-position: 0 0, 14px 14px;
+    }
+    .preview-frame iframe { width: 100%; height: 100%; border: 0; display: block; }
+    .preview-controls { position: absolute; top: 10px; right: 10px; z-index: 2; display: flex; gap: 6px; }
+    .preview-btn {
+      padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line);
+      background: rgba(14, 15, 18, 0.82); color: var(--ink); font: inherit; font-size: 13px;
+      font-weight: 600; cursor: pointer; backdrop-filter: blur(3px);
+      transition: background-color .15s, border-color .15s;
+    }
+    .preview-btn:hover { background: rgba(30, 33, 40, 0.92); border-color: var(--accent); }
+    .preview-btn.is-rolling { background: var(--accent); color: #1f2937; border-color: var(--accent); }
+    .preview-caption { color: var(--muted); font-size: 13px; margin: 8px 2px 0; min-height: 18px; }
+
+    /* Copyable overlay URL for the current theme. */
+    .url-box { display: flex; gap: 8px; margin-top: 16px; }
+    #url {
+      flex: 1; padding: 9px 11px; border-radius: 7px; border: 1px solid var(--line);
+      background: var(--panel-2); color: var(--ink);
+      font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 13px;
+    }
+    button {
+      padding: 9px 16px; border-radius: 7px; border: 1px solid var(--line);
+      background: var(--panel-2); color: var(--ink); font: inherit; cursor: pointer; white-space: nowrap;
+    }
+    button:hover { border-color: var(--accent-strong); }
+    button.primary { background: var(--accent-strong); color: #08121c; border-color: var(--accent-strong); font-weight: 600; }
+    button:focus-visible, #url:focus { outline: 2px solid var(--accent-strong); outline-offset: 0; }
+    .url-hint { color: var(--muted); font-size: 13px; margin: 8px 2px 0; }
+
+    .cta { margin-top: 18px; }
+    .btn { display: inline-block; padding: 10px 18px; border-radius: 8px; font-weight: 700; text-decoration: none; border: 1px solid var(--line); }
+    .btn.primary { background: var(--accent-strong); color: #08121c; border-color: var(--accent-strong); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Preview the overlay</h1>
+    <p class="sub">A built-in demo lineup — no event needed. Click a theme to preview it; <strong>Roll it</strong> to
+      watch the train cross, <strong>Freeze</strong> to study it up close, or <strong>Recenter</strong>. Grab the URL
+      below, or <a href="./configurator.html">build your own</a> with your RaidPal event.</p>
+
+    <div class="chips" id="chips" role="group" aria-label="Theme"></div>
+
+    <div class="preview-frame">
+      <iframe id="preview" title="Overlay preview"></iframe>
+      <div class="preview-controls">
+        <button type="button" id="preview-roll" class="preview-btn"
+          title="Roll the train across — freeze it in place to study (wheels keep turning), resume anytime">▶&nbsp;Roll it</button>
+        <button type="button" id="preview-still" class="preview-btn" hidden
+          title="Back to the centered still preview">◼&nbsp;Recenter</button>
+      </div>
+    </div>
+    <p class="preview-caption" id="caption">A still preview so you can study the art — its ambient motion still plays. Roll it to watch the whole train cross.</p>
+
+    <div class="url-box">
+      <input type="text" id="url" readonly aria-label="Overlay URL for this theme">
+      <button type="button" id="copy" class="primary">Copy</button>
+    </div>
+    <p class="url-hint">The overlay URL for this theme, using the demo lineup — swap <code>demo</code> for your event slug
+      (or <a href="./configurator.html">build it in the Configurator</a>).</p>
+
+    <div class="cta"><a class="btn primary" href="./configurator.html">Build your overlay</a></div>
+  </div>
+
+  <script type="module">
+    import { createPreviewFrame } from './src/preview-frame.js';
+    import { buildOverlayQuery } from './src/configurator.js';
+
+    // Sibling Overlay URL, derived from where THIS page lives (works locally + on a
+    // GitHub Pages subpath). The demo lineup renders with no RaidPal fetch, so it never 404s.
+    const OVERLAY_BASE = new URL('overlay.html', window.location.href).href;
+    const DEMO_EVENT = 'demo';
+    // [key, chip label] for the eleven options — ten Themes + Shuffle (the default).
+    const THEMES = [
+      ['shuffle', '🔀 Shuffle'], ['classic', 'Classic Americana'], ['flat', 'Flat'],
+      ['synthwave', 'Synthwave'], ['ticket', 'Vintage Ticket'], ['wood', 'Wooden Toy'],
+      ['comic', 'Comic'], ['departures', 'Departures Board'], ['paper', 'Construction Paper'],
+      ['tron', 'Tron'], ['pixel', '16-bit Pixel'],
+    ];
+    const KEYS = THEMES.map(([k]) => k);
+    const $ = (id) => document.getElementById(id);
+
+    const frame = createPreviewFrame({
+      iframe: $('preview'), rollBtn: $('preview-roll'), stillBtn: $('preview-still'), overlayBase: OVERLAY_BASE,
+    });
+
+    // Build the clickable theme chips.
+    const chipsEl = $('chips');
+    for (const [key, label] of THEMES) {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'chip'; b.dataset.theme = key; b.textContent = label;
+      b.addEventListener('click', () => select(key));
+      chipsEl.appendChild(b);
+    }
+
+    function select(theme) {
+      for (const b of chipsEl.children) b.classList.toggle('active', b.dataset.theme === theme);
+      // The demo event never changes, so a theme switch re-renders in place (no reload).
+      const query = buildOverlayQuery({ event: DEMO_EVENT, theme });
+      frame.render(query, DEMO_EVENT);
+      // The copyable overlay URL for this theme (preview=1 is NOT included — this is the
+      // real overlay URL you'd drop into OBS, on the demo lineup).
+      $('url').value = `${OVERLAY_BASE}?${query}`;
+      // Keep this page shareable: ?theme=… (Shuffle is the default, so it's omitted).
+      history.replaceState(null, '', theme !== 'shuffle' ? `?theme=${theme}` : location.pathname);
+    }
+
+    $('copy').addEventListener('click', async () => {
+      const text = $('url').value;
+      if (!text) return;
+      try {
+        await navigator.clipboard.writeText(text);
+      } catch {
+        $('url').select();
+        document.execCommand('copy'); // fallback for non-secure contexts
+      }
+      const original = $('copy').textContent;
+      $('copy').textContent = 'Copied!';
+      setTimeout(() => { $('copy').textContent = original; }, 1500);
+    });
+
+    // Hydrate the theme from ?theme=… so a preview link is shareable; default to Shuffle.
+    const fromUrl = new URLSearchParams(location.search).get('theme');
+    select(KEYS.includes(fromUrl) ? fromUrl : 'shuffle');
+  </script>
+</body>
+</html>
