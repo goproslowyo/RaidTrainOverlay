@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- A tiny bundled Theme asset: a maker's-mark roundel painted on the
+     starter Theme's locomotive. Transparent outside the disc (alpha channel), so it
+     sits cleanly on the Car over any stream.
+     Referenced from index.js via new URL('./assets/badge.svg', import.meta.url). -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <circle cx="24" cy="24" r="22" fill="#1f2937" stroke="#f4c430" stroke-width="3"/>
+  <path d="M24 9 l4.2 9 9.8.9 -7.4 6.5 2.2 9.6 -8.8-5.2 -8.8 5.2 2.2-9.6 -7.4-6.5 9.8-.9 Z"
+        fill="#f4c430"/>
+  <circle cx="24" cy="24" r="3.2" fill="#1f2937"/>
+</svg>
