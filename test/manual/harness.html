@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>RaidTrainOverlay manual harness</title>
+  <!--
+    Manual verification harness (NOT public surface — the overlay.html query-param
+    schema covers overlay.html's query params; this page reads its own location.hash).
+
+    It feeds the real modules a fixture Event and a fake clock so renderer
+    states the live API can't show on demand (Now Marker, departed dimming,
+    post-event, 20+ Car Trains, Mode animation) are observable and
+    screenshot-able. The PRD exempts the renderer from automated tests; this
+    page is what makes its manual verification reproducible.
+
+    Hash params (all optional):
+      #now=<ISO>      fake clock start    (default 2026-06-16T20:30:00Z — live)
+      &clockRate=N    fake seconds per real second        (default 1; 60 = 1min/s)
+      &cars=N         synthetic N-Slot timetable          (default: the 4-Slot fixture)
+      &mode=pass|marquee, &speed=N, &interval=N           (forwarded to the renderer)
+      &openslots=1    show Open Slot Cars labeled OPEN     (default off)
+      &spotlight=a,b  comma names → Spotlight glow         (case-insensitive)
+      &tz=PT,ET,GMT   up to 3 zones → absolute multi-zone times (else relative)
+      &height=N       vertical position 0..100, % of canvas (default 50, centered)
+      &scale=N        size multiplier 0.5..3 on --train-height (default 1)
+      &bg=checker|<css>  preview background: a busy checkerboard (verify Theme
+                      transparency / bundled-asset alpha) or any CSS colour
+                      (default the dark stage)
+      &hidefinished=1 drop departed Cars instead of dimming them    (default off)
+      &enginedim=X    Engine when Event is over: over|finished|never (default over)
+      &animAt=N       jump the Mode animation N seconds in (negative
+                      animation-delay) — deterministic frames for screenshots;
+                      composited transform animations run on the compositor's
+                      real-time clock, which --virtual-time-budget ignores
+
+    Examples:
+      harness.html#now=2026-06-16T17:00:00Z                      pre-event
+      harness.html#now=2026-06-16T19:30:00Z                      open Slot current
+      harness.html#now=2026-06-16T22:00:00Z                      post-event
+      harness.html#now=2026-06-16T20:59:30Z&clockRate=60         watch the Marker advance
+      harness.html#cars=24&mode=marquee&speed=2                  20+ Car perf / Modes
+      harness.html#now=2026-06-16T19:30:00Z&openslots=1          open Slot live, carries the Marker
+      harness.html#spotlight=DJ Charlie                          Spotlight glow (coexists with Marker)
+      harness.html#now=2026-06-16T17:00:00Z&tz=PT,ET,GMT         absolute multi-zone times
+      harness.html#height=0   /   #height=100                    Train at top / bottom of canvas
+      harness.html#now=2026-06-16T20:30:00Z&hidefinished=1        departed Cars removed, not dimmed
+      harness.html#now=2026-06-16T22:00:00Z&enginedim=over        Engine dims post-event
+  -->
+  <style>
+    :root {
+      --train-height: 28vh; /* same baseline as overlay.html */
+    }
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #14161a;
+      overflow: hidden;
+    }
+    #train {
+      width: 100vw;
+      height: 100vh;
+      position: relative; /* positioning context for the renderer's .rt-stage */
+    }
+    #status {
+      position: fixed;
+      top: 8px;
+      left: 8px;
+      z-index: 1;
+      color: #9ad;
+      font: 12px/1.5 monospace;
+      white-space: pre;
+    }
+  </style>
+</head>
+<body>
+  <div id="status"></div>
+  <div id="train"></div>
+  <script type="module">
+    import { makeEventPayload } from '../fixtures/event-payload.js';
+    import { normalizeEvent } from '../../src/raidpal-client.js';
+    import { buildTrain } from '../../src/lineup-engine.js';
+    import { renderTrain } from '../../src/train-renderer.js';
+    // Share the tz resolver (not parseConfig) so the harness can't drift from
+    // the real abbreviation→IANA map.
+    import { resolveZone } from '../../src/config.js';
+
+    const params = new URLSearchParams(location.hash.slice(1));
+    window.addEventListener('hashchange', () => location.reload());
+
+    // Synthetic timetable: hourly Slots from the fixture's 18:00 base, the
+    // second one open (mirrors the fixture), the rest occupied.
+    function syntheticTimeTable(count) {
+      const baseMs = new Date('2026-06-16T18:00:00Z').getTime();
+      return Array.from({ length: count }, (_, i) => {
+        const occupied = i !== 1;
+        return {
+          order: i,
+          starttime: new Date(baseMs + i * 3_600_000).toISOString(),
+          slot_occupied: occupied,
+          user_timezone: 'UTC',
+          broadcaster_display_name: occupied ? `DJ Car ${String(i).padStart(2, '0')}` : null,
+          broadcaster_image: null,
+          broadcaster_live: false,
+          broadcaster_id: occupied ? `car-${i}` : null,
+        };
+      });
+    }
+
+    const payload = makeEventPayload();
+    const carCount = Number(params.get('cars'));
+    if (Number.isFinite(carCount) && carCount > 0) {
+      payload.event.time_table = syntheticTimeTable(carCount);
+    }
+    const event = normalizeEvent(payload);
+
+    // Renderer config, built directly from hash params (the harness bypasses
+    // parseConfig on purpose — it exercises the renderer, not the URL schema —
+    // but reuses resolveZone so tz behaves identically to the real parser).
+    const config = {
+      event: 'fixture',
+      mode: params.get('mode') === 'marquee' ? 'marquee' : 'pass',
+      interval: Number(params.get('interval')) > 0 ? Number(params.get('interval')) : 15,
+      speed: Number(params.get('speed')) > 0 ? Number(params.get('speed')) : 1,
+      openslots: ['1', 'true', 'on', 'yes'].includes((params.get('openslots') ?? '').toLowerCase()),
+      spotlight: (params.get('spotlight') ?? '').split(',').map((n) => n.trim().toLowerCase()).filter(Boolean),
+      tz: (params.get('tz') ?? '').split(',').map(resolveZone).filter(Boolean).slice(0, 3),
+      hidefinished: ['1', 'true', 'on', 'yes'].includes((params.get('hidefinished') ?? '').toLowerCase()),
+      enginedim: ['over', 'finished', 'never'].includes((params.get('enginedim') ?? '').toLowerCase())
+        ? params.get('enginedim').toLowerCase() : 'over',
+      // Theme select; unknown keys fall back to classic in the renderer.
+      theme: params.get('theme') || 'classic',
+    };
+
+    // Vertical position (height param) — drives the renderer's .rt-stage.
+    // Absent/blank → centered; Number(null) is 0, so guard before the range test.
+    const heightRaw = params.get('height');
+    const heightNum = Number(heightRaw);
+    const height = heightRaw !== null && heightRaw !== '' && Number.isFinite(heightNum)
+      && heightNum >= 0 && heightNum <= 100 ? heightNum : 50;
+    document.getElementById('train').style.setProperty('--train-pos', String(height / 100));
+
+    // Size multiplier (scale param) — bounded 0.5..3, mirrors config.js; absent/
+    // out-of-range → 1. Drives the renderer's --train-scale.
+    const scaleRaw = params.get('scale');
+    const scaleNum = Number(scaleRaw);
+    const scale = scaleRaw !== null && scaleRaw !== '' && Number.isFinite(scaleNum)
+      && scaleNum >= 0.5 && scaleNum <= 3 ? scaleNum : 1;
+    document.getElementById('train').style.setProperty('--train-scale', String(scale));
+
+    // Preview background: a busy checkerboard to eyeball Theme + bundled-asset
+    // transparency (the stream is transparent, so non-rectangular art
+    // needs alpha), or any CSS colour. Default is the dark stage above.
+    const bg = params.get('bg');
+    if (bg === 'checker') {
+      document.body.style.background = 'repeating-conic-gradient(#3a4a5a 0 25%, #20303e 0 50%) 0 0 / 32px 32px';
+    } else if (bg) {
+      document.body.style.background = bg;
+    }
+
+    // Fake clock: starts at #now, advances clockRate fake seconds per real one.
+    const startMs = new Date(params.get('now') ?? '2026-06-16T20:30:00Z').getTime();
+    const clockRate = Number(params.get('clockRate')) > 0 ? Number(params.get('clockRate')) : 1;
+    const realStart = Date.now();
+    const fakeNow = () => new Date(startMs + (Date.now() - realStart) * clockRate);
+
+    const status = document.getElementById('status');
+    function showStatus(train, now) {
+      const track = document.querySelector('.rt-track');
+      const anim = track ? getComputedStyle(track).animationDuration : '—';
+      const current = train.cars.find((c) => c.isCurrent);
+      // The current Car may be an Open Slot (no broadcaster) when openslots is on.
+      const currentName = current ? (current.broadcaster?.displayName ?? current.displayName) : '—';
+      const spotlit = train.cars.filter((c) => c.isSpotlit).length;
+      status.textContent = [
+        `now   ${now.toISOString()}  (x${clockRate})`,
+        `phase ${train.phase}   mode ${config.mode}   speed ${config.speed}   interval ${config.interval}m`,
+        `cars  ${train.cars.length}  current ${currentName}   spotlit ${spotlit}`,
+        `cfg   openslots ${config.openslots}   tz ${config.tz.map((z) => z.token).join(',') || '—'}   height ${height}   scale ${scale}`,
+        `      hidefinished ${config.hidefinished}   enginedim ${config.enginedim}   engine ${train.engine.isHidden ? 'hidden' : train.engine.isDimmed ? 'dimmed' : 'shown'}`,
+        `anim  ${anim} per ${config.mode === 'marquee' ? 'loop' : 'period'}`,
+      ].join('\n');
+    }
+
+    const first = buildTrain(event, fakeNow(), config);
+    const view = renderTrain(first, document.getElementById('train'), config);
+    showStatus(first, fakeNow());
+
+    const animAt = Number(params.get('animAt'));
+    if (Number.isFinite(animAt) && animAt > 0) {
+      document.querySelector('.rt-track').style.animationDelay = `-${animAt}s`;
+    }
+
+    // Real 1s tick (vs the Overlay's 30s): with clockRate=60 a full hour of
+    // Marker progression plays out in a minute, exercising updateTime exactly
+    // as the shell does — in place, mid-animation.
+    setInterval(() => {
+      const now = fakeNow();
+      const train = buildTrain(event, now, config);
+      view.updateTime(train);
+      showStatus(train, now);
+    }, 1_000);
+  </script>
+</body>
+</html>
