@@ -1,0 +1,671 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RaidTrainOverlay — Configurator</title>
+  <!--
+    The Configurator: a form that generates an Overlay URL. It builds
+    the URL via the config module's serializer (the single source of truth for
+    the param schema) and saves named Presets in its OWN localStorage. The
+    Overlay never reads those Presets — the URL is the only thing it consumes.
+    Thin wiring only; the testable logic lives in src/configurator.js + src/presets.js.
+
+    Layout: a wide live-preview hero on top, then settings under tabs. New param
+    groups slot in as new tabs (e.g. Style) or new fields in an existing
+    tab (e.g. Auto-refresh `refresh`, marked below) without crowding.
+  -->
+  <style>
+    :root {
+      --bg: #14161a;
+      --panel: #1c1f26;
+      --panel-2: #232732;
+      --ink: #e7ecf3;
+      --muted: #9aa7b8;
+      --accent: #9ad;
+      --accent-strong: #57b6ff;
+      --ok: #5ed18a;
+      --bad: #ff6b6b;
+      --line: #2c313c;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; }
+    body {
+      background: var(--bg);
+      color: var(--ink);
+      font: 15px/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      padding: 24px;
+    }
+    a { color: var(--accent-strong); }
+    h1 { font-size: 22px; margin: 0 0 4px; }
+    h2 { font-size: 14px; text-transform: uppercase; letter-spacing: .06em; color: var(--accent); margin: 0 0 14px; }
+    .sub { color: var(--muted); margin: 0 0 20px; }
+    .wrap { max-width: 1140px; margin: 0 auto; }
+    .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px; margin-bottom: 18px; }
+
+    /* ── Hero: event + wide preview + URL ─────────────────────────────── */
+    .hero .event-field { margin-bottom: 16px; }
+    .preview-frame {
+      width: 100%; aspect-ratio: 16 / 9; border: 1px solid var(--line); border-radius: 8px;
+      overflow: hidden; position: relative;
+      /* Checkerboard = "this is transparent" (what OBS composites over your scene). */
+      background-color: #0e0f12;
+      background-image:
+        linear-gradient(45deg, #20242c 25%, transparent 25%, transparent 75%, #20242c 75%),
+        linear-gradient(45deg, #20242c 25%, transparent 25%, transparent 75%, #20242c 75%);
+      background-size: 28px 28px; background-position: 0 0, 14px 14px;
+    }
+    .preview-frame iframe { width: 100%; height: 100%; border: 0; display: block; }
+    .preview-placeholder {
+      position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+      text-align: center; padding: 16px; color: var(--muted); font-size: 15px;
+    }
+    .preview-controls { position: absolute; top: 10px; right: 10px; z-index: 2; display: flex; gap: 6px; }
+    .preview-btn {
+      padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line);
+      background: rgba(14, 15, 18, 0.82); color: var(--ink); font: inherit; font-size: 13px;
+      font-weight: 600; cursor: pointer; backdrop-filter: blur(3px);
+      transition: background-color .15s, border-color .15s;
+    }
+    .preview-btn:hover { background: rgba(30, 33, 40, 0.92); border-color: var(--accent); }
+    .preview-btn.is-rolling { background: var(--accent); color: #1f2937; border-color: var(--accent); }
+    .preview-caption { color: var(--muted); font-size: 13px; margin: 8px 2px 0; min-height: 18px; }
+    .url-box { display: flex; gap: 8px; margin-top: 16px; }
+
+    /* ── Fields ───────────────────────────────────────────────────────── */
+    .field { margin-bottom: 16px; }
+    .field:last-child { margin-bottom: 0; }
+    .field.dimmed { opacity: .45; }
+    label.lbl { display: block; font-weight: 600; margin-bottom: 4px; }
+    .hint { color: var(--muted); font-size: 13px; margin-top: 4px; }
+    input[type=text], input[type=number], select {
+      width: 100%; padding: 9px 11px; border-radius: 7px; border: 1px solid var(--line);
+      background: var(--panel-2); color: var(--ink); font: inherit;
+    }
+    input:focus, select:focus, button:focus-visible { outline: 2px solid var(--accent-strong); outline-offset: 0; }
+    .row { display: flex; align-items: center; gap: 10px; }
+    .check { display: flex; align-items: center; gap: 10px; }
+    .check input { width: 18px; height: 18px; }
+    input[type=range] { width: 100%; }
+    .range-out { min-width: 3ch; text-align: right; color: var(--accent); font-variant-numeric: tabular-nums; }
+
+    .status-dot { font-size: 13px; margin-top: 4px; min-height: 18px; }
+    .status-dot.ok { color: var(--ok); }
+    .status-dot.bad { color: var(--bad); }
+    .status-dot.checking { color: var(--muted); }
+
+    #url { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 13px; }
+    button {
+      padding: 9px 16px; border-radius: 7px; border: 1px solid var(--line);
+      background: var(--panel-2); color: var(--ink); font: inherit; cursor: pointer; white-space: nowrap;
+    }
+    button:hover:not(:disabled) { border-color: var(--accent-strong); }
+    button:disabled { opacity: .4; cursor: not-allowed; }
+    button.primary { background: var(--accent-strong); color: #08121c; border-color: var(--accent-strong); font-weight: 600; }
+
+    /* ── Tabs ─────────────────────────────────────────────────────────── */
+    .tabs { display: flex; gap: 4px; flex-wrap: wrap; border-bottom: 1px solid var(--line); margin-bottom: 18px; }
+    .tab {
+      background: transparent; border: 0; border-bottom: 2px solid transparent; border-radius: 0;
+      padding: 8px 14px; color: var(--muted); font-weight: 600;
+    }
+    .tab:hover { color: var(--ink); }
+    .tab.active { color: var(--accent-strong); border-bottom-color: var(--accent-strong); }
+    .panel { display: none; max-width: 600px; }
+    .panel.active { display: block; }
+
+    /* ── Presets ──────────────────────────────────────────────────────── */
+    .preset-bar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .preset-bar select, .preset-bar input { flex: 1 1 160px; }
+    .preset-msg { color: var(--muted); font-size: 13px; margin-top: 10px; min-height: 18px; }
+
+    ol.obs { padding-left: 20px; margin: 0; }
+    ol.obs li { margin-bottom: 8px; }
+    code { background: var(--panel-2); padding: 1px 5px; border-radius: 4px; font-size: 13px; }
+    footer { color: var(--muted); font-size: 13px; margin-top: 8px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>RaidTrainOverlay — Configurator</h1>
+    <p class="sub">Enter your event, preview it, then copy the link into an OBS browser source.</p>
+
+    <!-- ───────────────────────── HERO: event + preview + URL ───────────────────────── -->
+    <section class="card hero">
+      <div class="field event-field">
+        <label class="lbl" for="f-event">RaidPal event</label>
+        <input type="text" id="f-event" placeholder="your-event  (or paste the RaidPal link)" autocomplete="off">
+        <div class="hint">Paste your event's RaidPal link or just type the slug.</div>
+        <div class="status-dot" id="slug-status"></div>
+      </div>
+
+      <div class="preview-frame">
+        <iframe id="preview" title="Overlay preview"></iframe>
+        <div class="preview-placeholder" id="preview-placeholder">Your live preview appears here once you enter an event.</div>
+        <div class="preview-controls" id="preview-controls" hidden>
+          <button type="button" id="preview-roll" class="preview-btn"
+            title="Roll the train across — freeze it in place to study (wheels keep turning), resume anytime">▶&nbsp;Roll it</button>
+          <button type="button" id="preview-still" class="preview-btn" hidden
+            title="Back to the centered still preview">◼&nbsp;Recenter</button>
+        </div>
+      </div>
+      <div class="preview-caption" id="preview-caption"></div>
+
+      <div class="url-box">
+        <input type="text" id="url" readonly placeholder="Enter an event above to generate your URL">
+        <button id="copy" class="primary" disabled>Copy</button>
+      </div>
+    </section>
+
+    <!-- ───────────────────────── PRESETS ───────────────────────── -->
+    <section class="card">
+      <h2>Presets</h2>
+      <div class="preset-bar">
+        <input type="text" id="preset-name" placeholder="Preset name" autocomplete="off">
+        <button id="preset-save">Save</button>
+        <select id="preset-select"></select>
+        <button id="preset-load">Load</button>
+        <button id="preset-delete">Delete</button>
+      </div>
+      <div class="preset-msg" id="preset-msg"></div>
+    </section>
+
+    <!-- ───────────────────────── SETTINGS (tabbed) ───────────────────────── -->
+    <section class="card">
+      <h2>Settings</h2>
+      <div class="tabs" role="tablist">
+        <button class="tab active" data-panel="look" role="tab">Look</button>
+        <button class="tab" data-panel="motion" role="tab">Motion</button>
+        <button class="tab" data-panel="lineup" role="tab">Lineup</button>
+      </div>
+
+      <div class="panel active" id="panel-look" role="tabpanel">
+        <div class="field">
+          <label class="lbl" for="f-theme">Theme</label>
+          <select id="f-theme">
+            <!-- The shipped Theme roster. The default (classic) is
+                 omitted from the URL; the rest serialize as theme=key. -->
+            <option value="classic">Classic Americana</option>
+            <option value="flat">Flat cartoon</option>
+            <option value="synthwave">Synthwave</option>
+            <option value="ticket">Vintage ticket</option>
+            <option value="wood">Wooden toy train</option>
+            <option value="comic">Comic / halftone</option>
+            <option value="departures">Departures board</option>
+            <option value="paper">Paper cutout</option>
+            <option value="tron">Tron lightcycle</option>
+            <option value="pixel">16-bit pixel</option>
+            <option value="shuffle">🔀 Shuffle — cycle every theme</option>
+          </select>
+          <div class="hint">The art style that paints your train. <strong>Shuffle</strong> rotates the whole roster — a fresh theme each pass (or every few minutes in marquee).</div>
+        </div>
+        <div class="field">
+          <label class="lbl" for="f-scale">Train size</label>
+          <div class="row">
+            <input type="range" id="f-scale" min="0.5" max="2" step="0.1" value="1">
+            <span class="range-out" id="f-scale-out">1</span>
+          </div>
+          <div class="hint">How big the train is in your broadcast. 1 is the default; lower is smaller, higher is bigger. Watch the preview.</div>
+        </div>
+        <div class="field">
+          <label class="lbl" for="f-height">Vertical position</label>
+          <div class="row">
+            <input type="range" id="f-height" min="0" max="100" step="1" value="100">
+            <span class="range-out" id="f-height-out">100</span>
+          </div>
+          <div class="hint">0 = top, 100 = bottom, 50 = centered. The default sits it on the bottom edge, and the train always stays fully on screen — even when you resize it.</div>
+        </div>
+      </div>
+
+      <div class="panel" id="panel-motion" role="tabpanel">
+        <div class="field">
+          <label class="lbl" for="f-mode">Display style</label>
+          <select id="f-mode">
+            <option value="pass">Pass — rolls across every few minutes, then leaves</option>
+            <option value="marquee">Marquee — scrolls continuously, always on screen</option>
+          </select>
+        </div>
+        <div class="field" id="interval-row">
+          <label class="lbl" for="f-interval">Minutes between passes</label>
+          <input type="number" id="f-interval" min="1" step="1" value="15">
+          <div class="hint" id="interval-note">How often the train rolls across.</div>
+        </div>
+        <div class="field">
+          <label class="lbl" for="f-speed">Animation speed</label>
+          <input type="number" id="f-speed" min="0.1" step="0.1" value="1">
+          <div class="hint">Higher is faster. 1 is the default pace.</div>
+        </div>
+        <div class="field">
+          <label class="lbl" for="f-refresh">Auto-refresh (minutes)</label>
+          <input type="number" id="f-refresh" min="15" step="5" placeholder="off">
+          <div class="hint">How often to re-check RaidPal for lineup changes. Blank or 0 = check once on load. Minimum 15 to stay easy on RaidPal.</div>
+        </div>
+      </div>
+
+      <div class="panel" id="panel-lineup" role="tabpanel">
+        <div class="field">
+          <div class="check"><input type="checkbox" id="f-openslots"><label class="lbl" for="f-openslots" style="margin:0">Show open slots</label></div>
+          <div class="hint">Display unfilled slots as <strong>OPEN</strong> cars so viewers can sign up.</div>
+        </div>
+        <div class="field">
+          <div class="check"><input type="checkbox" id="f-hidefinished"><label class="lbl" for="f-hidefinished" style="margin:0">Hide finished cars</label></div>
+          <div class="hint">Remove cars that have already played, instead of dimming them.</div>
+        </div>
+        <div class="field">
+          <label class="lbl" for="f-spotlight">Spotlight broadcasters</label>
+          <input type="text" id="f-spotlight" placeholder="DJ Alpha, DJ Charlie" autocomplete="off">
+          <div class="hint">Comma-separated names to highlight with a glow. Capitalization doesn't matter.</div>
+        </div>
+        <div class="field">
+          <label class="lbl" for="f-enginedim">When the event ends</label>
+          <select id="f-enginedim">
+            <option value="over">Dim the engine</option>
+            <option value="finished">Hide it (when hiding finished cars)</option>
+            <option value="never">Keep the engine bright</option>
+          </select>
+          <div class="hint">How the lead engine reacts once the whole event is over.</div>
+        </div>
+        <div class="field">
+          <label class="lbl" for="f-tz">Show clock times in these zones</label>
+          <input type="text" id="f-tz" placeholder="PT, ET, GMT" autocomplete="off">
+          <div class="hint">Up to 3 zones to show absolute times instead of "in 2h". Leave blank for relative times.<br>
+            Known: <code>PT MT CT ET GMT UTC CET BST JST AEST</code> (or any IANA name).</div>
+          <div class="status-dot" id="tz-hint"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ───────────────────────── OBS INSTRUCTIONS ───────────────────────── -->
+    <div class="card">
+      <h2>Add this to OBS</h2>
+      <ol class="obs">
+        <li><strong>Copy your overlay URL</strong> with the Copy button above.</li>
+        <li>In OBS, under <strong>Sources</strong> click <strong>+</strong> and choose <strong>Browser</strong>. Name it (e.g. "Raid Train").</li>
+        <li><strong>Paste your URL</strong> into the URL field.</li>
+        <li>Set <strong>Width 1920</strong> and <strong>Height 1080</strong> (a standard 1080p canvas).</li>
+        <li>Leave the background transparent — the overlay is already see-through, so don't add a color.</li>
+        <li>Click <strong>OK</strong>. Your train appears.</li>
+        <li><strong>Leave the source at full size, positioned at 0, 0</strong> — don't drag or scale it in OBS. Set the train's <strong>Train size</strong> and <strong>Vertical position</strong> (both under <strong>Look</strong>) with the sliders here instead. They bake into the overlay and travel with the URL across scenes and machines, and the train always stays fully on screen.</li>
+      </ol>
+      <p class="hint">Changed something? Copy the new URL and paste it back into the same Browser source's URL field.</p>
+    </div>
+
+    <footer>The overlay link is the single source of truth — anyone with it gets the same overlay. <a href="overlay.html" target="_blank" rel="noopener">Open a blank overlay</a>.</footer>
+  </div>
+
+  <script type="module">
+    import { extractSlug, buildOverlayQuery } from './src/configurator.js';
+    import { parsePresets, serializePresets, upsertPreset, deletePreset, listPresetNames } from './src/presets.js';
+    import { loadEvent } from './src/raidpal-client.js';
+    import { resolveZone, parseConfig } from './src/config.js';
+
+    // Sibling Overlay URL, derived from where THIS page lives — works under
+    // `python3 -m http.server` locally and on a GitHub Pages subpath alike.
+    const OVERLAY_BASE = new URL('overlay.html', window.location.href).href;
+    // The built-in demo lineup (event=demo): a fresh Configurator (no shared link)
+    // previews it immediately — rendered with no RaidPal fetch, so it never 404s.
+    // Swap in your own slug. Same demo the landing page links to.
+    const DEMO_EVENT = 'demo';
+    const PRESET_KEY = 'raidtrainoverlay.configurator.presets';
+
+    const $ = (id) => document.getElementById(id);
+    const els = {
+      event: $('f-event'), mode: $('f-mode'), interval: $('f-interval'), speed: $('f-speed'),
+      refresh: $('f-refresh'),
+      openslots: $('f-openslots'), spotlight: $('f-spotlight'), tz: $('f-tz'),
+      hidefinished: $('f-hidefinished'), enginedim: $('f-enginedim'),
+      theme: $('f-theme'), scale: $('f-scale'), scaleOut: $('f-scale-out'),
+      height: $('f-height'), heightOut: $('f-height-out'),
+      url: $('url'), copy: $('copy'),
+      preview: $('preview'), previewPlaceholder: $('preview-placeholder'), previewCaption: $('preview-caption'),
+      previewRoll: $('preview-roll'), previewStill: $('preview-still'), previewControls: $('preview-controls'),
+      slugStatus: $('slug-status'), tzHint: $('tz-hint'),
+      intervalRow: $('interval-row'), intervalNote: $('interval-note'),
+      presetName: $('preset-name'), presetSave: $('preset-save'), presetSelect: $('preset-select'),
+      presetLoad: $('preset-load'), presetDelete: $('preset-delete'), presetMsg: $('preset-msg'),
+    };
+
+    const debounce = (fn, ms) => {
+      let t;
+      return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
+    };
+
+    // ── Tabs (presentation only; doesn't touch form state) ───────────────
+    const tabs = [...document.querySelectorAll('.tab')];
+    const panels = [...document.querySelectorAll('.panel')];
+    for (const tab of tabs) {
+      tab.addEventListener('click', () => {
+        for (const t of tabs) t.classList.toggle('active', t === tab);
+        for (const p of panels) p.classList.toggle('active', p.id === `panel-${tab.dataset.panel}`);
+      });
+    }
+
+    // ── Form state ↔ inputs ──────────────────────────────────────────────
+    function readForm() {
+      return {
+        event: els.event.value,
+        mode: els.mode.value,
+        interval: els.interval.value,
+        speed: els.speed.value,
+        refresh: els.refresh.value,
+        openslots: els.openslots.checked,
+        hidefinished: els.hidefinished.checked,
+        enginedim: els.enginedim.value,
+        spotlight: els.spotlight.value,
+        tz: els.tz.value,
+        theme: els.theme.value,
+        scale: els.scale.value,
+        height: els.height.value,
+      };
+    }
+    function writeForm(fs = {}) {
+      els.event.value = fs.event ?? '';
+      els.mode.value = fs.mode === 'marquee' ? 'marquee' : 'pass';
+      els.interval.value = fs.interval ?? '15';
+      els.speed.value = fs.speed ?? '1';
+      els.refresh.value = fs.refresh ?? '';
+      els.openslots.checked = Boolean(fs.openslots);
+      els.hidefinished.checked = Boolean(fs.hidefinished);
+      els.enginedim.value = ['over', 'finished', 'never'].includes(fs.enginedim) ? fs.enginedim : 'over';
+      els.spotlight.value = fs.spotlight ?? '';
+      els.tz.value = fs.tz ?? '';
+      els.theme.value = ['classic', 'flat', 'synthwave', 'ticket', 'wood', 'comic', 'departures', 'paper', 'tron', 'pixel', 'shuffle'].includes(fs.theme) ? fs.theme : 'classic';
+      els.scale.value = fs.scale ?? '1';
+      els.height.value = fs.height ?? '100';
+    }
+
+    // ── Live URL (synchronous, every input) ──────────────────────────────
+    function updateUrl(fs) {
+      const query = buildOverlayQuery(fs);
+      if (!query) {
+        els.url.value = '';
+        els.copy.disabled = true;
+      } else {
+        els.url.value = `${OVERLAY_BASE}?${query}`;
+        els.copy.disabled = false;
+      }
+      // Mirror the config into THIS page's address bar so the Configurator link is
+      // itself shareable (and reloadable) — same params as the overlay URL.
+      history.replaceState(null, '', query ? `?${query}` : window.location.pathname);
+    }
+
+    // ── interval gating + height readout + tz echo ───────────────────────
+    function updateMisc(fs) {
+      const isPass = fs.mode === 'pass';
+      const isShuffle = fs.theme === 'shuffle';
+      const showInterval = isPass || isShuffle; // shuffle reuses it as the per-theme cadence
+      els.interval.disabled = !showInterval;
+      els.intervalRow.classList.toggle('dimmed', !showInterval);
+      els.intervalNote.textContent =
+        isPass && isShuffle ? 'How often the train rolls across — each pass brings a new theme.'
+          : isPass ? 'How often the train rolls across.'
+            : isShuffle ? 'How often the theme changes (marquee stays on screen).'
+              : 'Only applies to the Pass display style.';
+      els.heightOut.textContent = fs.height;
+      els.scaleOut.textContent = fs.scale;
+
+      const tokens = fs.tz.split(',').map((t) => t.trim()).filter(Boolean);
+      if (tokens.length === 0) { els.tzHint.textContent = ''; els.tzHint.className = 'status-dot'; return; }
+      const ok = [], bad = [];
+      for (const t of tokens) (resolveZone(t) ? ok : bad).push(t);
+      const kept = ok.slice(0, 3), dropped = [...ok.slice(3), ...bad];
+      els.tzHint.textContent =
+        (kept.length ? `Showing: ${kept.join(', ')}` : '') +
+        (dropped.length ? `   ·   Ignored: ${dropped.join(', ')}` : '');
+      els.tzHint.className = 'status-dot' + (dropped.length ? ' bad' : ' ok');
+    }
+
+    // ── Slug validity + live preview (debounced together) ────────────────
+    let validateToken = 0;
+    let previewSlug = null;     // event currently LOADED in the preview iframe (null = placeholder)
+    let baseQuery = '';         // overlay query baked into the iframe's current src
+    let lastQuery = '';         // latest overlay query the form represents
+    let rollState = 'still'; // 'still' (centred showcase) | 'rolling' (sweeping) | 'frozen' (sweep paused in place)
+
+    function showPreviewPlaceholder(text) {
+      els.previewPlaceholder.textContent = text;
+      els.previewPlaceholder.style.display = 'flex';
+      els.previewControls.hidden = true; rollState = 'still';
+      if (els.preview.getAttribute('src')) els.preview.removeAttribute('src');
+      previewSlug = null; baseQuery = ''; lastQuery = '';
+    }
+    function loadPreview(fs) {
+      // A STILL, centred showcase (preview=1): the whole Train stays on-screen and
+      // never scrolls off, so you can study the art (its ambient motion still plays).
+      // The Roll-it toggle (below) sweeps it across instead. preview=1 is appended
+      // only here — the copied overlay URL is unaffected.
+      const query = buildOverlayQuery(fs);
+      const slug = extractSlug(fs.event);
+      els.previewPlaceholder.style.display = 'none';
+      els.previewControls.hidden = false;
+      if (slug !== previewSlug || !els.preview.getAttribute('src')) {
+        // Event changed (or first load): (re)load the iframe — the ONLY path that
+        // fetches RaidPal.
+        els.preview.src = `${OVERLAY_BASE}?${query}&preview=1`;
+        previewSlug = slug; baseQuery = query;
+      } else if (query !== lastQuery) {
+        // Same event, a knob moved (theme/scale/mode/…): re-render in the SAME
+        // document via postMessage — no iframe reload, no refetch, no flicker, and
+        // nothing that nudges a browser's auto-hidden chrome (e.g. Zen's sidebar).
+        // A re-render restarts the sweep, so a frozen preview returns to rolling.
+        if (rollState === 'frozen') { rollState = 'rolling'; updateRollButtons(); }
+        els.preview.contentWindow?.postMessage({ type: 'rto-preview', query, roll: rollState !== 'still' }, window.location.origin);
+      }
+      lastQuery = query;
+      if (fs.mode === 'pass') {
+        const mins = parseConfig(`interval=${encodeURIComponent(fs.interval)}`).interval;
+        els.previewCaption.textContent =
+          `A still preview so you can study your train. Your overlay uses Pass display — it rolls across every ${mins} min.`;
+      } else {
+        els.previewCaption.textContent = 'A still preview so you can study your train; your overlay scrolls continuously.';
+      }
+    }
+
+    // When the iframe finishes (re)loading its Event, re-apply the roll state and
+    // any config that moved on while it was loading — the iframe always (re)loads
+    // as a still showcase, so a rolling preview must be re-asserted here, and this
+    // also covers a postMessage that arrived before the overlay was listening.
+    els.preview.addEventListener('load', () => {
+      // A fresh iframe always loads as a still showcase and can't preserve a paused
+      // sweep, so a frozen preview resumes rolling on (re)load.
+      if (rollState === 'frozen') { rollState = 'rolling'; updateRollButtons(); }
+      if (rollState === 'rolling' || (lastQuery && lastQuery !== baseQuery)) {
+        els.preview.contentWindow?.postMessage({ type: 'rto-preview', query: lastQuery, roll: rollState === 'rolling' }, window.location.origin);
+        baseQuery = lastQuery;
+      }
+    });
+
+    // Roll it → Freeze → Resume, plus Recenter. Roll sweeps the whole train across;
+    // Freeze pauses that sweep IN PLACE (wheels + undulation keep going — running on
+    // the spot) so you can study it up close; Resume continues from there; Recenter
+    // drops back to the still, centred showcase. All in-place via postMessage.
+    function updateRollButtons() {
+      els.previewRoll.innerHTML = rollState === 'rolling' ? '⏸&nbsp;Freeze'
+        : rollState === 'frozen' ? '▶&nbsp;Resume' : '▶&nbsp;Roll it';
+      els.previewRoll.classList.toggle('is-rolling', rollState !== 'still');
+      els.previewStill.hidden = rollState === 'still';
+    }
+    els.previewRoll.addEventListener('click', () => {
+      if (!previewSlug) return;
+      const win = els.preview.contentWindow;
+      if (rollState === 'still') {
+        rollState = 'rolling';
+        win?.postMessage({ type: 'rto-preview', query: lastQuery, roll: true }, window.location.origin);
+      } else if (rollState === 'rolling') {
+        rollState = 'frozen'; // pause the sweep in place — no re-render
+        win?.postMessage({ type: 'rto-preview-pause', paused: true }, window.location.origin);
+      } else {
+        rollState = 'rolling'; // resume from where it froze
+        win?.postMessage({ type: 'rto-preview-pause', paused: false }, window.location.origin);
+      }
+      updateRollButtons();
+    });
+    els.previewStill.addEventListener('click', () => {
+      if (!previewSlug) return;
+      rollState = 'still';
+      els.preview.contentWindow?.postMessage({ type: 'rto-preview', query: lastQuery, roll: false }, window.location.origin);
+      updateRollButtons();
+    });
+
+    // Re-validate the slug against RaidPal ONLY when it changes; for every other
+    // tweak (theme, mode, scale, …) just refresh the still preview — no refetch. This
+    // makes the preview reload instantly on a theme change and stops a network
+    // request firing on every keystroke (which also tripped some browsers' UI).
+    let validatedSlug = null;
+    const refreshPreview = debounce(async () => {
+      const fs = readForm();
+      const slug = extractSlug(fs.event);
+      if (!slug) {
+        validatedSlug = null;
+        els.slugStatus.textContent = '';
+        els.slugStatus.className = 'status-dot';
+        showPreviewPlaceholder('Your live preview appears here once you enter an event.');
+        return;
+      }
+      if (slug === DEMO_EVENT) { // the built-in demo — no RaidPal lookup needed
+        validatedSlug = DEMO_EVENT;
+        els.slugStatus.textContent = '✓ Built-in demo lineup — paste your own event slug to go live';
+        els.slugStatus.className = 'status-dot ok';
+        loadPreview(fs);
+        return;
+      }
+      if (slug === validatedSlug) { loadPreview(fs); return; } // already valid — just re-preview, no fetch
+      els.slugStatus.textContent = 'Checking…';
+      els.slugStatus.className = 'status-dot checking';
+      const token = ++validateToken;
+      try {
+        await loadEvent(slug);
+        if (token !== validateToken) return; // a newer check superseded this one
+        validatedSlug = slug;
+        els.slugStatus.textContent = `✓ Found event "${slug}"`;
+        els.slugStatus.className = 'status-dot ok';
+        loadPreview(fs);
+      } catch {
+        if (token !== validateToken) return;
+        validatedSlug = null;
+        els.slugStatus.textContent = `✗ No RaidPal event "${slug}" — double-check the slug or link.`;
+        els.slugStatus.className = 'status-dot bad';
+        showPreviewPlaceholder('Enter a valid event to see the preview.');
+      }
+    }, 350);
+
+    function onFormChange() {
+      const fs = readForm();
+      updateUrl(fs);
+      updateMisc(fs);
+      refreshPreview();
+    }
+
+    // Collapse a pasted RaidPal URL down to its slug once the user finishes.
+    function collapseEventToSlug() {
+      const slug = extractSlug(els.event.value);
+      if (slug && slug !== els.event.value.trim()) { els.event.value = slug; onFormChange(); }
+    }
+    els.event.addEventListener('blur', collapseEventToSlug);
+    els.event.addEventListener('paste', () => setTimeout(collapseEventToSlug, 0));
+
+    for (const el of [els.event, els.mode, els.interval, els.speed, els.refresh, els.openslots,
+      els.hidefinished, els.enginedim, els.spotlight, els.tz, els.theme, els.scale, els.height]) {
+      el.addEventListener('input', onFormChange);
+    }
+
+    // ── Copy ─────────────────────────────────────────────────────────────
+    els.copy.addEventListener('click', async () => {
+      const text = els.url.value;
+      if (!text) return;
+      try {
+        await navigator.clipboard.writeText(text);
+      } catch {
+        els.url.select();
+        document.execCommand('copy'); // fallback for non-secure contexts
+      }
+      const original = els.copy.textContent;
+      els.copy.textContent = 'Copied!';
+      setTimeout(() => { els.copy.textContent = original; }, 1500);
+    });
+
+    // ── Presets (localStorage adapter around the pure src/presets.js) ─────
+    let store = parsePresets(localStorage.getItem(PRESET_KEY));
+    function persist() { localStorage.setItem(PRESET_KEY, serializePresets(store)); }
+    function refreshPresetList() {
+      const names = listPresetNames(store);
+      els.presetSelect.innerHTML = '';
+      if (names.length === 0) {
+        const opt = document.createElement('option');
+        opt.value = ''; opt.textContent = 'No saved presets yet';
+        els.presetSelect.appendChild(opt);
+        els.presetLoad.disabled = true; els.presetDelete.disabled = true;
+        return;
+      }
+      els.presetLoad.disabled = false; els.presetDelete.disabled = false;
+      for (const name of names) {
+        const opt = document.createElement('option');
+        opt.value = name; opt.textContent = name;
+        els.presetSelect.appendChild(opt);
+      }
+    }
+    function flashPresetMsg(text) {
+      els.presetMsg.textContent = text;
+      setTimeout(() => { if (els.presetMsg.textContent === text) els.presetMsg.textContent = ''; }, 2500);
+    }
+
+    els.presetSave.addEventListener('click', () => {
+      const name = els.presetName.value.trim();
+      if (!name) { flashPresetMsg('Name your preset first.'); return; }
+      if (Object.prototype.hasOwnProperty.call(store, name)
+        && !confirm(`A preset named "${name}" already exists — replace it?`)) return;
+      store = upsertPreset(store, name, readForm());
+      persist();
+      refreshPresetList();
+      els.presetSelect.value = name;
+      els.presetName.value = '';
+      flashPresetMsg(`Saved "${name}".`);
+    });
+    els.presetLoad.addEventListener('click', () => {
+      const name = els.presetSelect.value;
+      if (!name || !store[name]) return;
+      writeForm(store[name]);
+      onFormChange();
+      flashPresetMsg(`Loaded "${name}".`);
+    });
+    els.presetDelete.addEventListener('click', () => {
+      const name = els.presetSelect.value;
+      if (!name || !store[name]) return;
+      if (!confirm(`Delete preset "${name}"?`)) return;
+      store = deletePreset(store, name);
+      persist();
+      refreshPresetList();
+      flashPresetMsg(`Deleted "${name}".`);
+    });
+
+    // ── Init ──────────────────────────────────────────────────────────────
+    // Hydrate the form from THIS page's own query so a Configurator link is itself
+    // shareable + reloadable (?event=…&theme=…&… — same params as the overlay URL)
+    // and previews on load. With no query, seed a public demo event so a fresh
+    // page still previews immediately and themes can be browsed.
+    (function hydrateFromUrl() {
+      const qs = window.location.search.replace(/^\?/, '');
+      if (!qs) { els.event.value = DEMO_EVENT; return; }
+      const c = parseConfig(qs);
+      const p = new URLSearchParams(qs);
+      writeForm({
+        event: c.event ?? '',
+        mode: c.mode,
+        interval: String(c.interval),
+        speed: String(c.speed),
+        refresh: c.refresh ? String(c.refresh) : '',
+        openslots: c.openslots,
+        hidefinished: c.hidefinished,
+        enginedim: c.enginedim,
+        spotlight: p.get('spotlight') ?? '',   // raw, so the form keeps the typed casing
+        tz: p.get('tz') ?? '',
+        theme: c.theme,
+        scale: String(c.scale),
+        height: String(c.height),
+      });
+    })();
+    refreshPresetList();
+    onFormChange();
+  </script>
+</body>
+</html>
