@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>RaidTrainOverlay</title>
+  <style>
+    :root {
+      /* The Train's base height as a fraction of the source; the
+         scale param multiplies this at render time. Tuned to 28vh
+         against OBS at 1920×1080. */
+      --train-height: 28vh;
+    }
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: transparent;
+      overflow: hidden;
+    }
+    #train {
+      width: 100vw;
+      height: 100vh;
+      /* Full-canvas positioning context: the renderer's .rt-stage places the
+         Train vertically via --train-pos (the height param /100), set by the shell. */
+      position: relative;
+    }
+    /* Fixed-size Cars (overflow never shrinks) and vertical
+       placement (.rt-stage clamps the Train on-canvas via --train-pos)
+       live in the renderer's injected stylesheet. --train-height above is the base size; the scale
+       param multiplies it via --train-scale at render time. */
+  </style>
+</head>
+<body>
+  <div id="train"></div>
+  <script type="module" src="./src/overlay-shell.js"></script>
+</body>
+</html>
