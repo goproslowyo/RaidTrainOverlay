@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>RaidTrainOverlay — Configurator</title>
+  <title data-i18n="configurator.title">RaidTrainOverlay — Configurator</title>
   <!--
     The Configurator: a form that generates an Overlay URL. It builds
     the URL via the config module's serializer (the single source of truth for
@@ -127,148 +127,166 @@
 </head>
 <body>
   <div class="wrap">
-    <h1>RaidTrainOverlay — Configurator</h1>
-    <p class="sub">Enter your event, preview it, then copy the link into an OBS browser source.</p>
+    <h1 data-i18n="configurator.title">RaidTrainOverlay — Configurator</h1>
+    <p class="sub" data-i18n="configurator.sub">Enter your event, preview it, then copy the link into an OBS browser source.</p>
 
     <!-- ───────────────────────── HERO: event + preview + URL ───────────────────────── -->
     <section class="card hero">
       <div class="field event-field">
-        <label class="lbl" for="f-event">RaidPal event</label>
-        <input type="text" id="f-event" placeholder="your-event  (or paste the RaidPal link)" autocomplete="off">
-        <div class="hint">Paste your event's RaidPal link or just type the slug.</div>
+        <label class="lbl" for="f-event" data-i18n="configurator.eventLabel">RaidPal event</label>
+        <input type="text" id="f-event" placeholder="your-event  (or paste the RaidPal link)" data-i18n-attr="placeholder:configurator.eventPlaceholder" autocomplete="off">
+        <div class="hint" data-i18n="configurator.eventHint">Paste your event's RaidPal link or just type the slug.</div>
         <div class="status-dot" id="slug-status"></div>
       </div>
 
       <div class="preview-frame">
-        <iframe id="preview" title="Overlay preview"></iframe>
-        <div class="preview-placeholder" id="preview-placeholder">Your live preview appears here once you enter an event.</div>
+        <iframe id="preview" title="Overlay preview" data-i18n-attr="title:configurator.previewTitle"></iframe>
+        <div class="preview-placeholder" id="preview-placeholder" data-i18n="configurator.previewPlaceholder">Your live preview appears here once you enter an event.</div>
         <div class="preview-controls" id="preview-controls" hidden>
           <button type="button" id="preview-roll" class="preview-btn"
-            title="Roll the train across — freeze it in place to study (wheels keep turning), resume anytime">▶&nbsp;Roll it</button>
+            title="Roll the train across — freeze it in place to study (wheels keep turning), resume anytime"
+            data-i18n-attr="title:configurator.rollTitle">▶&nbsp;<span data-i18n="configurator.rollIt">Roll it</span></button>
           <button type="button" id="preview-still" class="preview-btn" hidden
-            title="Back to the centered still preview">◼&nbsp;Recenter</button>
+            title="Back to the centered still preview"
+            data-i18n-attr="title:configurator.stillTitle">◼&nbsp;<span data-i18n="configurator.recenter">Recenter</span></button>
         </div>
       </div>
       <div class="preview-caption" id="preview-caption"></div>
 
       <div class="url-box">
-        <input type="text" id="url" readonly placeholder="Enter an event above to generate your URL">
-        <button id="copy" class="primary" disabled>Copy</button>
+        <input type="text" id="url" readonly placeholder="Enter an event above to generate your URL" data-i18n-attr="placeholder:configurator.urlPlaceholder">
+        <button id="copy" class="primary" disabled data-i18n="configurator.copy">Copy</button>
       </div>
     </section>
 
     <!-- ───────────────────────── PRESETS ───────────────────────── -->
     <section class="card">
-      <h2>Presets</h2>
+      <h2 data-i18n="configurator.presets">Presets</h2>
       <div class="preset-bar">
-        <input type="text" id="preset-name" placeholder="Preset name" autocomplete="off">
-        <button id="preset-save">Save</button>
+        <input type="text" id="preset-name" placeholder="Preset name" data-i18n-attr="placeholder:configurator.presetNamePlaceholder" autocomplete="off">
+        <button id="preset-save" data-i18n="configurator.save">Save</button>
         <select id="preset-select"></select>
-        <button id="preset-load">Load</button>
-        <button id="preset-delete">Delete</button>
+        <button id="preset-load" data-i18n="configurator.load">Load</button>
+        <button id="preset-delete" data-i18n="configurator.delete">Delete</button>
       </div>
       <div class="preset-msg" id="preset-msg"></div>
     </section>
 
     <!-- ───────────────────────── SETTINGS (tabbed) ───────────────────────── -->
     <section class="card">
-      <h2>Settings</h2>
+      <h2 data-i18n="configurator.settings">Settings</h2>
       <div class="tabs" role="tablist">
-        <button class="tab active" data-panel="look" role="tab">Look</button>
-        <button class="tab" data-panel="motion" role="tab">Motion</button>
-        <button class="tab" data-panel="lineup" role="tab">Lineup</button>
+        <button class="tab active" data-panel="look" role="tab" data-i18n="configurator.tabLook">Look</button>
+        <button class="tab" data-panel="motion" role="tab" data-i18n="configurator.tabMotion">Motion</button>
+        <button class="tab" data-panel="lineup" role="tab" data-i18n="configurator.tabLineup">Lineup</button>
       </div>
 
       <div class="panel active" id="panel-look" role="tabpanel">
         <div class="field">
-          <label class="lbl" for="f-theme">Theme</label>
+          <label class="lbl" for="f-lang" data-i18n="configurator.languageLabel">Overlay language</label>
+          <select id="f-lang">
+            <option value="en">English</option>
+            <option value="es-ES">Español (España)</option>
+            <option value="es-MX">Español (México)</option>
+            <option value="pt-BR">Português (Brasil)</option>
+            <option value="fr">Français</option>
+            <option value="it">Italiano</option>
+            <option value="de">Deutsch</option>
+            <option value="nl">Nederlands</option>
+            <option value="da">Dansk</option>
+            <option value="lt">Lietuvių</option>
+          </select>
+          <div class="hint" data-i18n="configurator.languageHint">The language the on-stream overlay shows (NOW, OPEN, times…). Bakes into the URL.</div>
+        </div>
+        <div class="field">
+          <label class="lbl" for="f-theme" data-i18n="configurator.themeLabel">Theme</label>
           <select id="f-theme">
             <!-- The shipped Theme roster. The default (classic) is
                  omitted from the URL; the rest serialize as theme=key. -->
-            <option value="classic">Classic Americana</option>
-            <option value="flat">Flat cartoon</option>
-            <option value="synthwave">Synthwave</option>
-            <option value="ticket">Vintage ticket</option>
-            <option value="wood">Wooden toy train</option>
-            <option value="comic">Comic / halftone</option>
-            <option value="departures">Departures board</option>
-            <option value="paper">Paper cutout</option>
-            <option value="tron">Tron lightcycle</option>
-            <option value="pixel">16-bit pixel</option>
-            <option value="shuffle">🔀 Shuffle — cycle every theme</option>
+            <option value="classic" data-i18n="configurator.theme.classic">Classic Americana</option>
+            <option value="flat" data-i18n="configurator.theme.flat">Flat cartoon</option>
+            <option value="synthwave" data-i18n="configurator.theme.synthwave">Synthwave</option>
+            <option value="ticket" data-i18n="configurator.theme.ticket">Vintage ticket</option>
+            <option value="wood" data-i18n="configurator.theme.wood">Wooden toy train</option>
+            <option value="comic" data-i18n="configurator.theme.comic">Comic / halftone</option>
+            <option value="departures" data-i18n="configurator.theme.departures">Departures board</option>
+            <option value="paper" data-i18n="configurator.theme.paper">Paper cutout</option>
+            <option value="tron" data-i18n="configurator.theme.tron">Tron lightcycle</option>
+            <option value="pixel" data-i18n="configurator.theme.pixel">16-bit pixel</option>
+            <option value="shuffle" data-i18n="configurator.theme.shuffle">🔀 Shuffle — cycle every theme</option>
           </select>
-          <div class="hint">The art style that paints your train. <strong>Shuffle</strong> rotates the whole roster — a fresh theme each pass (or every few minutes in marquee).</div>
+          <div class="hint" data-i18n-html="configurator.themeHint">The art style that paints your train. <strong>Shuffle</strong> rotates the whole roster — a fresh theme each pass (or every few minutes in marquee).</div>
         </div>
         <div class="field">
-          <label class="lbl" for="f-scale">Train size</label>
+          <label class="lbl" for="f-scale" data-i18n="configurator.scaleLabel">Train size</label>
           <div class="row">
             <input type="range" id="f-scale" min="0.5" max="2" step="0.1" value="1">
             <span class="range-out" id="f-scale-out">1</span>
           </div>
-          <div class="hint">How big the train is in your broadcast. 1 is the default; lower is smaller, higher is bigger. Watch the preview.</div>
+          <div class="hint" data-i18n="configurator.scaleHint">How big the train is in your broadcast. 1 is the default; lower is smaller, higher is bigger. Watch the preview.</div>
         </div>
         <div class="field">
-          <label class="lbl" for="f-height">Vertical position</label>
+          <label class="lbl" for="f-height" data-i18n="configurator.heightLabel">Vertical position</label>
           <div class="row">
             <input type="range" id="f-height" min="0" max="100" step="1" value="100">
             <span class="range-out" id="f-height-out">100</span>
           </div>
-          <div class="hint">0 = top, 100 = bottom, 50 = centered. The default sits it on the bottom edge, and the train always stays fully on screen — even when you resize it.</div>
+          <div class="hint" data-i18n="configurator.heightHint">0 = top, 100 = bottom, 50 = centered. The default sits it on the bottom edge, and the train always stays fully on screen — even when you resize it.</div>
         </div>
       </div>
 
       <div class="panel" id="panel-motion" role="tabpanel">
         <div class="field">
-          <label class="lbl" for="f-mode">Display style</label>
+          <label class="lbl" for="f-mode" data-i18n="configurator.modeLabel">Display style</label>
           <select id="f-mode">
-            <option value="pass">Pass — rolls across every few minutes, then leaves</option>
-            <option value="marquee">Marquee — scrolls continuously, always on screen</option>
+            <option value="pass" data-i18n="configurator.modePass">Pass — rolls across every few minutes, then leaves</option>
+            <option value="marquee" data-i18n="configurator.modeMarquee">Marquee — scrolls continuously, always on screen</option>
           </select>
         </div>
         <div class="field" id="interval-row">
-          <label class="lbl" for="f-interval">Minutes between passes</label>
+          <label class="lbl" for="f-interval" data-i18n="configurator.intervalLabel">Minutes between passes</label>
           <input type="number" id="f-interval" min="1" step="1" value="15">
           <div class="hint" id="interval-note">How often the train rolls across.</div>
         </div>
         <div class="field">
-          <label class="lbl" for="f-speed">Animation speed</label>
+          <label class="lbl" for="f-speed" data-i18n="configurator.speedLabel">Animation speed</label>
           <input type="number" id="f-speed" min="0.1" step="0.1" value="1">
-          <div class="hint">Higher is faster. 1 is the default pace.</div>
+          <div class="hint" data-i18n="configurator.speedHint">Higher is faster. 1 is the default pace.</div>
         </div>
         <div class="field">
-          <label class="lbl" for="f-refresh">Auto-refresh (minutes)</label>
-          <input type="number" id="f-refresh" min="15" step="5" placeholder="off">
-          <div class="hint">How often to re-check RaidPal for lineup changes. Blank or 0 = check once on load. Minimum 15 to stay easy on RaidPal.</div>
+          <label class="lbl" for="f-refresh" data-i18n="configurator.refreshLabel">Auto-refresh (minutes)</label>
+          <input type="number" id="f-refresh" min="15" step="5" placeholder="off" data-i18n-attr="placeholder:configurator.refreshPlaceholder">
+          <div class="hint" data-i18n="configurator.refreshHint">How often to re-check RaidPal for lineup changes. Blank or 0 = check once on load. Minimum 15 to stay easy on RaidPal.</div>
         </div>
       </div>
 
       <div class="panel" id="panel-lineup" role="tabpanel">
         <div class="field">
-          <div class="check"><input type="checkbox" id="f-openslots"><label class="lbl" for="f-openslots" style="margin:0">Show open slots</label></div>
-          <div class="hint">Display unfilled slots as <strong>OPEN</strong> cars so viewers can sign up.</div>
+          <div class="check"><input type="checkbox" id="f-openslots"><label class="lbl" for="f-openslots" style="margin:0" data-i18n="configurator.openslotsLabel">Show open slots</label></div>
+          <div class="hint" data-i18n-html="configurator.openslotsHint">Display unfilled slots as <strong>OPEN</strong> cars so viewers can sign up.</div>
         </div>
         <div class="field">
-          <div class="check"><input type="checkbox" id="f-hidefinished"><label class="lbl" for="f-hidefinished" style="margin:0">Hide finished cars</label></div>
-          <div class="hint">Remove cars that have already played, instead of dimming them.</div>
+          <div class="check"><input type="checkbox" id="f-hidefinished"><label class="lbl" for="f-hidefinished" style="margin:0" data-i18n="configurator.hidefinishedLabel">Hide finished cars</label></div>
+          <div class="hint" data-i18n="configurator.hidefinishedHint">Remove cars that have already played, instead of dimming them.</div>
         </div>
         <div class="field">
-          <label class="lbl" for="f-spotlight">Spotlight broadcasters</label>
-          <input type="text" id="f-spotlight" placeholder="DJ Alpha, DJ Charlie" autocomplete="off">
-          <div class="hint">Comma-separated names to highlight with a glow. Capitalization doesn't matter.</div>
+          <label class="lbl" for="f-spotlight" data-i18n="configurator.spotlightLabel">Spotlight broadcasters</label>
+          <input type="text" id="f-spotlight" placeholder="DJ Alpha, DJ Charlie" data-i18n-attr="placeholder:configurator.spotlightPlaceholder" autocomplete="off">
+          <div class="hint" data-i18n="configurator.spotlightHint">Comma-separated names to highlight with a glow. Capitalization doesn't matter.</div>
         </div>
         <div class="field">
-          <label class="lbl" for="f-enginedim">When the event ends</label>
+          <label class="lbl" for="f-enginedim" data-i18n="configurator.enginedimLabel">When the event ends</label>
           <select id="f-enginedim">
-            <option value="over">Dim the engine</option>
-            <option value="finished">Hide it (when hiding finished cars)</option>
-            <option value="never">Keep the engine bright</option>
+            <option value="over" data-i18n="configurator.enginedimOver">Dim the engine</option>
+            <option value="finished" data-i18n="configurator.enginedimFinished">Hide it (when hiding finished cars)</option>
+            <option value="never" data-i18n="configurator.enginedimNever">Keep the engine bright</option>
           </select>
-          <div class="hint">How the lead engine reacts once the whole event is over.</div>
+          <div class="hint" data-i18n="configurator.enginedimHint">How the lead engine reacts once the whole event is over.</div>
         </div>
         <div class="field">
-          <label class="lbl" for="f-tz">Show clock times in these zones</label>
-          <input type="text" id="f-tz" placeholder="PT, ET, GMT" autocomplete="off">
-          <div class="hint">Up to 3 zones to show absolute times instead of "in 2h". Leave blank for relative times.<br>
+          <label class="lbl" for="f-tz" data-i18n="configurator.tzLabel">Show clock times in these zones</label>
+          <input type="text" id="f-tz" placeholder="PT, ET, GMT" data-i18n-attr="placeholder:configurator.tzPlaceholder" autocomplete="off">
+          <div class="hint" data-i18n-html="configurator.tzHint">Up to 3 zones to show absolute times instead of "in 2h". Leave blank for relative times.<br>
             Known: <code>PT MT CT ET GMT UTC CET BST JST AEST</code> (or any IANA name).</div>
           <div class="status-dot" id="tz-hint"></div>
         </div>
@@ -277,20 +295,20 @@
 
     <!-- ───────────────────────── OBS INSTRUCTIONS ───────────────────────── -->
     <div class="card">
-      <h2>Add this to OBS</h2>
+      <h2 data-i18n="configurator.obsTitle">Add this to OBS</h2>
       <ol class="obs">
-        <li><strong>Copy your overlay URL</strong> with the Copy button above.</li>
-        <li>In OBS, under <strong>Sources</strong> click <strong>+</strong> and choose <strong>Browser</strong>. Name it (e.g. "Raid Train").</li>
-        <li><strong>Paste your URL</strong> into the URL field.</li>
-        <li>Set <strong>Width 1920</strong> and <strong>Height 1080</strong> (a standard 1080p canvas).</li>
-        <li>Leave the background transparent — the overlay is already see-through, so don't add a color.</li>
-        <li>Click <strong>OK</strong>. Your train appears.</li>
-        <li><strong>Leave the source at full size, positioned at 0, 0</strong> — don't drag or scale it in OBS. Set the train's <strong>Train size</strong> and <strong>Vertical position</strong> (both under <strong>Look</strong>) with the sliders here instead. They bake into the overlay and travel with the URL across scenes and machines, and the train always stays fully on screen.</li>
+        <li data-i18n-html="configurator.obs1"><strong>Copy your overlay URL</strong> with the Copy button above.</li>
+        <li data-i18n-html="configurator.obs2">In OBS, under <strong>Sources</strong> click <strong>+</strong> and choose <strong>Browser</strong>. Name it (e.g. "Raid Train").</li>
+        <li data-i18n-html="configurator.obs3"><strong>Paste your URL</strong> into the URL field.</li>
+        <li data-i18n-html="configurator.obs4">Set <strong>Width 1920</strong> and <strong>Height 1080</strong> (a standard 1080p canvas).</li>
+        <li data-i18n-html="configurator.obs5">Leave the background transparent — the overlay is already see-through, so don't add a color.</li>
+        <li data-i18n-html="configurator.obs6">Click <strong>OK</strong>. Your train appears.</li>
+        <li data-i18n-html="configurator.obs7"><strong>Leave the source at full size, positioned at 0, 0</strong> — don't drag or scale it in OBS. Set the train's <strong>Train size</strong> and <strong>Vertical position</strong> (both under <strong>Look</strong>) with the sliders here instead. They bake into the overlay and travel with the URL across scenes and machines, and the train always stays fully on screen.</li>
       </ol>
-      <p class="hint">Changed something? Copy the new URL and paste it back into the same Browser source's URL field.</p>
+      <p class="hint" data-i18n="configurator.obsChanged">Changed something? Copy the new URL and paste it back into the same Browser source's URL field.</p>
     </div>
 
-    <footer>The overlay link is the single source of truth — anyone with it gets the same overlay. <a href="overlay.html" target="_blank" rel="noopener">Open a blank overlay</a>.</footer>
+    <footer data-i18n-html="configurator.footer">The overlay link is the single source of truth — anyone with it gets the same overlay. <a href="overlay.html" target="_blank" rel="noopener">Open a blank overlay</a>.</footer>
   </div>
 
   <script type="module">
@@ -298,6 +316,13 @@
     import { parsePresets, serializePresets, upsertPreset, deletePreset, listPresetNames } from './src/presets.js';
     import { loadEvent } from './src/raidpal-client.js';
     import { resolveZone, parseConfig } from './src/config.js';
+    import { resolveLocale, loadMessages, makeT, canonicalLocale, SUPPORTED_LOCALES } from './src/i18n/index.js';
+    import { localizeDom } from './src/i18n/dom.js';
+
+    // The Configurator localizes its own UI to the chosen overlay language (the
+    // f-lang selector), so a streamer sees the page in the language their overlay
+    // will speak. `t` is rebound whenever that locale changes (applyUiLocale).
+    let t = (key) => key;
 
     // Sibling Overlay URL, derived from where THIS page lives — works under
     // `python3 -m http.server` locally and on a GitHub Pages subpath alike.
@@ -315,6 +340,7 @@
       openslots: $('f-openslots'), spotlight: $('f-spotlight'), tz: $('f-tz'),
       hidefinished: $('f-hidefinished'), enginedim: $('f-enginedim'),
       theme: $('f-theme'), scale: $('f-scale'), scaleOut: $('f-scale-out'),
+      lang: $('f-lang'),
       height: $('f-height'), heightOut: $('f-height-out'),
       url: $('url'), copy: $('copy'),
       preview: $('preview'), previewPlaceholder: $('preview-placeholder'), previewCaption: $('preview-caption'),
@@ -356,6 +382,7 @@
         theme: els.theme.value,
         scale: els.scale.value,
         height: els.height.value,
+        lang: els.lang.value === 'en' ? '' : els.lang.value,
       };
     }
     function writeForm(fs = {}) {
@@ -372,6 +399,18 @@
       els.theme.value = ['classic', 'flat', 'synthwave', 'ticket', 'wood', 'comic', 'departures', 'paper', 'tron', 'pixel', 'shuffle'].includes(fs.theme) ? fs.theme : 'classic';
       els.scale.value = fs.scale ?? '1';
       els.height.value = fs.height ?? '100';
+      els.lang.value = SUPPORTED_LOCALES.includes(canonicalLocale(fs.lang)) ? canonicalLocale(fs.lang) : 'en';
+    }
+
+    // Switch the Configurator UI + the overlay language together: load the
+    // catalog, rebind `t`, re-localize the static DOM, and refresh the dynamic
+    // strings (interval note, caption, status) that `t` feeds.
+    async function applyUiLocale(locale) {
+      const messages = await loadMessages(locale);
+      t = makeT(messages);
+      localizeDom(document, messages);
+      document.documentElement.lang = locale;
+      onFormChange();
     }
 
     // ── Live URL (synchronous, every input) ──────────────────────────────
@@ -397,21 +436,21 @@
       els.interval.disabled = !showInterval;
       els.intervalRow.classList.toggle('dimmed', !showInterval);
       els.intervalNote.textContent =
-        isPass && isShuffle ? 'How often the train rolls across — each pass brings a new theme.'
-          : isPass ? 'How often the train rolls across.'
-            : isShuffle ? 'How often the theme changes (marquee stays on screen).'
-              : 'Only applies to the Pass display style.';
+        isPass && isShuffle ? t('configurator.intervalNotePassShuffle')
+          : isPass ? t('configurator.intervalNotePass')
+            : isShuffle ? t('configurator.intervalNoteShuffle')
+              : t('configurator.intervalNoteOff');
       els.heightOut.textContent = fs.height;
       els.scaleOut.textContent = fs.scale;
 
-      const tokens = fs.tz.split(',').map((t) => t.trim()).filter(Boolean);
+      const tokens = fs.tz.split(',').map((tok) => tok.trim()).filter(Boolean);
       if (tokens.length === 0) { els.tzHint.textContent = ''; els.tzHint.className = 'status-dot'; return; }
       const ok = [], bad = [];
-      for (const t of tokens) (resolveZone(t) ? ok : bad).push(t);
+      for (const tok of tokens) (resolveZone(tok) ? ok : bad).push(tok);
       const kept = ok.slice(0, 3), dropped = [...ok.slice(3), ...bad];
       els.tzHint.textContent =
-        (kept.length ? `Showing: ${kept.join(', ')}` : '') +
-        (dropped.length ? `   ·   Ignored: ${dropped.join(', ')}` : '');
+        (kept.length ? t('configurator.tzShowing', { zones: kept.join(', ') }) : '') +
+        (dropped.length ? `   ·   ${t('configurator.tzIgnored', { zones: dropped.join(', ') })}` : '');
       els.tzHint.className = 'status-dot' + (dropped.length ? ' bad' : ' ok');
     }
 
@@ -454,10 +493,9 @@
       lastQuery = query;
       if (fs.mode === 'pass') {
         const mins = parseConfig(`interval=${encodeURIComponent(fs.interval)}`).interval;
-        els.previewCaption.textContent =
-          `A still preview so you can study your train. Your overlay uses Pass display — it rolls across every ${mins} min.`;
+        els.previewCaption.textContent = t('configurator.captionPass', { mins });
       } else {
-        els.previewCaption.textContent = 'A still preview so you can study your train; your overlay scrolls continuously.';
+        els.previewCaption.textContent = t('configurator.captionMarquee');
       }
     }
 
@@ -480,8 +518,8 @@
     // the spot) so you can study it up close; Resume continues from there; Recenter
     // drops back to the still, centred showcase. All in-place via postMessage.
     function updateRollButtons() {
-      els.previewRoll.innerHTML = rollState === 'rolling' ? '⏸&nbsp;Freeze'
-        : rollState === 'frozen' ? '▶&nbsp;Resume' : '▶&nbsp;Roll it';
+      els.previewRoll.innerHTML = rollState === 'rolling' ? `⏸&nbsp;${t('configurator.freeze')}`
+        : rollState === 'frozen' ? `▶&nbsp;${t('configurator.resume')}` : `▶&nbsp;${t('configurator.rollIt')}`;
       els.previewRoll.classList.toggle('is-rolling', rollState !== 'still');
       els.previewStill.hidden = rollState === 'still';
     }
@@ -519,33 +557,33 @@
         validatedSlug = null;
         els.slugStatus.textContent = '';
         els.slugStatus.className = 'status-dot';
-        showPreviewPlaceholder('Your live preview appears here once you enter an event.');
+        showPreviewPlaceholder(t('configurator.previewPlaceholder'));
         return;
       }
       if (slug === DEMO_EVENT) { // the built-in demo — no RaidPal lookup needed
         validatedSlug = DEMO_EVENT;
-        els.slugStatus.textContent = '✓ Built-in demo lineup — paste your own event slug to go live';
+        els.slugStatus.textContent = t('configurator.slugDemo');
         els.slugStatus.className = 'status-dot ok';
         loadPreview(fs);
         return;
       }
       if (slug === validatedSlug) { loadPreview(fs); return; } // already valid — just re-preview, no fetch
-      els.slugStatus.textContent = 'Checking…';
+      els.slugStatus.textContent = t('configurator.slugChecking');
       els.slugStatus.className = 'status-dot checking';
       const token = ++validateToken;
       try {
         await loadEvent(slug);
         if (token !== validateToken) return; // a newer check superseded this one
         validatedSlug = slug;
-        els.slugStatus.textContent = `✓ Found event "${slug}"`;
+        els.slugStatus.textContent = t('configurator.slugFound', { slug });
         els.slugStatus.className = 'status-dot ok';
         loadPreview(fs);
       } catch {
         if (token !== validateToken) return;
         validatedSlug = null;
-        els.slugStatus.textContent = `✗ No RaidPal event "${slug}" — double-check the slug or link.`;
+        els.slugStatus.textContent = t('configurator.slugNotFound', { slug });
         els.slugStatus.className = 'status-dot bad';
-        showPreviewPlaceholder('Enter a valid event to see the preview.');
+        showPreviewPlaceholder(t('configurator.previewEnterValid'));
       }
     }, 350);
 
@@ -568,6 +606,9 @@
       els.hidefinished, els.enginedim, els.spotlight, els.tz, els.theme, els.scale, els.height]) {
       el.addEventListener('input', onFormChange);
     }
+    // The overlay-language selector both bakes lang= into the URL and re-localizes
+    // THIS page (applyUiLocale runs onFormChange itself).
+    els.lang.addEventListener('change', () => applyUiLocale(els.lang.value || 'en'));
 
     // ── Copy ─────────────────────────────────────────────────────────────
     els.copy.addEventListener('click', async () => {
@@ -580,7 +621,7 @@
         document.execCommand('copy'); // fallback for non-secure contexts
       }
       const original = els.copy.textContent;
-      els.copy.textContent = 'Copied!';
+      els.copy.textContent = t('configurator.copied');
       setTimeout(() => { els.copy.textContent = original; }, 1500);
     });
 
@@ -592,7 +633,7 @@
       els.presetSelect.innerHTML = '';
       if (names.length === 0) {
         const opt = document.createElement('option');
-        opt.value = ''; opt.textContent = 'No saved presets yet';
+        opt.value = ''; opt.textContent = t('configurator.noPresets');
         els.presetSelect.appendChild(opt);
         els.presetLoad.disabled = true; els.presetDelete.disabled = true;
         return;
@@ -611,31 +652,31 @@
 
     els.presetSave.addEventListener('click', () => {
       const name = els.presetName.value.trim();
-      if (!name) { flashPresetMsg('Name your preset first.'); return; }
+      if (!name) { flashPresetMsg(t('configurator.presetNameFirst')); return; }
       if (Object.prototype.hasOwnProperty.call(store, name)
-        && !confirm(`A preset named "${name}" already exists — replace it?`)) return;
+        && !confirm(t('configurator.presetReplace', { name }))) return;
       store = upsertPreset(store, name, readForm());
       persist();
       refreshPresetList();
       els.presetSelect.value = name;
       els.presetName.value = '';
-      flashPresetMsg(`Saved "${name}".`);
+      flashPresetMsg(t('configurator.presetSaved', { name }));
     });
     els.presetLoad.addEventListener('click', () => {
       const name = els.presetSelect.value;
       if (!name || !store[name]) return;
       writeForm(store[name]);
       onFormChange();
-      flashPresetMsg(`Loaded "${name}".`);
+      flashPresetMsg(t('configurator.presetLoaded', { name }));
     });
     els.presetDelete.addEventListener('click', () => {
       const name = els.presetSelect.value;
       if (!name || !store[name]) return;
-      if (!confirm(`Delete preset "${name}"?`)) return;
+      if (!confirm(t('configurator.presetDeleteConfirm', { name }))) return;
       store = deletePreset(store, name);
       persist();
       refreshPresetList();
-      flashPresetMsg(`Deleted "${name}".`);
+      flashPresetMsg(t('configurator.presetDeleted', { name }));
     });
 
     // ── Init ──────────────────────────────────────────────────────────────
@@ -662,10 +703,20 @@
         theme: c.theme,
         scale: String(c.scale),
         height: String(c.height),
+        lang: c.lang ?? '',
       });
     })();
-    refreshPresetList();
-    onFormChange();
+    // Initial locale: an explicit ?lang= wins; otherwise detect from the browser.
+    // applyUiLocale localizes the static DOM, binds `t`, and runs onFormChange
+    // (which builds the URL + preview from the now-localized state). The preset
+    // list is rendered after `t` is bound so its strings localize too.
+    (async function initLocale() {
+      const urlConfig = parseConfig(window.location.search.replace(/^\?/, ''));
+      const initialLocale = canonicalLocale(urlConfig.lang) || resolveLocale(undefined, navigator.languages);
+      els.lang.value = initialLocale;
+      await applyUiLocale(initialLocale);
+      refreshPresetList();
+    })();
   </script>
 </body>
 </html>

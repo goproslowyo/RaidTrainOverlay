@@ -21,7 +21,10 @@
  *
  * Transparent only — no full-bleed background.
  */
-import { esc, wheel, smokeSVG, pointerSVG, avatarSVG, fitAll, undulate, toVehicles } from './shared-svg.js';
+import { esc, wheel, smokeSVG, pointerSVG, avatarSVG, fitAll, undulate, toVehicles, themeT } from './shared-svg.js';
+
+// Translator the builders paint with — rebound to the active locale in build().
+let L = themeT();
 
 const ENGINE_W = 208;
 const CAR_W = 176;
@@ -155,8 +158,7 @@ function flatTender(x, w, org) {
   for (let k = 0; k < 6; k++) s += `<circle cx="${x + 22 + k * ((w - 44) / 5)}" cy="108" r="4" fill="${C.darkHi}"/>`; // heaped coal
   s += `<circle cx="${x + 34}" cy="138" r="23" fill="${C.cream}"/>`;
   s += avatarSVG('fl-org', x + 34, 138, 19, org.image, org.name, C.brass);
-  s += `<text x="${x + 60}" y="130" font-weight="800" font-size="9" fill="#ffd8a8" letter-spacing="1">ORGANISED</text>`;
-  s += `<text x="${x + 60}" y="142" font-weight="800" font-size="9" fill="#ffd8a8" letter-spacing="1">BY</text>`;
+  s += `<text x="${x + 60}" y="136" font-weight="800" font-size="9" fill="#ffd8a8" letter-spacing="1">${esc(L('overlay.organisedBy'))}</text>`;
   s += `<text class="rt-fit" data-maxw="${w - 26}" x="${cx}" y="164" text-anchor="middle" font-weight="800" font-size="14" fill="#fff">${esc(org.name)}</text>`;
   const front = flatWheel(x + 38, railY, 14, '#5a4322') + flatWheel(x + w - 38, railY, 14, '#5a4322');
   return { body: s, front };
@@ -182,7 +184,7 @@ function flatCoach(x, w, v, i, caboose) {
   const timeBaseY = 160;
   s += `<text class="fl-time" data-base-y="${timeBaseY}" x="${x + 84}" y="${timeBaseY}" font-weight="700" font-size="12">${timeTspans(v.timeLines, x + 84, timeBaseY)}</text>`;
   const sx = centerX(x, w), sy = 150;
-  s += `<g class="fl-stamp" transform="rotate(-9 ${sx} ${sy})"><rect x="${sx - 38}" y="${sy - 14}" width="76" height="28" rx="4" fill="#0a1024" opacity="0.6" stroke="#bcd2ff" stroke-width="2.5"/><text x="${sx}" y="${sy + 6}" text-anchor="middle" font-weight="800" font-size="15" fill="#dbeafe" letter-spacing="2">PLAYED</text></g>`;
+  s += `<g class="fl-stamp" transform="rotate(-9 ${sx} ${sy})"><rect x="${sx - 38}" y="${sy - 14}" width="76" height="28" rx="4" fill="#0a1024" opacity="0.6" stroke="#bcd2ff" stroke-width="2.5"/><text x="${sx}" y="${sy + 6}" text-anchor="middle" font-weight="800" font-size="15" fill="#dbeafe" letter-spacing="2">${esc(L('overlay.played'))}</text></g>`;
   const front = flatWheel(x + 44, railY, 15, C.blueHi) + flatWheel(x + w - 44, railY, 15, C.blueHi);
   return { body: s, front };
 }
@@ -191,8 +193,9 @@ function flatOpen(x, w, v, i) {
   const cx = centerX(x, w);
   let s = i > 0 ? `<rect x="${x - GAP - 2}" y="${railY - 40}" width="${GAP + 6}" height="8" rx="4" fill="${C.dark}"/>` : '';
   s += `<rect x="${x + 10}" y="94" width="${w - 20}" height="76" rx="14" fill="none" stroke="${COL.open}" stroke-width="4" stroke-dasharray="10 7"/>`;
-  s += `<text x="${cx}" y="130" text-anchor="middle" font-weight="800" font-size="30" fill="${COL.open}">OPEN</text>`;
-  const openTime = v.timeLines[0] ? `sign up! · ${esc(v.timeLines[0])}` : 'sign up!';
+  s += `<text x="${cx}" y="130" text-anchor="middle" font-weight="800" font-size="30" fill="${COL.open}">${esc(L('overlay.open'))}</text>`;
+  const signUp = L('overlay.signUp');
+  const openTime = v.timeLines[0] ? `${signUp} · ${esc(v.timeLines[0])}` : signUp;
   s += `<text class="fl-time" data-base-y="152" x="${cx}" y="152" text-anchor="middle" font-weight="700" font-size="12" fill="${COL.open}">${openTime}</text>`;
   const front = flatWheel(x + 46, railY, 15, '#2f9e44') + flatWheel(x + w - 46, railY, 15, '#2f9e44');
   return { body: s, front };
@@ -204,7 +207,7 @@ function renderUnit(unit, x, w, i) {
   if (unit.type === 'engine') {
     parts = flatEngine(x, v, i);
     stateClasses = (v.isCurrent ? ' rt-car--current' : '') + (v.isSpotlit ? ' rt-car--spotlit' : '') + (v.isDimmed ? ' rt-car--departed' : '');
-    pointer = `<g class="rt-pointer rt-now-bob">${pointerSVG(x + 40, 60, COL.now, 'NOW')}</g>`;
+    pointer = `<g class="rt-pointer rt-now-bob">${pointerSVG(x + 40, 60, COL.now, L('overlay.now'))}</g>`;
     dataAttr = ' data-engine="1"';
   } else if (unit.type === 'tender') {
     parts = flatTender(x, w, v);
@@ -213,18 +216,19 @@ function renderUnit(unit, x, w, i) {
   } else if (v.isOpen) {
     parts = flatOpen(x, w, v, i);
     stateClasses = (v.isCurrent ? ' rt-car--current' : '') + (v.isDeparted ? ' rt-car--departed' : '');
-    pointer = `<g class="rt-pointer rt-now-bob">${pointerSVG(centerX(x, w), 60, COL.now, 'NOW')}</g>`;
+    pointer = `<g class="rt-pointer rt-now-bob">${pointerSVG(centerX(x, w), 60, COL.now, L('overlay.now'))}</g>`;
     dataAttr = ` data-slot="${v.slotOrder}"`;
   } else {
     parts = flatCoach(x, w, v, i, unit.type === 'caboose');
     stateClasses = (v.isCurrent ? ' rt-car--current' : '') + (v.isDeparted ? ' rt-car--departed' : '') + (v.isSpotlit ? ' rt-car--spotlit' : '');
-    pointer = `<g class="rt-pointer rt-now-bob">${pointerSVG(x + 44, 60, COL.now, 'NOW')}</g>`;
+    pointer = `<g class="rt-pointer rt-now-bob">${pointerSVG(x + 44, 60, COL.now, L('overlay.now'))}</g>`;
     dataAttr = ` data-slot="${v.slotOrder}"`;
   }
   return `<g class="rt-car${stateClasses}"${dataAttr}><g class="fl-art">${parts.body}</g><g class="fl-front">${parts.front}</g>${pointer}</g>`;
 }
 
-export function build(train) {
+export function build(train, opts = {}) {
+  L = themeT(opts);
   const vehicles = toVehicles(train);
   const units = [];
   const engine = vehicles[0];

@@ -28,6 +28,7 @@
                       (default the dark stage)
       &hidefinished=1 drop departed Cars instead of dimming them    (default off)
       &enginedim=X    Engine when Event is over: over|finished|never (default over)
+      &lang=X         overlay locale (en es-ES es-MX pt-BR it de nl da lt fr; default en)
       &animAt=N       jump the Mode animation N seconds in (negative
                       animation-delay) — deterministic frames for screenshots;
                       composited transform animations run on the compositor's
@@ -45,6 +46,7 @@
       harness.html#height=0   /   #height=100                    Train at top / bottom of canvas
       harness.html#now=2026-06-16T20:30:00Z&hidefinished=1        departed Cars removed, not dimmed
       harness.html#now=2026-06-16T22:00:00Z&enginedim=over        Engine dims post-event
+      harness.html#now=2026-06-16T19:30:00Z&openslots=1&lang=de&theme=departures  localized (German)
   -->
   <style>
     :root {
@@ -83,6 +85,7 @@
     // Share the tz resolver (not parseConfig) so the harness can't drift from
     // the real abbreviation→IANA map.
     import { resolveZone } from '../../src/config.js';
+    import { resolveLocale, loadMessages, makeT } from '../../src/i18n/index.js';
 
     const params = new URLSearchParams(location.hash.slice(1));
     window.addEventListener('hashchange', () => location.reload());
@@ -130,6 +133,14 @@
       // Theme select; unknown keys fall back to classic in the renderer.
       theme: params.get('theme') || 'classic',
     };
+
+    // Locale (&lang=): resolve + bind a translator onto config, exactly as the
+    // overlay shell does, so the harness renders the localized overlay words
+    // (NOW / OPEN / PLAYED / statuses) and locale-aware tz clock. Default en.
+    const locale = resolveLocale(params.get('lang'), navigator.languages);
+    config.locale = locale;
+    config.t = makeT(await loadMessages(locale));
+    document.documentElement.lang = locale;
 
     // Vertical position (height param) — drives the renderer's .rt-stage.
     // Absent/blank → centered; Number(null) is 0, so guard before the range test.

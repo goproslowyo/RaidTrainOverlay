@@ -23,8 +23,12 @@
  * Transparent only — no full-bleed background. The Track is the pixel
  * steel rail + ties band.
  */
-import { esc, toVehicles, fitAll } from './shared-svg.js';
+import { esc, toVehicles, fitAll, themeT } from './shared-svg.js';
 import { injectStyle } from './shared-html.js';
+
+// Translator the builders paint with — rebound to the active locale in build();
+// it persists for the in-place update() ticks (same locale until a re-render).
+let L = themeT();
 
 const STYLE_ID = 'rt-theme-pixel-style';
 const CW = 52; // car width, backing px
@@ -139,7 +143,11 @@ function drawPlayed(ctx, ox, y) {
     E: ['111', '100', '111', '100', '111'],
     D: ['110', '101', '101', '101', '110'],
   };
-  const word = 'PLAYED';
+  // The hand-drawn pixel font only has glyphs for the English PLAYED letters. A
+  // localized word with other letters can't be drawn here, so fall back to the
+  // English glyphs (the departed dim + the HTML PLAYED sub-line still localize).
+  const localized = L('overlay.played').toUpperCase();
+  const word = [...localized].every((ch) => G[ch]) ? localized : 'PLAYED';
   const gw = 3, gap = 1;
   const textW = word.length * gw + (word.length - 1) * gap;
   const bx = ox + Math.floor((CW - textW) / 2);
@@ -244,16 +252,16 @@ function drawCar(ctx, ox, bob, v, img, f) {
  *  ENGINE tag, not a static label — it's a real streamer and the eternal leader. */
 function subText(v) {
   // The tender's handle rides the rt-fit name line; the sub-line is the credit label.
-  if (v.kind === 'tender') return 'ORGANISED BY';
-  if (v.isOpen) return 'SIGN UP';
+  if (v.kind === 'tender') return L('overlay.organisedBy');
+  if (v.isOpen) return L('overlay.signUp');
   // A handed-off Slot reads PLAYED + keeps its time (the loco dims only on isDimmed).
   const handed = v.kind === 'engine' ? v.isDimmed : v.isDeparted;
   const time = (v.timeLines?.[0] || '').toUpperCase();
   if (v.kind === 'engine') {
-    const tag = handed ? '▪ DONE' : 'CONDUCTOR';
+    const tag = handed ? `▪ ${L('status.departed')}` : L('overlay.conductor');
     return time ? `${tag} · ${time}` : tag;
   }
-  if (handed) return time ? `▪ PLAYED · ${time}` : '▪ PLAYED';
+  if (handed) return time ? `▪ ${L('overlay.played')} · ${time}` : `▪ ${L('overlay.played')}`;
   return time;
 }
 function cellStateClass(v) {
@@ -267,7 +275,8 @@ function cellStateClass(v) {
   ].filter(Boolean).join(' ');
 }
 
-export function build(train) {
+export function build(train, opts = {}) {
+  L = themeT(opts);
   const vehicles = toVehicles(train); // mutated in place on a time tick
   // The loco is vehicles[0] (the first streamer). When it has a separate
   // Organiser credit, splice a synthetic tender car right behind it — a coal-car
@@ -304,7 +313,7 @@ export function build(train) {
   vehicles.forEach((v) => {
     const cell = document.createElement('div');
     cell.className = `pix-cell ${cellStateClass(v)}`.trim();
-    const nameHTML = `<div class="pix-name rt-fit">${esc((v.name || 'OPEN').toUpperCase())}</div>`;
+    const nameHTML = `<div class="pix-name rt-fit">${esc((v.name || L('overlay.open')).toUpperCase())}</div>`;
     const subHTML = `<div class="pix-sub">${esc(subText(v))}</div>`;
     // The tender is a credit: its "ORGANISED BY" label reads ABOVE the handle, like
     // a caption. Every other Car leads with the name, role/time caption below.

@@ -1,0 +1,177 @@
+// Brazilian Portuguese (pt-BR) — hardened via back-translation + native-reviewer critique; pending live native confirmation.
+/**
+ * Português (Brasil) — machine-translated draft, pending native review.
+ *
+ * Mirrors every key in en.js (the source of truth). The catalog-completeness
+ * test checks this set against English; loadMessages merges this OVER English
+ * so any missing key falls back to the English string.
+ *
+ * Overlay words are compact badges stamped onto fixed-width cars — keep
+ * translations short so they don't overflow the art.
+ */
+export default {
+  // ── Overlay (viewer-facing, painted into the train) ──────────────────────
+  'overlay.now': 'AGORA',
+  'overlay.open': 'LIVRE',
+  'overlay.signUp': 'inscreva-se!',
+  'overlay.played': 'FEITO',
+  'overlay.conductor': 'MAQUINISTA',
+  'overlay.organisedBy': 'ORGANIZADO POR',
+  'overlay.staff': 'EQUIPE',
+
+  // ── Departures-board status lamps + captions ─────────────────────────────
+  'status.onTime': 'NO HORÁRIO',
+  'status.boarding': 'EMBARCANDO',
+  'status.departed': 'PARTIU',
+  'status.lead': 'LÍDER',
+  'departures.header': 'PARTIDAS',
+
+  // ── Relative time: "in {v}", where {v} = compact units like "2h30m" ──────
+  // Unit tokens are single-letter for the fixed-width car; {v} is assembled
+  // from them before being dropped into time.in.
+  'time.in': 'em {v}',
+  'time.d': 'd',
+  'time.h': 'h',
+  'time.m': 'min',
+
+  // ── Configurator (streamer-facing) ───────────────────────────────────────
+  'configurator.title': 'RaidTrainOverlay — Configurador',
+  'configurator.sub': 'Insira seu evento, veja a prévia e copie o link para uma fonte de Navegador no OBS.',
+  'configurator.eventLabel': 'Evento do RaidPal',
+  'configurator.eventPlaceholder': 'seu-evento  (ou cole o link do RaidPal)',
+  'configurator.eventHint': 'Cole o link do RaidPal do seu evento ou só digite o slug.',
+  'configurator.previewTitle': 'Prévia do overlay',
+  'configurator.previewPlaceholder': 'Sua prévia ao vivo aparece aqui assim que você inserir um evento.',
+  'configurator.previewEnterValid': 'Insira um evento válido para ver a prévia.',
+  'configurator.rollTitle': 'Faça o trem cruzar a tela — congele no lugar pra examinar (as rodas continuam girando), retome quando quiser',
+  'configurator.rollIt': 'Passar',
+  'configurator.freeze': 'Congelar',
+  'configurator.resume': 'Retomar',
+  'configurator.stillTitle': 'Voltar à prévia estática centralizada',
+  'configurator.recenter': 'Recentralizar',
+  'configurator.captionPass': 'Uma prévia estática pra você examinar seu trem. Seu overlay usa o modo Passagem — ele cruza a tela a cada {mins} min.',
+  'configurator.captionMarquee': 'Uma prévia estática pra você examinar seu trem; seu overlay rola sem parar.',
+  'configurator.urlPlaceholder': 'Insira um evento acima para gerar sua URL',
+  'configurator.copy': 'Copiar',
+  'configurator.copied': 'Copiado!',
+
+  'configurator.presets': 'Predefinições',
+  'configurator.presetNamePlaceholder': 'Nome da predefinição',
+  'configurator.save': 'Salvar',
+  'configurator.load': 'Carregar',
+  'configurator.delete': 'Excluir',
+  'configurator.noPresets': 'Nenhuma predefinição salva ainda',
+
+  'configurator.settings': 'Configurações',
+  'configurator.tabLook': 'Aparência',
+  'configurator.tabMotion': 'Movimento',
+  'configurator.tabLineup': 'Escalação',
+
+  'configurator.languageLabel': 'Idioma do overlay',
+  'configurator.languageHint': 'O idioma que o overlay mostra na transmissão (AGORA, LIVRE, horários…). Fica gravado na URL.',
+
+  'configurator.themeLabel': 'Tema',
+  'configurator.theme.classic': 'Clássico americano',
+  'configurator.theme.flat': 'Desenho flat',
+  'configurator.theme.synthwave': 'Synthwave',
+  'configurator.theme.ticket': 'Bilhete vintage',
+  'configurator.theme.wood': 'Trenzinho de madeira',
+  'configurator.theme.comic': 'Quadrinhos / meio-tom',
+  'configurator.theme.departures': 'Painel de partidas',
+  'configurator.theme.paper': 'Recorte de papel',
+  'configurator.theme.tron': 'Tron lightcycle',
+  'configurator.theme.pixel': 'Pixel 16 bits',
+  'configurator.theme.shuffle': '🔀 Aleatório — alterna todos os temas',
+  'configurator.themeHint': 'O estilo de arte que pinta seu trem. <strong>Aleatório</strong> percorre a lista inteira — um tema novo a cada passagem (ou a cada poucos minutos no modo letreiro).',
+
+  'configurator.scaleLabel': 'Tamanho do trem',
+  'configurator.scaleHint': 'O tamanho do trem na sua transmissão. 1 é o padrão; menor deixa menor, maior deixa maior. Observe a prévia.',
+  'configurator.heightLabel': 'Posição vertical',
+  'configurator.heightHint': '0 = topo, 100 = base, 50 = centralizado. O padrão o deixa na borda inferior, e o trem sempre fica totalmente na tela — mesmo quando você o redimensiona.',
+
+  'configurator.modeLabel': 'Estilo de exibição',
+  'configurator.modePass': 'Passagem — cruza a tela a cada poucos minutos e some',
+  'configurator.modeMarquee': 'Letreiro — rola sem parar, sempre na tela',
+  'configurator.intervalLabel': 'Minutos entre passagens',
+  'configurator.intervalNotePassShuffle': 'Com que frequência o trem cruza a tela — cada passagem traz um tema novo.',
+  'configurator.intervalNotePass': 'Com que frequência o trem cruza a tela.',
+  'configurator.intervalNoteShuffle': 'Com que frequência o tema muda (o letreiro fica na tela).',
+  'configurator.intervalNoteOff': 'Só vale para o estilo de exibição Passagem.',
+  'configurator.speedLabel': 'Velocidade da animação',
+  'configurator.speedHint': 'Maior é mais rápido. 1 é o ritmo padrão.',
+  'configurator.refreshLabel': 'Atualização automática (minutos)',
+  'configurator.refreshPlaceholder': 'desligado',
+  'configurator.refreshHint': 'Com que frequência reconsultar o RaidPal por mudanças na escalação. Em branco ou 0 = consulta uma vez ao carregar. Mínimo de 15 para não sobrecarregar o RaidPal.',
+
+  'configurator.openslotsLabel': 'Mostrar vagas abertas',
+  'configurator.openslotsHint': 'Exibe as vagas não preenchidas como vagões <strong>LIVRE</strong> para os espectadores se inscreverem.',
+  'configurator.hidefinishedLabel': 'Ocultar vagões finalizados',
+  'configurator.hidefinishedHint': 'Remove os vagões que já passaram, em vez de escurecê-los.',
+  'configurator.spotlightLabel': 'Destacar streamers',
+  'configurator.spotlightPlaceholder': 'DJ Alpha, DJ Charlie',
+  'configurator.spotlightHint': 'Nomes separados por vírgula para destacar com um brilho. Maiúsculas e minúsculas não importam.',
+  'configurator.enginedimLabel': 'Quando o evento terminar',
+  'configurator.enginedimOver': 'Escurecer a locomotiva',
+  'configurator.enginedimFinished': 'Ocultá-la (ao ocultar vagões finalizados)',
+  'configurator.enginedimNever': 'Manter a locomotiva acesa',
+  'configurator.enginedimHint': 'Como a locomotiva líder reage quando todo o evento termina.',
+  'configurator.tzLabel': 'Mostrar os horários do relógio nestes fusos',
+  'configurator.tzPlaceholder': 'PT, ET, GMT',
+  'configurator.tzHint': 'Até 3 fusos para mostrar horários absolutos em vez de "em 2h". Deixe em branco para horários relativos.<br>\n            Conhecidos: <code>PT MT CT ET GMT UTC CET BST JST AEST</code> (ou qualquer nome IANA).',
+  'configurator.tzShowing': 'Mostrando: {zones}',
+  'configurator.tzIgnored': 'Ignorados: {zones}',
+
+  'configurator.obsTitle': 'Adicione isto ao OBS',
+  'configurator.obs1': '<strong>Copie a URL do seu overlay</strong> com o botão Copiar acima.',
+  'configurator.obs2': 'No OBS, em <strong>Fontes</strong> clique em <strong>+</strong> e escolha <strong>Navegador</strong>. Dê um nome (ex.: "Raid Train").',
+  'configurator.obs3': '<strong>Cole sua URL</strong> no campo de URL.',
+  'configurator.obs4': 'Defina <strong>Largura 1920</strong> e <strong>Altura 1080</strong> (uma tela 1080p padrão).',
+  'configurator.obs5': 'Deixe o fundo transparente — o overlay já é transparente, então não adicione cor.',
+  'configurator.obs6': 'Clique em <strong>OK</strong>. Seu trem aparece.',
+  'configurator.obs7': '<strong>Deixe a fonte em tamanho real, posicionada em 0, 0</strong> — não arraste nem redimensione no OBS. Defina o <strong>Tamanho do trem</strong> e a <strong>Posição vertical</strong> (ambos em <strong>Aparência</strong>) com os controles daqui. Eles ficam gravados no overlay e viajam com a URL entre cenas e máquinas, e o trem sempre fica totalmente na tela.',
+  'configurator.obsChanged': 'Mudou algo? Copie a nova URL e cole de volta no campo de URL da mesma fonte de Navegador.',
+  'configurator.footer': 'O link do overlay é a única fonte de verdade — qualquer pessoa com ele obtém o mesmo overlay. <a href="overlay.html" target="_blank" rel="noopener">Abrir um overlay em branco</a>.',
+
+  // Configurator runtime status strings (interpolated)
+  'configurator.slugDemo': '✓ Escalação de demonstração integrada — cole o slug do seu próprio evento para ir ao ar',
+  'configurator.slugChecking': 'Verificando…',
+  'configurator.slugFound': '✓ Evento "{slug}" encontrado',
+  'configurator.slugNotFound': '✗ Nenhum evento "{slug}" no RaidPal — confira o slug ou o link.',
+  'configurator.presetNameFirst': 'Dê um nome à sua predefinição primeiro.',
+  'configurator.presetReplace': 'Já existe uma predefinição chamada "{name}" — substituir?',
+  'configurator.presetSaved': '"{name}" salva.',
+  'configurator.presetLoaded': '"{name}" carregada.',
+  'configurator.presetDeleteConfirm': 'Excluir a predefinição "{name}"?',
+  'configurator.presetDeleted': '"{name}" excluída.',
+
+  // ── Landing page ─────────────────────────────────────────────────────────
+  'landing.tagline': 'Seu raid train do <a href="https://raidpal.com">RaidPal</a>, como um trem animado de vagões de streamers — para OBS.',
+  'landing.build': 'Monte seu overlay',
+  'landing.preview': 'Veja a prévia do overlay',
+  'landing.demoNote': 'Uma escalação de demonstração integrada — não precisa de evento. Monte a sua com seu próprio slug.',
+  'landing.howTitle': 'Como funciona',
+  'landing.how1': '<strong>Abra o <a href="./configurator.html">Configurador</a>.</strong> Cole o link do RaidPal do seu evento — a URL inteira serve, ele captura o evento pra você — depois escolha um tema e as opções e copie a URL do overlay.',
+  'landing.how2': '<strong>Adicione ao OBS.</strong> No OBS: <em>Fontes → + → Navegador</em>, cole a URL e ajuste o tamanho da fonte à sua tela. O fundo do overlay é transparente.',
+  'landing.themesTitle': 'Dez temas',
+  'landing.themesIntro': 'Clique em um tema para inseri-lo na URL do seu overlay (Aleatório alterna todos):',
+  'landing.theme.classic': 'Clássico americano',
+  'landing.theme.flat': 'Flat',
+  'landing.theme.synthwave': 'Synthwave',
+  'landing.theme.ticket': 'Bilhete vintage',
+  'landing.theme.wood': 'Trenzinho de madeira',
+  'landing.theme.comic': 'Quadrinhos',
+  'landing.theme.departures': 'Painel de partidas',
+  'landing.theme.paper': 'Papel cartão',
+  'landing.theme.tron': 'Tron',
+  'landing.theme.pixel': 'Pixel 16 bits',
+  'landing.theme.shuffle': '🔀 Aleatório',
+  'landing.urlAria': 'URL do overlay para o tema selecionado',
+  'landing.copy': 'Copiar',
+  'landing.urlNote': 'Troque <code>your-event-slug</code> pelo seu evento — todo o resto tem um padrão sensato. Ou monte o link completo no <a href="./configurator.html">Configurador</a>.',
+  'landing.readme': 'README',
+  'landing.authorTheme': 'Crie um tema',
+  'landing.source': 'Código-fonte',
+  'landing.license': 'Licença MIT',
+  'landing.credit': 'Feito com ❤️ por um streamer, para streamers',
+  'landing.creditBy': 'por',
+};

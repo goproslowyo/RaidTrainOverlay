@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { buildTrain, formatRelativeTime, formatAbsoluteTime } from '../src/lineup-engine.js';
 import { normalizeEvent } from '../src/raidpal-client.js';
 import { makeEventPayload } from './fixtures/event-payload.js';
+import { loadMessages, makeT } from '../src/i18n/index.js';
 
 // Fixture (occupied orders 0/2/3 + Open Slot 1), Slots 60min from 18:00Z:
 //   order 0 DJ Alpha   18:00  ← the first passenger Car (kicks off the stream)
@@ -338,4 +339,48 @@ test('the locomotive dims or hides post-event per enginedim and hidefinished', (
   // 'finished' follows the hidefinished rule: hide it if Cars are hidden, else dim.
   assert.deepEqual(flags({ enginedim: 'finished', hidefinished: true }), { isDimmed: false, isHidden: true });
   assert.deepEqual(flags({ enginedim: 'finished' }), { isDimmed: true, isHidden: false });
+});
+
+// ── Localization: config.t / config.locale flow into the view model ─────────
+
+test('formatRelativeTime localizes the "in" prefix and unit tokens via t', async () => {
+  const now = new Date('2026-06-16T12:00:00Z');
+  const fr = makeT(await loadMessages('fr'));
+  const nl = makeT(await loadMessages('nl'));
+  // Assert the contract, not a translator's exact token: the compact value is
+  // assembled from the catalog's own d/h/m unit tokens and wrapped by its
+  // "in {v}" — so a translator changing fr "m"→"min" stays correct. The prefix
+  // word is verified to actually be localized.
+  const rel = (t, body) => t('time.in', { v: body });
+  const fu = { d: fr('time.d'), h: fr('time.h'), m: fr('time.m') };
+  const nu = { d: nl('time.d'), h: nl('time.h'), m: nl('time.m') };
+  assert.equal(formatRelativeTime(new Date('2026-06-16T13:30:00Z'), now, fr), rel(fr, `1${fu.h}30${fu.m}`));
+  assert.equal(formatRelativeTime(new Date('2026-06-17T18:00:00Z'), now, fr), rel(fr, `1${fu.d}6${fu.h}`));
+  assert.equal(formatRelativeTime(new Date('2026-06-16T13:30:00Z'), now, nl), rel(nl, `1${nu.h}30${nu.m}`));
+  assert.ok(formatRelativeTime(new Date('2026-06-16T13:30:00Z'), now, fr).startsWith('dans'));
+  assert.ok(formatRelativeTime(new Date('2026-06-16T13:30:00Z'), now, nl).startsWith('over'));
+});
+
+test('formatAbsoluteTime is 24-hour for European locales, 12-hour for en/es-MX', () => {
+  const t = new Date('2026-06-16T20:00:00Z'); // 20:00 UTC
+  assert.match(formatAbsoluteTime(t, 'UTC', 'de'), /^20[:.]00$/);   // 24-hour, no AM/PM
+  assert.match(formatAbsoluteTime(t, 'UTC', 'fr'), /20[:h]00/);     // 24-hour
+  assert.match(formatAbsoluteTime(t, 'UTC', 'en'), /8:00\s?PM/i);   // 12-hour
+  assert.match(formatAbsoluteTime(t, 'UTC', 'es-MX'), /8:00/);      // 12-hour (Mexico)
+  // Default (no locale arg) stays en-US 12-hour, unchanged from before i18n.
+  assert.equal(formatAbsoluteTime(t, 'UTC'), '8:00 PM');
+});
+
+test('buildTrain localizes NOW and the OPEN-slot label through config.t', async () => {
+  const event = normalizeEvent(makeEventPayload());
+  const de = makeT(await loadMessages('de'));
+  const cfg = { ...CONFIG, openslots: true, t: de, locale: 'de' };
+
+  // 19:30 → the open Slot (order 1) is live; its time line reads the localized NOW.
+  const train = buildTrain(event, NOW, cfg);
+  const open = train.cars.find((c) => c.slotOrder === 1);
+  assert.equal(open.isOpen, true);
+  assert.equal(open.displayName, de('overlay.open')); // not the literal "OPEN"
+  assert.equal(open.relativeTime, de('overlay.now')); // localized NOW
+  assert.notEqual(de('overlay.open'), 'OPEN');         // sanity: the catalog really translated it
 });

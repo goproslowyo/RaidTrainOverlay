@@ -25,8 +25,12 @@
  *
  * Transparent only — no full-bleed background.
  */
-import { fitAll, undulate, toVehicles, esc } from './shared-svg.js';
+import { fitAll, undulate, toVehicles, esc, themeT } from './shared-svg.js';
 import { ensureHtmlShared, injectStyle, htmlAvatar, stateClasses, timeLinesHTML } from './shared-html.js';
+
+// Translator the builders paint with — rebound to the active locale in build();
+// it persists for the in-place update() ticks (same locale until a re-render).
+let L = themeT();
 
 const STYLE_ID = 'rt-theme-tron-style';
 // Bike bounding box (wheels ~108 tall) + the name/time strip below + NOW headroom above.
@@ -211,7 +215,7 @@ export function buildTrack() {
 function timeBlock(v) {
   if (v.isOpen) {
     const t = v.timeLines[0] ? ` · ${esc(v.timeLines[0])}` : '';
-    return `<span>jack in${t}</span>`;
+    return `<span>${esc(L('overlay.signUp'))}${t}</span>`;
   }
   return timeLinesHTML(v.timeLines);
 }
@@ -227,12 +231,12 @@ function tronCar(v, i) {
   ].filter(Boolean).join(' ');
   const cls = `rt-car tr-car ${structural} ${stateClasses(v)}`.replace(/\s+/g, ' ').trim();
   const dataSlot = isEngine ? ' data-engine="1"' : ` data-slot="${v.slotOrder}"`;
-  const chev = v.isOpen ? '' : '<div class="rt-pointer rt-now-bob tr-chev">▸ NOW</div>';
+  const chev = v.isOpen ? '' : `<div class="rt-pointer rt-now-bob tr-chev">▸ ${esc(L('overlay.now'))}</div>`;
   const rider = v.isOpen
     ? '<div class="tr-rider"><div class="tr-ring tr-ring-open">+</div></div>'
     : `<div class="tr-rider"><div class="tr-ring">${htmlAvatar(v)}</div></div>`;
-  const name = v.isOpen ? 'OPEN' : esc(v.name);
-  const stamp = v.isOpen ? '' : '<div class="tr-stamp">PLAYED</div>';
+  const name = v.isOpen ? esc(L('overlay.open')) : esc(v.name);
+  const stamp = v.isOpen ? '' : `<div class="tr-stamp">${esc(L('overlay.played'))}</div>`;
   // Coaches (not the gold loco / green Open) carry an identity hue.
   const hued = !v.isOpen && !isEngine;
   return `<div class="${cls}"${dataSlot} style="${carStyle(i, hued)}">${chev}` +
@@ -249,11 +253,12 @@ function tronTender(org, i) {
     `<div class="tr-body"></div>` +
     `<div class="tr-wheel rt-wheel tr-front"></div><div class="tr-wheel rt-wheel tr-rear"></div>` +
     `<div class="tr-rider"><div class="tr-ring">${htmlAvatar(org)}</div></div>` +
-    `<div class="tr-tender-label">ORGANISED BY</div>` +
+    `<div class="tr-tender-label">${esc(L('overlay.organisedBy'))}</div>` +
     `<div class="tr-tender-name rt-fit">${esc(org.name)}</div></div>`;
 }
 
-export function build(train) {
+export function build(train, opts = {}) {
+  L = themeT(opts);
   const vehicles = toVehicles(train);
   const node = document.createElement('div');
   node.className = 'tr rt-theme-tron';

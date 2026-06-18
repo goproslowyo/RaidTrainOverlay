@@ -25,8 +25,11 @@
  * Transparent only — no full-bleed background. Sunset-gradient Cars,
  * cyan avatar rings, neon glows.
  */
-import { fitAll, undulate, toVehicles, esc } from './shared-svg.js';
+import { fitAll, undulate, toVehicles, esc, themeT } from './shared-svg.js';
 import { ensureHtmlShared, injectStyle, htmlAvatar, htmlWheel, stateClasses, timeLinesHTML } from './shared-html.js';
+
+// Translator the builders paint with — rebound to the active locale in build().
+let L = themeT();
 
 const STYLE_ID = 'rt-theme-synthwave-style';
 // Design height in px (Car body + wheels); the floating Now pointer overhangs
@@ -151,7 +154,7 @@ export function buildTrack() {
 function timeBlock(v) {
   if (v.isOpen) {
     const t = v.timeLines[0] ? ` · ${esc(v.timeLines[0])}` : '';
-    return `<span>sign up${t}</span>`;
+    return `<span>${esc(L('overlay.signUp'))}${t}</span>`;
   }
   return timeLinesHTML(v.timeLines);
 }
@@ -169,15 +172,15 @@ function neonCar(v) {
   // The loco has no slotOrder key (it's the eternal leader, tracked separately);
   // its Now pointer rides .rt-car--current from stateClasses like the coaches.
   const dataSlot = isEngine ? ' data-engine="1"' : ` data-slot="${v.slotOrder}"`;
-  const pointer = v.isOpen ? '' : '<div class="rt-pointer rt-now-bob sw-pointer">NOW ▾</div>';
+  const pointer = v.isOpen ? '' : `<div class="rt-pointer rt-now-bob sw-pointer">${esc(L('overlay.now'))} ▾</div>`;
   const ring = v.isOpen
     ? '<div class="sw-ring sw-ring-open">+</div>'
     : `<div class="sw-ring">${htmlAvatar(v)}</div>`;
-  const name = v.isOpen ? 'OPEN' : esc(v.name);
+  const name = v.isOpen ? esc(L('overlay.open')) : esc(v.name);
   // PLAYED stamp: always in the DOM, revealed by .rt-car--departed (CSS). The loco
   // never carries a per-slot departed (stateClasses only dims it on isDimmed), so
   // it won't stamp until the Event ends.
-  const stamp = v.isOpen ? '' : '<div class="sw-stamp">PLAYED</div>';
+  const stamp = v.isOpen ? '' : `<div class="sw-stamp">${esc(L('overlay.played'))}</div>`;
   const wheels = `<div class="sw-wheels">${htmlWheel('sw-w')}${htmlWheel('sw-w')}</div>`;
   return `<div class="${cls}"${dataSlot}>${pointer}${ring}<div class="sw-name rt-fit">${name}</div><div class="sw-time">${timeBlock(v)}</div>${stamp}${wheels}</div>`;
 }
@@ -189,12 +192,13 @@ function tenderCar(org) {
   const wheels = `<div class="sw-wheels">${htmlWheel('sw-w')}${htmlWheel('sw-w')}</div>`;
   return `<div class="rt-car sw-car sw-tender" data-tender="1">`
     + `<div class="sw-ring">${htmlAvatar(org)}</div>`
-    + `<div class="sw-tender-label">ORGANISED BY</div>`
+    + `<div class="sw-tender-label">${esc(L('overlay.organisedBy'))}</div>`
     + `<div class="sw-tender-name rt-fit">${esc(org.name)}</div>`
     + `${wheels}</div>`;
 }
 
-export function build(train) {
+export function build(train, opts = {}) {
+  L = themeT(opts);
   const vehicles = toVehicles(train);
   const node = document.createElement('div');
   node.className = 'sw rt-theme-synthwave';

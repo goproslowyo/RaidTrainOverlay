@@ -16,7 +16,11 @@
  *
  * Transparent only — no full-bleed background.
  */
-import { esc, wheel, pointerSVG, avatarSVG, fitAll, undulate, toVehicles } from './shared-svg.js';
+import { esc, wheel, pointerSVG, avatarSVG, fitAll, undulate, toVehicles, themeT } from './shared-svg.js';
+
+// The translator the builders paint with: rebound to the active locale at the
+// top of build() (themeT reads config.t), English until then.
+let L = themeT();
 
 const ENGINE_W = 200;
 const CAR_W = 168;
@@ -95,11 +99,11 @@ function porthole(id, cx, cy, r, image, name) {
 
 function nowBurst(cx, y) {
   const star = `M ${cx} ${y - 26} L ${cx + 7} ${y - 9} L ${cx + 26} ${y - 9} L ${cx + 11} ${y + 3} L ${cx + 18} ${y + 22} L ${cx} ${y + 10} L ${cx - 18} ${y + 22} L ${cx - 11} ${y + 3} L ${cx - 26} ${y - 9} L ${cx - 7} ${y - 9} Z`;
-  return `<g class="rt-pointer rt-now-bob"><path d="${star}" fill="${INK}" transform="translate(2 2)"/><path d="${star}" fill="#ffd23f" stroke="${INK}" stroke-width="3"/><text x="${cx}" y="${y + 1}" text-anchor="middle" font-weight="800" font-size="13" fill="${INK}">NOW!</text></g>`;
+  return `<g class="rt-pointer rt-now-bob"><path d="${star}" fill="${INK}" transform="translate(2 2)"/><path d="${star}" fill="#ffd23f" stroke="${INK}" stroke-width="3"/><text x="${cx}" y="${y + 1}" text-anchor="middle" font-weight="800" font-size="13" fill="${INK}">${esc(L('overlay.now'))}!</text></g>`;
 }
 
 function playedStamp(cx, cy) {
-  return `<g class="cm-stamp" transform="rotate(-9 ${cx} ${cy})"><rect x="${cx - 40}" y="${cy - 15}" width="80" height="30" rx="7" fill="#fff" stroke="${INK}" stroke-width="3"/><text x="${cx}" y="${cy + 6}" text-anchor="middle" font-weight="800" font-size="16" fill="#c92a2a" letter-spacing="1">PLAYED</text></g>`;
+  return `<g class="cm-stamp" transform="rotate(-9 ${cx} ${cy})"><rect x="${cx - 40}" y="${cy - 15}" width="80" height="30" rx="7" fill="#fff" stroke="${INK}" stroke-width="3"/><text x="${cx}" y="${cy + 6}" text-anchor="middle" font-weight="800" font-size="16" fill="#c92a2a" letter-spacing="1">${esc(L('overlay.played'))}</text></g>`;
 }
 function spark(x, y) {
   return `<text class="cm-spark" x="${x}" y="${y}" font-size="30" font-weight="800" fill="#22d3ee" stroke="${INK}" stroke-width="1.5">★</text>`;
@@ -167,7 +171,7 @@ function comicTender(x, w, org) {
   let s = `<rect x="${x - GAP - 2}" y="${railY - 42}" width="${GAP + 6}" height="8" rx="4" fill="${INK}"/>`;
   s += inkBox(x + 8, 100, w - 16, 72, 12, '#cfe3ff');
   s += porthole('cm-org', x + 36, 134, 21, org.image, org.name);
-  s += `<rect x="${x + 60}" y="116" width="${w - 72}" height="22" rx="11" fill="#ffd23f" stroke="${INK}" stroke-width="3"/><text x="${x + 60 + (w - 72) / 2}" y="131" text-anchor="middle" font-weight="800" font-size="8.5" fill="${INK}" letter-spacing="0.5">ORGANISED BY</text>`;
+  s += `<rect x="${x + 60}" y="116" width="${w - 72}" height="22" rx="11" fill="#ffd23f" stroke="${INK}" stroke-width="3"/><text x="${x + 60 + (w - 72) / 2}" y="131" text-anchor="middle" font-weight="800" font-size="8.5" fill="${INK}" letter-spacing="0.5">${esc(L('overlay.organisedBy'))}</text>`;
   s += `<text class="rt-fit" data-maxw="${w - 22}" x="${centerX(x, w)}" y="164" text-anchor="middle" font-weight="800" font-size="14" fill="${INK}">${esc(org.name)}</text>`;
   const front = wheel(x + 40, railY, 16, INK, 6, '#cfe3ff') + wheel(x + w - 40, railY, 16, INK, 6, '#cfe3ff');
   return { body: s, front };
@@ -178,7 +182,7 @@ function comicOpen(x, w, v, i) {
   let s = i > 0 ? `<rect x="${x - GAP - 2}" y="${railY - 42}" width="${GAP + 6}" height="8" rx="4" fill="${INK}"/>` : '';
   s += `<rect x="${x + 8}" y="92" width="${w - 16}" height="80" rx="12" fill="#eafff0" stroke="${COL.open}" stroke-width="4" stroke-dasharray="11 8"/>`;
   s += `<circle cx="${cx}" cy="124" r="26" fill="#fff" stroke="${COL.open}" stroke-width="4"/><text x="${cx}" y="${134}" text-anchor="middle" font-weight="800" font-size="34" fill="${COL.open}">?</text>`;
-  s += `<rect x="${cx - 42}" y="148" width="84" height="24" rx="12" fill="#fff" stroke="${COL.open}" stroke-width="3"/><text x="${cx}" y="165" text-anchor="middle" font-weight="800" font-size="13" fill="#246b33">SIGN UP</text>`;
+  s += `<rect x="${cx - 42}" y="148" width="84" height="24" rx="12" fill="#fff" stroke="${COL.open}" stroke-width="3"/><text x="${cx}" y="165" text-anchor="middle" font-weight="800" font-size="13" fill="#246b33">${esc(L('overlay.signUp'))}</text>`;
   const front = wheel(x + 46, railY, 17, INK, 6, '#eafff0') + wheel(x + w - 46, railY, 17, INK, 6, '#eafff0');
   return { body: s, front };
 }
@@ -209,7 +213,8 @@ function renderUnit(unit, x, w, i) {
   return `<g class="rt-car${stateClasses}"${dataAttr}><g class="cm-art">${parts.body}</g><g class="cm-front">${parts.front}</g>${burst}</g>`;
 }
 
-export function build(train) {
+export function build(train, opts = {}) {
+  L = themeT(opts);
   const vehicles = toVehicles(train);
   const units = [];
   const engine = vehicles[0];

@@ -16,7 +16,12 @@
  *
  * Transparent only — no full-bleed background.
  */
-import { SVG_NS, esc, wheel, smokeSVG, pointerSVG, avatarSVG, fitAll, undulate, toVehicles } from './shared-svg.js';
+import { SVG_NS, esc, wheel, smokeSVG, pointerSVG, avatarSVG, fitAll, undulate, toVehicles, themeT } from './shared-svg.js';
+
+// The translator the builders paint with: rebound to the active locale at the
+// top of build() (themeT reads config.t), English until then. Module-level is
+// safe — build() runs synchronously start to finish before any other render.
+let L = themeT();
 
 const ENG = 256;
 const CAR = 200;
@@ -142,8 +147,7 @@ function classicTender(x, w, org) {
   // Avatar top-left with the "ORGANISED BY" label beside it; the name gets its OWN
   // full-width line below so even a long handle fits (rt-fit condenses if needed).
   s += avatarSVG('cl-org', x + 32, bodyTop + 36, 19, org.image, org.name, COL.org);
-  s += `<text x="${x + 60}" y="${bodyTop + 31}" font-weight="800" font-size="10" fill="#e9c46a" letter-spacing="1.5">ORGANISED</text>`;
-  s += `<text x="${x + 60}" y="${bodyTop + 45}" font-weight="800" font-size="10" fill="#e9c46a" letter-spacing="1.5">BY</text>`;
+  s += `<text x="${x + 60}" y="${bodyTop + 38}" font-weight="800" font-size="10" fill="#e9c46a" letter-spacing="1.5">${esc(L('overlay.organisedBy'))}</text>`;
   s += `<text class="rt-fit" data-maxw="${w - 22}" x="${cx}" y="${bodyTop + 69}" text-anchor="middle" font-weight="800" font-size="15" fill="#f1b40a">${esc(org.name)}</text>`;
   const front = wheel(x + 34, wy, 16, '#c92a2a', 6, '#5e0d0d') + wheel(x + w - 34, wy, 16, '#c92a2a', 6, '#5e0d0d');
   return { body: s, front };
@@ -176,7 +180,7 @@ function classicCoach(x, w, v, i, maxTimeLines, caboose) {
   // on the body, angled across it.
   const sx = centerX(x, w);
   const sy = railY - 44;
-  s += `<g class="cl-stamp" transform="rotate(-9 ${sx} ${sy})"><rect x="${sx - 40}" y="${sy - 15}" width="80" height="30" rx="4" fill="#2a0a0a" opacity="0.66" stroke="#ff9a9a" stroke-width="2.5"/><text x="${sx}" y="${sy + 6}" text-anchor="middle" font-weight="800" font-size="16" fill="#ffd0d0" letter-spacing="2">PLAYED</text></g>`;
+  s += `<g class="cl-stamp" transform="rotate(-9 ${sx} ${sy})"><rect x="${sx - 40}" y="${sy - 15}" width="80" height="30" rx="4" fill="#2a0a0a" opacity="0.66" stroke="#ff9a9a" stroke-width="2.5"/><text x="${sx}" y="${sy + 6}" text-anchor="middle" font-weight="800" font-size="16" fill="#ffd0d0" letter-spacing="2">${esc(L('overlay.played'))}</text></g>`;
   const front = [x + 34, x + 64, x + w - 64, x + w - 34]
     .map((cxw) => wheel(cxw, wy, 16, '#c92a2a', 6, '#5e0d0d')).join('');
   return { body: s, front };
@@ -188,8 +192,8 @@ function classicOpen(x, w, v) {
   const cx = centerX(x, w);
   let s = `<rect x="${x + 6}" y="${railY}" width="${w - 12}" height="10" rx="2" fill="#7a1414"/>`;
   s += `<rect x="${x + 10}" y="${bodyTop}" width="${w - 20}" height="60" rx="8" fill="none" stroke="${COL.open}" stroke-width="4" stroke-dasharray="11 7"/>`;
-  s += `<text x="${cx}" y="${bodyTop + 26}" text-anchor="middle" font-weight="800" font-size="24" fill="${COL.open}">OPEN</text>`;
-  s += `<text x="${cx}" y="${bodyTop + 43}" text-anchor="middle" font-weight="700" font-size="11" fill="${COL.open}">sign up!</text>`;
+  s += `<text x="${cx}" y="${bodyTop + 26}" text-anchor="middle" font-weight="800" font-size="24" fill="${COL.open}">${esc(L('overlay.open'))}</text>`;
+  s += `<text x="${cx}" y="${bodyTop + 43}" text-anchor="middle" font-weight="700" font-size="11" fill="${COL.open}">${esc(L('overlay.signUp'))}</text>`;
   s += `<text class="cl-time" x="${cx}" y="${bodyTop + 55}" text-anchor="middle" font-weight="700" font-size="11" fill="${COL.open}">${timeTspans(v.timeLines, cx, bodyTop + 55)}</text>`;
   const front = [x + 34, x + 64, x + w - 64, x + w - 34]
     .map((cxw) => wheel(cxw, wy, 16, '#2f2f2f', 6, '#cfd6dd')).join('');
@@ -211,7 +215,7 @@ function renderUnit(unit, x, w, i, maxTimeLines) {
       (v.isCurrent ? ' rt-car--current' : '') +
       (v.isSpotlit ? ' rt-car--spotlit' : '') +
       (v.isDimmed ? ' rt-car--departed' : '');
-    pointer = `<g class="rt-pointer rt-now-bob">${pointerSVG(centerX(x, w), 44, COL.now, 'NOW')}</g>`;
+    pointer = `<g class="rt-pointer rt-now-bob">${pointerSVG(centerX(x, w), 44, COL.now, L('overlay.now'))}</g>`;
     dataSlot = ' data-engine="1"';
   } else if (unit.type === 'tender') {
     parts = classicTender(x, w, v);
@@ -220,7 +224,7 @@ function renderUnit(unit, x, w, i, maxTimeLines) {
   } else if (v.isOpen) {
     parts = classicOpen(x, w, v);
     stateClasses = (v.isCurrent ? ' rt-car--current' : '') + (v.isDeparted ? ' rt-car--departed' : '');
-    pointer = `<g class="rt-pointer rt-now-bob">${pointerSVG(centerX(x, w), 44, COL.now, 'NOW')}</g>`;
+    pointer = `<g class="rt-pointer rt-now-bob">${pointerSVG(centerX(x, w), 44, COL.now, L('overlay.now'))}</g>`;
     dataSlot = ` data-slot="${v.slotOrder}"`;
   } else {
     parts = classicCoach(x, w, v, i, maxTimeLines, unit.type === 'caboose');
@@ -228,7 +232,7 @@ function renderUnit(unit, x, w, i, maxTimeLines) {
       (v.isCurrent ? ' rt-car--current' : '') +
       (v.isDeparted ? ' rt-car--departed' : '') +
       (v.isSpotlit ? ' rt-car--spotlit' : '');
-    pointer = `<g class="rt-pointer rt-now-bob">${pointerSVG(centerX(x, w), 44, COL.now, 'NOW')}</g>`;
+    pointer = `<g class="rt-pointer rt-now-bob">${pointerSVG(centerX(x, w), 44, COL.now, L('overlay.now'))}</g>`;
     dataSlot = ` data-slot="${v.slotOrder}"`;
   }
   // cl-back (e.g. the loco's driving wheels) renders behind the body; cl-front
@@ -237,6 +241,7 @@ function renderUnit(unit, x, w, i, maxTimeLines) {
 }
 
 export function build(train, opts = {}) {
+  L = themeT(opts);
   const maxTimeLines = opts.maxTimeLines || 1;
   const vehicles = toVehicles(train);
 

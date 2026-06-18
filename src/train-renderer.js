@@ -322,7 +322,7 @@ export function renderTrain(train, container, config) {
   applyMode(track, config, buildCopy);
   requestAnimationFrame(() => {
     for (const copy of built) copy.afterAttach?.();
-    pinLeadBadges(track);
+    pinLeadBadges(track, config);
   });
 
   return {
@@ -337,7 +337,8 @@ export function renderTrain(train, container, config) {
  *  streamer reads clearly as the lead on any Theme. It lives in the moving Track
  *  so it rides along, and is measured after layout so it sits over the loco art
  *  whatever shape the Theme drew. */
-function pinLeadBadges(track) {
+function pinLeadBadges(track, config) {
+  const conductor = config?.t ? config.t('overlay.conductor') : 'CONDUCTOR';
   const trackRect = track.getBoundingClientRect();
   // Anchor vertically to a coach's top — the car-body line, which the loco's smoke
   // (a taller bounding box) would otherwise push the badge way above.
@@ -351,7 +352,7 @@ function pinLeadBadges(track) {
     if (!rect.width) continue;
     const badge = document.createElement('div');
     badge.className = 'rt-lead';
-    badge.textContent = 'CONDUCTOR';
+    badge.textContent = conductor;
     badge.style.left = `${rect.left - trackRect.left + rect.width / 2}px`;
     badge.style.top = `${topY}px`;
     track.appendChild(badge);

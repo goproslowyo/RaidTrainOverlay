@@ -12,7 +12,12 @@
  * A Theme is one module exporting { key, ensureStyles, build, buildTrack }. The
  * four contract pieces are numbered inline below.
  */
-import { esc, wheel, avatarSVG, pointerSVG, fitAll, undulate, toVehicles } from '../shared-svg.js';
+import { esc, wheel, avatarSVG, pointerSVG, fitAll, undulate, toVehicles, themeT } from '../shared-svg.js';
+
+// The translator the builders paint with: rebound to the active locale at the top
+// of build() (themeT reads config.t), English until then. The viewer-facing words
+// (OPEN / NOW / PLAYED / sign up!) come from L('overlay.*') now, not hardcoded.
+let L = themeT();
 
 // Bundled asset: new URL('./assets/x', import.meta.url) resolves against
 // the module's deployed location — correct under any base path, no build, no config.
@@ -69,8 +74,8 @@ function starterCar(v, x, w, i, isEngine) {
   const fill = isEngine ? '#8a4b12' : v.isOpen ? '#14361f' : '#1e3a5f';
   let body = `<rect x="${x + 6}" y="${top}" width="${w - 12}" height="104" rx="12" fill="${fill}" stroke="${ring}" stroke-width="3"/>`;
   if (v.isOpen) {
-    body += `<text x="${cx}" y="${top + 50}" text-anchor="middle" font-weight="800" font-size="26" fill="#37b24d">OPEN</text>`;
-    body += `<text x="${cx}" y="${top + 72}" text-anchor="middle" font-weight="700" font-size="12" fill="#6ee7a7">sign up!</text>`;
+    body += `<text x="${cx}" y="${top + 50}" text-anchor="middle" font-weight="800" font-size="26" fill="#37b24d">${esc(L('overlay.open'))}</text>`;
+    body += `<text x="${cx}" y="${top + 72}" text-anchor="middle" font-weight="700" font-size="12" fill="#6ee7a7">${esc(L('overlay.signUp'))}</text>`;
   } else {
     // avatarSVG paints initials, then the (clipped) avatar over them — so a 404 on
     // the flaky CDN still shows initials, never a blank hole.
@@ -80,7 +85,7 @@ function starterCar(v, x, w, i, isEngine) {
   // The bundled asset, per-element: a maker's mark on the loco only.
   if (isEngine) body += `<image href="${BADGE}" x="${x + 10}" y="${top + 6}" width="26" height="26"/>`;
   // PLAYED stamp — only a booked Slot can be "played", never an Open one.
-  if (!v.isOpen) body += `<g class="st-stamp" transform="rotate(-8 ${cx} ${railY - 52})"><rect x="${cx - 34}" y="${railY - 65}" width="68" height="26" rx="4" fill="#2a0a0acc" stroke="#ff9a9a" stroke-width="2"/><text x="${cx}" y="${railY - 47}" text-anchor="middle" font-weight="800" font-size="13" fill="#ffd0d0" letter-spacing="1">PLAYED</text></g>`;
+  if (!v.isOpen) body += `<g class="st-stamp" transform="rotate(-8 ${cx} ${railY - 52})"><rect x="${cx - 34}" y="${railY - 65}" width="68" height="26" rx="4" fill="#2a0a0acc" stroke="#ff9a9a" stroke-width="2"/><text x="${cx}" y="${railY - 47}" text-anchor="middle" font-weight="800" font-size="13" fill="#ffd0d0" letter-spacing="1">${esc(L('overlay.played'))}</text></g>`;
   const front = wheel(x + 34, railY + 12, 16, '#374151', 6, '#9ca3af') + wheel(x + w - 34, railY + 12, 16, '#374151', 6, '#9ca3af');
   return { body, front };
 }
@@ -89,7 +94,8 @@ function starterCar(v, x, w, i, isEngine) {
  *    flattens the live view-model: vehicles[0] is the locomotive (the organiser, who
  *    conducts the train); the rest are the coaches. (engine.organiser is a vestigial,
  *    always-null fallback — the organiser drives the loco, so there is no tender.) */
-export function build(train) {
+export function build(train, opts = {}) {
+  L = themeT(opts);
   const vehicles = toVehicles(train);
   const widthOf = (i) => (i === 0 ? ENG : CAR);
   const xs = [];
@@ -108,7 +114,7 @@ export function build(train) {
     const state = (v.isCurrent ? ' rt-car--current' : '') + (v.isSpotlit ? ' rt-car--spotlit' : '') + (departed ? ' rt-car--departed' : '');
     const slot = isEngine ? ' data-engine="1"' : ` data-slot="${v.slotOrder}"`;
     // The Now Marker is always in the DOM; base CSS reveals it on .rt-car--current.
-    const pointer = v.isOpen ? '' : `<g class="rt-pointer rt-now-bob">${pointerSVG(xs[i] + w / 2, 30, '#fbbf24', 'NOW')}</g>`;
+    const pointer = v.isOpen ? '' : `<g class="rt-pointer rt-now-bob">${pointerSVG(xs[i] + w / 2, 30, '#fbbf24', L('overlay.now'))}</g>`;
     body += `<g class="rt-car${state}"${slot}><g class="st-art">${parts.body}</g><g class="st-front">${parts.front}</g>${pointer}</g>`;
   });
 

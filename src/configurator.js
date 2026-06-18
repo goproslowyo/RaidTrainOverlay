@@ -40,6 +40,7 @@ export function buildOverlayQuery(formState = {}) {
   const params = new URLSearchParams();
   const slug = extractSlug(formState.event);
   if (slug) params.set('event', slug);
+  if (formState.lang) params.set('lang', String(formState.lang));
   if (formState.mode) params.set('mode', formState.mode);
   if (formState.openslots) params.set('openslots', '1');
   if (formState.hidefinished) params.set('hidefinished', '1');

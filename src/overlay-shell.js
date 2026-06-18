@@ -10,12 +10,24 @@ import { startEventFeed } from './event-feed.js';
 import { buildTrain } from './lineup-engine.js';
 import { renderTrain, SHIPPED_THEMES } from './train-renderer.js';
 import { DEMO_SLUG, DEMO_SPOTLIGHT, makeDemoEvent } from './demo-event.js';
+import { resolveLocale, loadMessages, makeT } from './i18n/index.js';
 
 const config = parseConfig(window.location.search);
 // Preview/showcase (?preview=1): a static, centred Train (no traversal) for the
 // Configurator's live preview and for screenshotting an overlay. Read raw so it
 // stays out of the URL schema (parseConfig) and the Configurator's copied link.
 config.preview = ['1', 'true', 'on', 'yes'].includes((new URLSearchParams(window.location.search).get('preview') ?? '').toLowerCase());
+
+// Resolve the display locale once and bind a translator onto config: the engine
+// and every Theme read their words through config.t / config.locale. ?lang= wins,
+// else the browser's preference. Top-level await so the catalog is ready before
+// the first render — an OBS source must never flash English then swap.
+await applyLocale(resolveLocale(config.lang, navigator.languages));
+async function applyLocale(locale) {
+  config.locale = locale;
+  config.t = makeT(await loadMessages(locale));
+  document.documentElement.lang = locale;
+}
 const container = document.getElementById('train');
 // Vertical placement (height param): --train-pos is the height as a
 // 0..1 fraction; the renderer's .rt-stage clamps the Train within the canvas so
@@ -116,7 +128,7 @@ if (!config.event) {
   // (e.g. Zen's sidebar reacting to an iframe navigation). Guarded to same-origin
   // + the preview flag, so it can never affect a real OBS overlay.
   if (config.preview) {
-    window.addEventListener('message', (event) => {
+    window.addEventListener('message', async (event) => {
       if (event.origin !== window.location.origin) return;
       if (event.data?.type === 'rto-preview-pause') {
         // Freeze/resume the roll sweep IN PLACE: pause only the Track's traversal
@@ -129,6 +141,10 @@ if (!config.event) {
       if (event.data?.type !== 'rto-preview') return;
       const wasShuffle = config.theme === 'shuffle';
       Object.assign(config, parseConfig(event.data.query), { preview: true });
+      // A locale change in the Configurator re-loads the catalog before re-render
+      // (rare + deliberate, so the async reload is fine here).
+      const nextLocale = resolveLocale(config.lang, navigator.languages);
+      if (nextLocale !== config.locale) await applyLocale(nextLocale);
       if (config.event === DEMO_SLUG && config.spotlight.length === 0) config.spotlight = DEMO_SPOTLIGHT;
       config.previewRoll = !!event.data.roll; // still showcase ⇄ rolling sweep
       container.style.setProperty('--train-pos', String(config.height / 100));

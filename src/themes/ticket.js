@@ -30,8 +30,12 @@
  * a perforated stub, punch-holes, № + barcode, and a wax-stamp per state. The card
  * has no wheels in the mockup (it sits on the rail), so htmlWheel is omitted.
  */
-import { fitAll, undulate, toVehicles, esc } from './shared-svg.js';
+import { fitAll, undulate, toVehicles, esc, themeT } from './shared-svg.js';
 import { ensureHtmlShared, injectStyle, htmlAvatar, stateClasses, timeLinesHTML } from './shared-html.js';
+
+// Translator the builders paint with — rebound to the active locale in build();
+// it persists for the in-place update() ticks (same locale until a re-render).
+let L = themeT();
 
 const STYLE_ID = 'rt-theme-ticket-style';
 // The ticket card is 104 design px tall. Mapping the full card to --rt-th made
@@ -168,7 +172,7 @@ function kindLabel(v) {
 function metaBlock(v) {
   if (v.isOpen) {
     const t = v.timeLines[0] ? ` · ${esc(v.timeLines[0])}` : '';
-    return `<span>CLAIM IT${t.toUpperCase()}</span>`;
+    return `<span>${esc(L('overlay.signUp').toUpperCase())}${t.toUpperCase()}</span>`;
   }
   return timeLinesHTML((v.timeLines ?? []).map((l) => `DEP ${l.toUpperCase()}`));
 }
@@ -187,16 +191,16 @@ function ticketCar(v) {
 
   if (v.isOpen) {
     const stub = `<div class="tk-stub tk-stub-open"><div class="tk-punch t"></div><div class="tk-punch b"></div>+</div>`;
-    const main = `<div class="tk-main"><div class="tk-line">RAID TRAIN · COACH</div><div class="tk-name rt-fit">SEAT AVAILABLE</div><div class="tk-meta">${metaBlock(v)}</div><div class="tk-barcode"></div></div>`;
+    const main = `<div class="tk-main"><div class="tk-line">RAID TRAIN · COACH</div><div class="tk-name rt-fit">${esc(L('overlay.open'))}</div><div class="tk-meta">${metaBlock(v)}</div><div class="tk-barcode"></div></div>`;
     return `<div class="${cls}"${dataSlot}>${stub}${main}</div>`;
   }
 
   // Stamps: always present, revealed by state. BOARDING rides the base .rt-pointer
   // hook (Now only). VIP / PUNCHED are revealed by --spotlit / --departed in CSS.
   const stamps =
-    `<div class="rt-pointer tk-stamp tk-board">BOARDING</div>` +
+    `<div class="rt-pointer tk-stamp tk-board">${esc(L('status.boarding'))}</div>` +
     `<div class="tk-stamp tk-vip">★ VIP</div>` +
-    `<div class="tk-stamp tk-dep">PLAYED</div>`;
+    `<div class="tk-stamp tk-dep">${esc(L('overlay.played'))}</div>`;
   // ticket № from the vehicle index along the lineup.
   const no = String(1013 + v.no * 7);
   const stub = `<div class="tk-stub"><div class="tk-punch t"></div><div class="tk-punch b"></div><div class="tk-av">${htmlAvatar(v)}</div><div class="tk-no">№ ${no}</div></div>`;
@@ -209,11 +213,12 @@ function ticketCar(v) {
  *  a long handle like "teknokat222" condenses to fit rather than clipping. */
 function tenderCar(org) {
   const stub = `<div class="tk-stub"><div class="tk-punch t"></div><div class="tk-punch b"></div><div class="tk-av">${htmlAvatar(org)}</div><div class="tk-no">SEASON PASS</div></div>`;
-  const main = `<div class="tk-main"><div class="tk-tender-label">ORGANISED BY</div><div class="tk-tender-name rt-fit">${esc(org.name)}</div><div class="tk-barcode"></div></div>`;
+  const main = `<div class="tk-main"><div class="tk-tender-label">${esc(L('overlay.organisedBy'))}</div><div class="tk-tender-name rt-fit">${esc(org.name)}</div><div class="tk-barcode"></div></div>`;
   return `<div class="rt-car tk-card tk-tender" data-tender="1">${stub}${main}</div>`;
 }
 
-export function build(train) {
+export function build(train, opts = {}) {
+  L = themeT(opts);
   const vehicles = toVehicles(train);
   vehicles.forEach((v, i) => { v.no = i; });
   const node = document.createElement('div');

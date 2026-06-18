@@ -15,7 +15,11 @@
  *
  * Transparent only — no full-bleed background.
  */
-import { esc, wheel, smokeSVG, pointerSVG, avatarSVG, fitAll, undulate, toVehicles } from './shared-svg.js';
+import { esc, wheel, smokeSVG, pointerSVG, avatarSVG, fitAll, undulate, toVehicles, themeT } from './shared-svg.js';
+
+// The translator the builders paint with — rebound to the active locale at the
+// top of build(); persists for the in-place update() ticks (English until then).
+let L = themeT();
 
 const ENGINE_W = 206;
 const CAR_W = 172;
@@ -125,7 +129,7 @@ function paperCoach(x, w, v, i, caboose) {
   const timeBaseY = 158;
   s += `<text class="pp-time" data-base-y="${timeBaseY}" x="${x + 80 + (w - 92) / 2}" y="${timeBaseY}" text-anchor="middle" font-family="${FONT}" font-weight="700" font-size="12" fill="${INK}">${(v.timeLines ?? [''])[0] ?? ''}</text>`;
   const sx = centerX(x, w), sy = 150;
-  s += `<g class="pp-stamp" transform="rotate(-8 ${sx} ${sy})"><rect x="${sx - 38}" y="${sy - 14}" width="76" height="28" rx="3" fill="#fff7ec" stroke="#b23a2a" stroke-width="2.5"/><text x="${sx}" y="${sy + 6}" text-anchor="middle" font-family="${FONT}" font-weight="800" font-size="15" fill="#b23a2a" letter-spacing="2">PLAYED</text></g>`;
+  s += `<g class="pp-stamp" transform="rotate(-8 ${sx} ${sy})"><rect x="${sx - 38}" y="${sy - 14}" width="76" height="28" rx="3" fill="#fff7ec" stroke="#b23a2a" stroke-width="2.5"/><text x="${sx}" y="${sy + 6}" text-anchor="middle" font-family="${FONT}" font-weight="800" font-size="15" fill="#b23a2a" letter-spacing="2">${esc(L('overlay.played'))}</text></g>`;
   s += `</g>`;
   const front = paperWheel(x + 44, railY, 15) + paperWheel(x + w - 44, railY, 15);
   return { body: s, front };
@@ -137,7 +141,7 @@ function paperTender(x, w, org) {
   s += `<g transform="rotate(-1 ${cx} 132)">`;
   s += paperPiece(x + 8, 98, w - 16, 76, '#d8b98a');
   s += polaroid('pp-org', x + 38, 132, 20, org.image, org.name, -3, '#f4b09acc');
-  s += `<text x="${x + 66}" y="124" font-family="${FONT}" font-weight="800" font-size="10" fill="#6b4a22" letter-spacing="1">ORGANISED BY</text>`;
+  s += `<text x="${x + 66}" y="124" font-family="${FONT}" font-weight="800" font-size="10" fill="#6b4a22" letter-spacing="1">${esc(L('overlay.organisedBy'))}</text>`;
   s += handLabel(x + 64, 134, w - 78, org.name, w - 92, 15);
   s += `</g>`;
   const front = paperWheel(x + 40, railY, 14) + paperWheel(x + w - 40, railY, 14);
@@ -148,8 +152,9 @@ function paperOpen(x, w, v, i) {
   const cx = centerX(x, w);
   let s = i > 0 ? `<rect x="${x - GAP - 2}" y="${railY - 40}" width="${GAP + 6}" height="8" rx="4" fill="#caa06a"/>` : '';
   s += `<rect x="${x + 10}" y="92" width="${w - 20}" height="80" rx="8" fill="#eafff0" stroke="${COL.open}" stroke-width="3" stroke-dasharray="9 7"/>`;
-  s += `<text x="${cx}" y="130" text-anchor="middle" font-family="${FONT}" font-weight="800" font-size="30" fill="${COL.open}">OPEN</text>`;
-  const openTime = v.timeLines[0] ? `cut me in! · ${esc(v.timeLines[0])}` : 'cut me in!';
+  s += `<text x="${cx}" y="130" text-anchor="middle" font-family="${FONT}" font-weight="800" font-size="30" fill="${COL.open}">${esc(L('overlay.open'))}</text>`;
+  const signUp = L('overlay.signUp');
+  const openTime = v.timeLines[0] ? `${signUp} · ${esc(v.timeLines[0])}` : signUp;
   s += `<text class="pp-time" data-base-y="152" x="${cx}" y="152" text-anchor="middle" font-family="${FONT}" font-weight="700" font-size="12" fill="${COL.open}">${openTime}</text>`;
   const front = paperWheel(x + 46, railY, 15) + paperWheel(x + w - 46, railY, 15);
   return { body: s, front };
@@ -161,7 +166,7 @@ function renderUnit(unit, x, w, i) {
   if (unit.type === 'engine') {
     parts = paperEngine(x, v, i);
     stateClasses = (v.isCurrent ? ' rt-car--current' : '') + (v.isSpotlit ? ' rt-car--spotlit' : '') + (v.isDimmed ? ' rt-car--departed' : '');
-    pointer = `<g class="rt-pointer rt-now-bob">${pointerSVG(x + 42, 56, COL.now, 'NOW')}</g>`;
+    pointer = `<g class="rt-pointer rt-now-bob">${pointerSVG(x + 42, 56, COL.now, L('overlay.now'))}</g>`;
     dataAttr = ' data-engine="1"';
   } else if (unit.type === 'tender') {
     parts = paperTender(x, w, v);
@@ -170,18 +175,19 @@ function renderUnit(unit, x, w, i) {
   } else if (v.isOpen) {
     parts = paperOpen(x, w, v, i);
     stateClasses = (v.isCurrent ? ' rt-car--current' : '') + (v.isDeparted ? ' rt-car--departed' : '');
-    pointer = `<g class="rt-pointer rt-now-bob">${pointerSVG(centerX(x, w), 56, COL.now, 'NOW')}</g>`;
+    pointer = `<g class="rt-pointer rt-now-bob">${pointerSVG(centerX(x, w), 56, COL.now, L('overlay.now'))}</g>`;
     dataAttr = ` data-slot="${v.slotOrder}"`;
   } else {
     parts = paperCoach(x, w, v, i, unit.type === 'caboose');
     stateClasses = (v.isCurrent ? ' rt-car--current' : '') + (v.isDeparted ? ' rt-car--departed' : '') + (v.isSpotlit ? ' rt-car--spotlit' : '');
-    pointer = `<g class="rt-pointer rt-now-bob">${pointerSVG(x + 42, 54, COL.now, 'NOW')}</g>`;
+    pointer = `<g class="rt-pointer rt-now-bob">${pointerSVG(x + 42, 54, COL.now, L('overlay.now'))}</g>`;
     dataAttr = ` data-slot="${v.slotOrder}"`;
   }
   return `<g class="rt-car${stateClasses}"${dataAttr}><g class="pp-art">${parts.body}</g><g class="pp-front">${parts.front}</g>${pointer}</g>`;
 }
 
-export function build(train) {
+export function build(train, opts = {}) {
+  L = themeT(opts);
   const vehicles = toVehicles(train);
   const units = [];
   const engine = vehicles[0];

@@ -1,43 +1,78 @@
 /**
  * lineup-engine: pure functions from (normalized Event, now, config) to Train
- * view state. No DOM, no I/O. `config` is unused until config-derived state
- * lands, but is part of the signature from day one.
+ * view state. No DOM, no I/O. The display locale rides on `config`: `config.t`
+ * is a bound translator (i18n/index.makeT) and `config.locale` a BCP-47 tag,
+ * both attached by the overlay shell after it resolves the locale. When absent
+ * (unit tests, a cold call) the engine falls back to English so its output is
+ * unchanged — this is why DEFAULT_T below mirrors the en catalog's time keys.
  */
+
+/** The English fallback for the handful of keys the engine localizes, so the
+ *  engine stays self-contained and its no-config output is exactly as before. */
+const DEFAULT_STRINGS = {
+  'overlay.now': 'NOW',
+  'overlay.open': 'OPEN',
+  'time.in': 'in {v}',
+  'time.d': 'd',
+  'time.h': 'h',
+  'time.m': 'm',
+};
+function defaultT(key, params) {
+  let s = DEFAULT_STRINGS[key] ?? key;
+  if (params) for (const [k, v] of Object.entries(params)) s = s.split(`{${k}}`).join(String(v));
+  return s;
+}
+
 /**
  * Relative time string for an upcoming Slot ("in 45m"). Future-only contract:
  * the current Slot reads "NOW" and departed Slots read "" via buildTrain, so
  * this never sees a non-positive delta. Minutes round up — never "in 0m".
+ *
+ * Localized via `t`: the "in {v}" wrapper and the compact d/h/m unit tokens come
+ * from the catalog; the numeric assembly (e.g. "2h30m") stays here so the line
+ * fits the fixed-width Car. `t` defaults to English, so a 2-arg call is unchanged.
  */
-export function formatRelativeTime(starttime, now) {
+export function formatRelativeTime(starttime, now, t = defaultT) {
   const minutes = Math.ceil((starttime.getTime() - now.getTime()) / 60_000);
-  if (minutes < 60) return `in ${minutes}m`;
-  if (minutes < 1440) {
+  const [D, H, M] = [t('time.d'), t('time.h'), t('time.m')];
+  let value;
+  if (minutes < 60) {
+    value = `${minutes}${M}`;
+  } else if (minutes < 1440) {
     const h = Math.floor(minutes / 60);
     const m = minutes % 60;
-    return m === 0 ? `in ${h}h` : `in ${h}h${m}m`;
+    value = m === 0 ? `${h}${H}` : `${h}${H}${m}${M}`;
+  } else {
+    // Beyond a day, leftover minutes are noise on a fixed-size Car.
+    const d = Math.floor(minutes / 1440);
+    const h = Math.floor((minutes % 1440) / 60);
+    value = h === 0 ? `${d}${D}` : `${d}${D}${h}${H}`;
   }
-  // Beyond a day, leftover minutes are noise on a fixed-size Car.
-  const d = Math.floor(minutes / 1440);
-  const h = Math.floor((minutes % 1440) / 60);
-  return h === 0 ? `in ${d}d` : `in ${d}d${h}h`;
+  return t('time.in', { v: value });
 }
 
 /**
  * Absolute wall-clock time of an instant in an IANA zone ("2:00 PM"). DST is
  * automatic: the same instant formatted in a region zone yields the right
- * offset for that date. Locale is fixed to en-US in v1 (12-hour); i18n is a
- * future param.
+ * offset for that date. The locale drives both the digits and 12-vs-24-hour:
+ * `hour12` is no longer forced, so en-US/es-MX render 12-hour and de/nl/da/lt/
+ * fr/it/es-ES render 24-hour. Defaults to en-US so a 2-arg call is unchanged.
  */
-export function formatAbsoluteTime(date, zone) {
-  return new Intl.DateTimeFormat('en-US', {
+export function formatAbsoluteTime(date, zone, locale = 'en-US') {
+  return new Intl.DateTimeFormat(locale, {
     timeZone: zone,
     hour: 'numeric',
     minute: '2-digit',
-    hour12: true,
   }).format(date);
 }
 
 export function buildTrain(event, now, config) {
+  // Display locale rides on config (attached by the overlay shell); absent in
+  // unit tests, where the English fallbacks keep output identical.
+  const t = config.t ?? defaultT;
+  const locale = config.locale ?? 'en-US';
+  const NOW = t('overlay.now');
+
   const slotMs = event.slotDurationMins * 60_000;
   const nowMs = now.getTime();
   // The Slot window is [starttime, starttime + slot_duration_mins): inclusive
@@ -47,9 +82,9 @@ export function buildTrain(event, now, config) {
   const isDepartedSlot = (slot) => nowMs >= slotEndMs(slot);
   // Current reads "NOW"; departed reads "" — dimming is the departed signal.
   const relativeTime = (slot) => {
-    if (isCurrentSlot(slot)) return 'NOW';
+    if (isCurrentSlot(slot)) return NOW;
     if (isDepartedSlot(slot)) return '';
-    return formatRelativeTime(slot.starttime, now);
+    return formatRelativeTime(slot.starttime, now, t);
   };
 
   // With tz set, upcoming Cars show absolute multi-zone times (flyer parity);
@@ -58,9 +93,9 @@ export function buildTrain(event, now, config) {
   const tz = config.tz ?? [];
   const timeLines = (slot) => {
     if (tz.length === 0) return [relativeTime(slot)];
-    if (isCurrentSlot(slot)) return ['NOW'];
+    if (isCurrentSlot(slot)) return [NOW];
     if (isDepartedSlot(slot)) return [''];
-    return tz.map(({ token, zone }) => `${formatAbsoluteTime(slot.starttime, zone)} ${token}`);
+    return tz.map(({ token, zone }) => `${formatAbsoluteTime(slot.starttime, zone, locale)} ${token}`);
   };
 
   // The Caboose is the last Broadcaster's Car — the highest-order occupied
@@ -101,7 +136,7 @@ export function buildTrain(event, now, config) {
             image: slot.broadcaster.image,
           },
         }
-      : { ...base, isOpen: true, isSpotlit: false, broadcaster: null, displayName: 'OPEN' };
+      : { ...base, isOpen: true, isSpotlit: false, broadcaster: null, displayName: t('overlay.open') };
   };
 
   const displayed = event.slots.filter(includeSlot).sort((a, b) => a.order - b.order).map(toCar);

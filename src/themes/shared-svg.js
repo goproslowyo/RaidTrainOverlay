@@ -19,6 +19,40 @@ export const esc = (s) =>
 /** First two alphanumerics of a name, upper-cased — the avatar fallback glyphs. */
 export const initials = (name) => (name || 'OPEN').replace(/[^A-Za-z0-9]/g, '').slice(0, 2).toUpperCase();
 
+/** English fallback for the words painted into the train, so a Theme renders
+ *  correctly even when built without a config (manual harness, a cold call). */
+const LABELS_EN = {
+  'overlay.now': 'NOW',
+  'overlay.open': 'OPEN',
+  'overlay.signUp': 'sign up!',
+  'overlay.played': 'PLAYED',
+  'overlay.organisedBy': 'ORGANISED BY',
+  'overlay.staff': 'STAFF',
+  'status.onTime': 'ON TIME',
+  'status.boarding': 'BOARDING',
+  'status.departed': 'DEPARTED',
+  'status.lead': 'LEAD',
+  'departures.header': 'DEPARTURES',
+};
+
+/**
+ * The translator a Theme paints with: the bound `config.t` (attached by the
+ * overlay shell once it resolves the locale), or an English fallback. Every
+ * Theme reads its viewer-facing words — OPEN / sign up! / NOW / PLAYED, the
+ * organiser credit, the departures statuses — through this, so localization is
+ * one lookup, never a hardcoded literal. `opts` is the Theme build context
+ * (`{ config, maxTimeLines }`).
+ */
+export function themeT(opts) {
+  const t = opts?.config?.t;
+  if (t) return t;
+  return (key, params) => {
+    let s = LABELS_EN[key] ?? key;
+    if (params) for (const [k, v] of Object.entries(params)) s = s.split(`{${k}}`).join(String(v));
+    return s;
+  };
+}
+
 /** A spoked wheel as raw SVG; wrap with `wheel()` so .rt-wheel spins it. */
 export function spoke(cx, cy, r, fill, spokes = 6, spokeCol = '#00000055') {
   let s = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${fill}" stroke="#2b2b2b" stroke-width="2.5"/>`;

@@ -30,8 +30,12 @@
  *
  * Transparent only — no full-bleed background.
  */
-import { fitAll, undulate, toVehicles, esc } from './shared-svg.js';
+import { fitAll, undulate, toVehicles, esc, themeT } from './shared-svg.js';
 import { ensureHtmlShared, injectStyle, htmlAvatar, htmlWheel, stateClasses } from './shared-html.js';
+
+// Translator the builders paint with — rebound to the active locale in build();
+// it persists for the in-place update() ticks (same locale until a re-render).
+let L = themeT();
 
 const STYLE_ID = 'rt-theme-departures-style';
 // The full assembly is ≈110 design px (board 70 + posts 14 + wagon 14 + wheel
@@ -200,16 +204,16 @@ export function buildTrack() {
  *  coach — DEPARTED only post-event (isDimmed), BOARDING during their Slot. */
 function statusText(v) {
   if (v.kind === 'engine') {
-    if (v.isDimmed) return 'DEPARTED';      // the Event is over
-    if (v.isCurrent) return 'BOARDING';     // the first streamer's Slot is live
-    if (v.isDeparted) return 'LEAD';        // played their Slot, still heads the
-                                            // train — "ON TIME" read wrong here
-    return 'ON TIME';                       // upcoming — before their Slot
+    if (v.isDimmed) return L('status.departed');   // the Event is over
+    if (v.isCurrent) return L('status.boarding');  // the first streamer's Slot is live
+    if (v.isDeparted) return L('status.lead');     // played their Slot, still heads the
+                                                   // train — "ON TIME" read wrong here
+    return L('status.onTime');                     // upcoming — before their Slot
   }
-  if (v.isOpen) return 'OPEN';        // unbooked — stays OPEN even once its time passes
-  if (v.isDeparted) return 'DEPARTED';
-  if (v.isCurrent) return 'BOARDING';
-  return 'ON TIME';
+  if (v.isOpen) return L('overlay.open');     // unbooked — stays OPEN even once its time passes
+  if (v.isDeparted) return L('status.departed');
+  if (v.isCurrent) return L('status.boarding');
+  return L('status.onTime');
 }
 
 /** The time-cell text: the first streamer's time line on the loco too (NOW during
@@ -220,7 +224,7 @@ function timeText(v) {
 
 /** Split-flap letters from a name (staggered flip via per-letter animation-delay). */
 function flapsHTML(name, idx) {
-  return [...esc(name || 'OPEN').toUpperCase()]
+  return [...esc(name || L('overlay.open')).toUpperCase()]
     .map((ch, k) => `<span class="dp-flap" style="animation-delay:${(-(idx * 0.3 + k * 0.12)).toFixed(2)}s">${ch === ' ' ? '&nbsp;' : ch}</span>`)
     .join('');
 }
@@ -239,10 +243,10 @@ function depCar(v, idx) {
   // The loco is the eternal leader (tracked separately, no slotOrder key); coaches
   // key by slotOrder. Its NOW + dim ride .rt-car--* from stateClasses.
   const dataSlot = isEngine ? ' data-engine="1"' : ` data-slot="${v.slotOrder}"`;
-  const cap = isEngine ? `<div class="dp-cap">● DEPARTURES</div>` : '';
+  const cap = isEngine ? `<div class="dp-cap">● ${esc(L('departures.header'))}</div>` : '';
   // PLAYED stamp: always in the DOM, revealed by .rt-car--departed (CSS). Sits on
   // the board itself (the .dp-photo is overflow:hidden), angled over its top-left.
-  const stamp = v.isOpen ? '' : `<div class="dp-stamp">PLAYED</div>`;
+  const stamp = v.isOpen ? '' : `<div class="dp-stamp">${esc(L('overlay.played'))}</div>`;
   const board =
     `<div class="dp-board">` +
       stamp +
@@ -268,16 +272,17 @@ function tenderCar(org) {
     `<div class="dp-board">` +
       `<div class="dp-photo">${htmlAvatar(org)}</div>` +
       `<div class="dp-rows">` +
-        `<div class="dp-tender-label">ORGANISED BY</div>` +
+        `<div class="dp-tender-label">${esc(L('overlay.organisedBy'))}</div>` +
         `<div class="dp-tender-name rt-fit">${esc(org.name)}</div>` +
       `</div>` +
     `</div>`;
   const posts = `<div class="dp-posts"><i></i><i></i></div>`;
   const wagon = `<div class="dp-wagon"><div class="dp-wheels">${htmlWheel('dp-w')}${htmlWheel('dp-w')}${htmlWheel('dp-w')}</div></div>`;
-  return `<div class="rt-car dp-car dp-tender" data-tender="1"><div class="dp-cap">STAFF</div>${board}${posts}${wagon}</div>`;
+  return `<div class="rt-car dp-car dp-tender" data-tender="1"><div class="dp-cap">${esc(L('overlay.staff'))}</div>${board}${posts}${wagon}</div>`;
 }
 
-export function build(train) {
+export function build(train, opts = {}) {
+  L = themeT(opts);
   const vehicles = toVehicles(train);
   const node = document.createElement('div');
   node.className = 'dp rt-theme-departures';

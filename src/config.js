@@ -108,8 +108,13 @@ export function parseConfig(queryString) {
   const params = new URLSearchParams(queryString);
   const event = (params.get('event') ?? '').trim();
   const mode = (params.get('mode') ?? '').toLowerCase();
+  const lang = (params.get('lang') ?? '').trim();
   return {
     event: event === '' ? null : event,
+    // The display locale, kept as the raw requested tag (or null). Resolution to
+    // a supported locale + the navigator fallback happen in the overlay shell so
+    // parseConfig stays pure (no `navigator`); the Configurator's selector sets it.
+    lang: lang === '' ? null : lang,
     mode: mode === 'marquee' ? 'marquee' : 'pass',
     interval: positiveNumber(params.get('interval'), 15),
     speed: positiveNumber(params.get('speed'), 1),
@@ -151,6 +156,9 @@ export function parseConfig(queryString) {
 export function serializeConfig(config) {
   const params = new URLSearchParams();
   if (config.event) params.set('event', config.event);
+  // Locale: emit only when set and not the default English (matches the
+  // omit-defaults contract). The raw requested tag round-trips verbatim.
+  if (config.lang && config.lang !== 'en') params.set('lang', config.lang);
   if (config.mode !== 'pass') params.set('mode', config.mode);
   if (config.interval !== 15) params.set('interval', String(config.interval));
   if (config.speed !== 1) params.set('speed', String(config.speed));

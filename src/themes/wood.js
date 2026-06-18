@@ -22,8 +22,12 @@
  * Transparent only — no full-bleed background. Rounded tinted blocks,
  * magnet couplers between Cars, an engine chimney puffing smoke.
  */
-import { fitAll, undulate, toVehicles, esc } from './shared-svg.js';
+import { fitAll, undulate, toVehicles, esc, themeT } from './shared-svg.js';
 import { ensureHtmlShared, injectStyle, htmlAvatar, htmlWheel, stateClasses, timeLinesHTML } from './shared-html.js';
+
+// Translator the builders paint with — rebound to the active locale in build();
+// it persists for the in-place update() ticks (same locale until a re-render).
+let L = themeT();
 
 const STYLE_ID = 'rt-theme-wood-style';
 // Design height in px = the Car block (padding 18+74 badge + ~8 badge gap + name
@@ -177,7 +181,7 @@ function woodKid() {
 function timeBlock(v) {
   if (v.isOpen) {
     const t = v.timeLines[0] ? ` · ${esc(v.timeLines[0])}` : '';
-    return `hop on!${t}`;
+    return `${L('overlay.signUp')}${t}`;
   }
   return timeLinesHTML(v.timeLines);
 }
@@ -199,14 +203,14 @@ function woodCar(v, i) {
   const wheels = `<div class="wd-wheels">${htmlWheel('wd-w')}${htmlWheel('wd-w')}</div>`;
 
   if (v.isOpen) {
-    return `<div class="${cls}"${dataSlot}><div class="wd-badge wd-badge-open">+</div><div class="wd-name rt-fit">OPEN</div><div class="wd-time">${timeBlock(v)}</div>${wheels}</div>`;
+    return `<div class="${cls}"${dataSlot}><div class="wd-badge wd-badge-open">+</div><div class="wd-name rt-fit">${esc(L('overlay.open'))}</div><div class="wd-time">${timeBlock(v)}</div>${wheels}</div>`;
   }
 
   const tint = isEngine ? ENGINE_TINT : WOOD_TINTS[i % WOOD_TINTS.length];
   const stack = isEngine ? '<div class="wd-stack"><span></span><span></span><span></span></div>' : '';
   // Now flag always present (engine included now); base CSS reveals .rt-pointer
   // only on the current Car, so the loco carries NOW during its streamer's Slot.
-  const flag = '<div class="rt-pointer rt-now-bob wd-flag">NOW</div>';
+  const flag = `<div class="rt-pointer rt-now-bob wd-flag">${esc(L('overlay.now'))}</div>`;
   // ★ star always present; revealed by .rt-car--spotlit.
   const star = '<div class="wd-star">★</div>';
   const knots = '<div class="wd-knot k1"></div><div class="wd-knot k2"></div>';
@@ -214,7 +218,7 @@ function woodCar(v, i) {
   // PLAYED stamp: always in the DOM, revealed by .rt-car--departed (CSS). The loco
   // never carries a per-slot departed (stateClasses only dims it on isDimmed), so
   // it won't stamp until the Event ends.
-  const stamp = '<div class="wd-stamp">PLAYED</div>';
+  const stamp = `<div class="wd-stamp">${esc(L('overlay.played'))}</div>`;
   return `<div class="${cls}"${dataSlot} style="--tint:${tint}">${stack}${flag}${star}${knots}${badge}<div class="wd-name rt-fit">${esc(v.name)}</div><div class="wd-time">${timeBlock(v)}</div>${stamp}${wheels}</div>`;
 }
 
@@ -227,12 +231,13 @@ function tenderCar(org) {
   const knots = '<div class="wd-knot k1"></div><div class="wd-knot k2"></div>';
   return `<div class="rt-car wd-car wd-tender" data-tender="1">`
     + `${knots}<div class="wd-badge">${htmlAvatar(org)}</div>`
-    + `<div class="wd-tender-label">ORGANISED BY</div>`
+    + `<div class="wd-tender-label">${esc(L('overlay.organisedBy'))}</div>`
     + `<div class="wd-tender-name rt-fit">${esc(org.name)}</div>`
     + `${wheels}</div>`;
 }
 
-export function build(train) {
+export function build(train, opts = {}) {
+  L = themeT(opts);
   const vehicles = toVehicles(train);
   const node = document.createElement('div');
   node.className = 'wd rt-theme-wood';

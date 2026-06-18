@@ -25,7 +25,7 @@ test('parseConfig ignores unknown and malformed params', () => {
   const config = parseConfig('?event=trainwreck-lucky-13&bogus=1&%%%');
   assert.equal(config.event, 'trainwreck-lucky-13');
   assert.deepEqual(Object.keys(config), [
-    'event', 'mode', 'interval', 'speed', 'scale', 'openslots', 'spotlight', 'tz', 'height',
+    'event', 'lang', 'mode', 'interval', 'speed', 'scale', 'openslots', 'spotlight', 'tz', 'height',
     'hidefinished', 'enginedim', 'refresh', 'theme',
   ]);
 });
@@ -229,6 +229,10 @@ test('serializeConfig emits only non-default params, keeping the URL minimal', (
   assert.equal(serializeConfig(parseConfig('?event=x&refresh=30')), 'event=x&refresh=30');
   assert.equal(serializeConfig(parseConfig('?event=x&refresh=5')), 'event=x&refresh=15');
   assert.equal(serializeConfig(parseConfig('?event=x&refresh=0')), 'event=x');
+  // lang serializes only when set and not the default English; it sorts right after event.
+  assert.equal(serializeConfig(parseConfig('?event=x&lang=de')), 'event=x&lang=de');
+  assert.equal(serializeConfig(parseConfig('?event=x&lang=es-MX')), 'event=x&lang=es-MX');
+  assert.equal(serializeConfig(parseConfig('?event=x&lang=en')), 'event=x');
   // No event → nothing to render → empty string (defensive; Configurator always has one).
   assert.equal(serializeConfig(parseConfig('')), '');
 });
@@ -258,6 +262,8 @@ test('parse(serialize(parse(q))) round-trips every param (the Configurator contr
     'event=x&enginedim=banana&hidefinished=nope',
     'event=x&refresh=30',
     'event=x&refresh=5',
+    'event=x&lang=de',
+    'event=x&lang=es-MX&theme=flat',
   ];
   for (const query of cases) {
     const parsed = parseConfig(query);

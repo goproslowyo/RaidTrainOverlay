@@ -67,58 +67,71 @@
       </div>
       <div class="rail" aria-hidden="true"></div>
       <h1>RaidTrain<span class="a">Overlay</span></h1>
-      <p class="tag">Your <a href="https://raidpal.com">RaidPal</a> raid train, as an animated train of streamer cars — for OBS.</p>
+      <p class="tag" data-i18n-html="landing.tagline">Your <a href="https://raidpal.com">RaidPal</a> raid train, as an animated train of streamer cars — for OBS.</p>
     </header>
 
     <div class="cta">
-      <a class="btn primary" href="./configurator.html">Build your overlay</a>
-      <a class="btn ghost" href="./preview.html">Preview the overlay</a>
+      <a class="btn primary" href="./configurator.html" data-i18n="landing.build">Build your overlay</a>
+      <a class="btn ghost" href="./preview.html" data-i18n="landing.preview">Preview the overlay</a>
     </div>
-    <p class="muted" style="text-align:center; font-size:0.88rem;">A built-in demo lineup — no event needed. Build yours with your own slug.</p>
+    <p class="muted" style="text-align:center; font-size:0.88rem;" data-i18n="landing.demoNote">A built-in demo lineup — no event needed. Build yours with your own slug.</p>
 
     <section>
-      <h2>How it works</h2>
+      <h2 data-i18n="landing.howTitle">How it works</h2>
       <ol>
-        <li><strong>Open the <a href="./configurator.html">Configurator</a>.</strong> Paste your event's RaidPal
+        <li data-i18n-html="landing.how1"><strong>Open the <a href="./configurator.html">Configurator</a>.</strong> Paste your event's RaidPal
           link — the whole URL is fine, it grabs the event for you — then pick a theme and options and copy the overlay URL.</li>
-        <li><strong>Add it to OBS.</strong> In OBS: <em>Sources → + → Browser</em>, paste the URL, and size the source
+        <li data-i18n-html="landing.how2"><strong>Add it to OBS.</strong> In OBS: <em>Sources → + → Browser</em>, paste the URL, and size the source
           to your canvas. The overlay background is transparent.</li>
       </ol>
     </section>
 
     <section>
-      <h2>Ten themes</h2>
-      <p class="muted">Click a theme to drop it into your overlay URL (Shuffle cycles them all):</p>
+      <h2 data-i18n="landing.themesTitle">Ten themes</h2>
+      <p class="muted" data-i18n="landing.themesIntro">Click a theme to drop it into your overlay URL (Shuffle cycles them all):</p>
       <div class="themes">
-        <button class="chip" data-theme="classic">Classic Americana <code>classic</code></button>
-        <button class="chip" data-theme="flat">Flat <code>flat</code></button>
-        <button class="chip" data-theme="synthwave">Synthwave <code>synthwave</code></button>
-        <button class="chip" data-theme="ticket">Vintage Ticket <code>ticket</code></button>
-        <button class="chip" data-theme="wood">Wooden Toy <code>wood</code></button>
-        <button class="chip" data-theme="comic">Comic <code>comic</code></button>
-        <button class="chip" data-theme="departures">Departures Board <code>departures</code></button>
-        <button class="chip" data-theme="paper">Construction Paper <code>paper</code></button>
-        <button class="chip" data-theme="tron">Tron <code>tron</code></button>
-        <button class="chip" data-theme="pixel">16-bit Pixel <code>pixel</code></button>
-        <button class="chip" data-theme="shuffle">🔀 Shuffle <code>shuffle</code></button>
+        <button class="chip" data-theme="classic"><span data-i18n="landing.theme.classic">Classic Americana</span> <code>classic</code></button>
+        <button class="chip" data-theme="flat"><span data-i18n="landing.theme.flat">Flat</span> <code>flat</code></button>
+        <button class="chip" data-theme="synthwave"><span data-i18n="landing.theme.synthwave">Synthwave</span> <code>synthwave</code></button>
+        <button class="chip" data-theme="ticket"><span data-i18n="landing.theme.ticket">Vintage Ticket</span> <code>ticket</code></button>
+        <button class="chip" data-theme="wood"><span data-i18n="landing.theme.wood">Wooden Toy</span> <code>wood</code></button>
+        <button class="chip" data-theme="comic"><span data-i18n="landing.theme.comic">Comic</span> <code>comic</code></button>
+        <button class="chip" data-theme="departures"><span data-i18n="landing.theme.departures">Departures Board</span> <code>departures</code></button>
+        <button class="chip" data-theme="paper"><span data-i18n="landing.theme.paper">Construction Paper</span> <code>paper</code></button>
+        <button class="chip" data-theme="tron"><span data-i18n="landing.theme.tron">Tron</span> <code>tron</code></button>
+        <button class="chip" data-theme="pixel"><span data-i18n="landing.theme.pixel">16-bit Pixel</span> <code>pixel</code></button>
+        <button class="chip" data-theme="shuffle"><span data-i18n="landing.theme.shuffle">🔀 Shuffle</span> <code>shuffle</code></button>
       </div>
       <div class="url-box">
-        <input type="text" id="overlay-url" readonly aria-label="Overlay URL for the selected theme">
-        <button type="button" id="overlay-copy">Copy</button>
+        <input type="text" id="overlay-url" readonly aria-label="Overlay URL for the selected theme" data-i18n-attr="aria-label:landing.urlAria">
+        <button type="button" id="overlay-copy" data-i18n="landing.copy">Copy</button>
       </div>
-      <p class="muted url-note">Swap <code>your-event-slug</code> for your event — everything else has a sensible default. Or build the full link in the <a href="./configurator.html">Configurator</a>.</p>
+      <p class="muted url-note" data-i18n-html="landing.urlNote">Swap <code>your-event-slug</code> for your event — everything else has a sensible default. Or build the full link in the <a href="./configurator.html">Configurator</a>.</p>
     </section>
 
     <footer>
-      <a href="https://github.com/goproslowyo/RaidTrainOverlay#readme">README</a> &middot;
-      <a href="https://github.com/goproslowyo/RaidTrainOverlay/blob/main/docs/authoring-a-theme.md">Author a theme</a> &middot;
-      <a href="https://github.com/goproslowyo/RaidTrainOverlay">Source</a> &middot;
-      MIT licensed
-      <div class="credit">Built with ❤️ by a streamer, for streamers &middot; by <a href="https://github.com/goproslowyo">goproslowyo</a></div>
-      <div class="ver"><span id="ver">v0.1.0</span><span id="sha"></span></div>
+      <a href="https://github.com/goproslowyo/RaidTrainOverlay#readme" data-i18n="landing.readme">README</a> &middot;
+      <a href="https://github.com/goproslowyo/RaidTrainOverlay/blob/main/docs/authoring-a-theme.md" data-i18n="landing.authorTheme">Author a theme</a> &middot;
+      <a href="https://github.com/goproslowyo/RaidTrainOverlay" data-i18n="landing.source">Source</a> &middot;
+      <span data-i18n="landing.license">MIT licensed</span>
+      <div class="credit"><span data-i18n="landing.credit">Built with ❤️ by a streamer, for streamers</span> &middot; <span data-i18n="landing.creditBy">by</span> <a href="https://github.com/goproslowyo">goproslowyo</a></div>
+      <div class="ver"><span id="ver">v0.2.0</span><span id="sha"></span></div>
     </footer>
   </div>
-  <script>
+  <script type="module">
+    import { resolveLocale, loadMessages } from './src/i18n/index.js';
+    import { localizeDom } from './src/i18n/dom.js';
+
+    // Localize the landing page to ?lang= or the browser's preference; the inline
+    // English stays as the fallback. The chips build minimal demo URLs (no lang —
+    // the Configurator is where the overlay language is set), so a copied link is
+    // just event + theme, exactly as the note describes.
+    const locale = resolveLocale(new URLSearchParams(location.search).get('lang'), navigator.languages);
+    const messages = await loadMessages(locale);
+    localizeDom(document, messages);
+    document.documentElement.lang = locale;
+    const copiedLabel = messages['configurator.copied'] || 'Copied!';
+
     // Theme chips → the overlay URL. Clicking a chip drops its theme into the minimal
     // URL (classic is the default, so it stays omitted); Copy copies it. The base
     // resolves to wherever this page lives (Pages, a custom domain, or local dev), so
@@ -137,7 +150,7 @@
       copy.addEventListener('click', async () => {
         try { await navigator.clipboard.writeText(out.value); }
         catch { out.select(); document.execCommand('copy'); }
-        const orig = copy.textContent; copy.textContent = 'Copied!';
+        const orig = copy.textContent; copy.textContent = copiedLabel;
         setTimeout(() => { copy.textContent = orig; }, 1500);
       });
     })();
