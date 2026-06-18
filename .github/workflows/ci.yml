@@ -1,0 +1,23 @@
+name: CI
+
+# Validates every push and pull request — including translation contributions:
+# the test suite enforces that each locale has every key with {tokens} + HTML
+# intact and that all source parses; the i18n lint prints advisory quality hints.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      # No dependencies to install — the project is dependency-free (node --test).
+      - name: Test suite (hard checks)
+        run: node --test
+      - name: i18n quality lint (advisory)
+        run: node test/i18n-lint.mjs

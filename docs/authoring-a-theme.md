@@ -130,6 +130,28 @@ Two always-in-the-DOM hooks the base CSS drives for you:
 In `update(nextTrain)`, toggle the classes from the next train's state and rewrite any
 time text — see the starter's `update`.
 
+### Localized words (don't hardcode English)
+
+The words your Theme paints — **NOW**, **OPEN**, **sign up!**, **PLAYED**, the organiser
+credit, the departures statuses — are translated. Read them through a translator instead
+of writing the literal: import `themeT` from `shared-svg.js`, bind it at the top of
+`build(train, opts)`, and look up the catalog key:
+
+```js
+import { themeT } from './shared-svg.js';
+let L = themeT();                       // English fallback until build runs
+export function build(train, opts = {}) {
+  L = themeT(opts);                     // opts.config.t, set by the overlay shell
+  // …`>${esc(L('overlay.played'))}</text>`  instead of  `>PLAYED</text>`
+}
+```
+
+Keys live in `src/i18n/locales/en.js`: `overlay.now` / `overlay.open` / `overlay.signUp`
+/ `overlay.played` / `overlay.conductor` / `overlay.organisedBy` / `overlay.staff`,
+`status.{onTime,boarding,departed,lead}`, `departures.header`. (`NOW` and the open-slot
+name already arrive localized in the view model's `timeLines` / `name`.) Keep badge words
+**short** — they sit on fixed-width cars. The starter Theme shows the pattern.
+
 ---
 
 ## 5. Motion, sizing & media

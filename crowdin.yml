@@ -1,0 +1,33 @@
+# Crowdin scaffold — a STARTING POINT, not turnkey. See TRANSLATING.md.
+#
+# Set the project id, and export CROWDIN_PERSONAL_TOKEN before `crowdin push`.
+# The catalogs are ES-module key→string objects (src/i18n/locales/*.js). Crowdin
+# has no first-class parser for `.js` modules, so do ONE of:
+#   (a) In the Crowdin project, assign these files the "JavaScript"/generic
+#       key-value parser and confirm a round-trip on a test branch, OR
+#   (b) Mirror the catalogs to JSON (one small build step) and point Crowdin at
+#       the JSON with `type: json` — the most reliable path.
+# Either way, upload src/i18n/context.js DESCRIPTIONS as per-string CONTEXT and
+# import the existing locale files as draft translations to APPROVE/correct
+# (don't make volunteers start cold — that's what makes a pass actually finish).
+
+project_id: ""
+api_token_env: CROWDIN_PERSONAL_TOKEN
+base_path: "."
+preserve_hierarchy: true
+
+files:
+  - source: /src/i18n/locales/en.js
+    translation: /src/i18n/locales/%locale%.js
+    # type: json   # ← uncomment after switching to a JSON mirror (option b)
+    languages_mapping:
+      locale:
+        es-ES: es-ES
+        es-MX: es-MX
+        pt-BR: pt-BR
+        it: it
+        de: de
+        nl: nl
+        da: da
+        lt: lt
+        fr: fr

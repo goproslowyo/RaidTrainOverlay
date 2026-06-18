@@ -34,6 +34,7 @@ All optional, set as query params (the Configurator writes these for you):
 | Param | Meaning |
 |---|---|
 | `event` | **Required.** RaidPal event slug. |
+| `lang` | Overlay language: `en` (default), `es-ES`, `es-MX`, `pt-BR`, `it`, `de`, `nl`, `da`, `lt`, `fr`. Localizes the on-screen words (NOW, OPEN, PLAYED, statuses) and uses a locale-aware clock; absent, it follows the browser. |
 | `theme` | `classic` (default), `flat`, `synthwave`, `ticket`, `wood`, `comic`, `departures`, `paper`, `tron`, `pixel`. |
 | `mode` | `pass` (one pass every `interval`) or `marquee` (continuous loop). |
 | `speed`, `interval` | Traversal speed; minutes between passes. |
@@ -56,6 +57,16 @@ It's a static site — no build, no server.
 The bundled `.nojekyll` disables Jekyll processing, and all paths are relative, so it works
 under the project subpath as-is. The RaidPal API is fetched client-side from the served
 origin (it works the same from `github.io` as from `localhost`).
+
+## Languages
+
+The overlay and configurator are available in English, Spanish (Spain & Mexico),
+Brazilian Portuguese, Italian, German, Dutch, Danish, Lithuanian, and French — set with
+the `lang` param or the configurator's language picker (it follows the browser otherwise).
+
+The non-English catalogs are machine translations hardened by an automated review pass but
+**not yet confirmed by native speakers** — corrections are very welcome and take ~2 minutes
+(you edit a draft, not a blank page). See **[TRANSLATING.md](TRANSLATING.md)**.
 
 ## Author a theme
 
