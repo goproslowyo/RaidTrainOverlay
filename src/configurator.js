@@ -42,13 +42,14 @@ export function buildOverlayQuery(formState = {}) {
   if (slug) params.set('event', slug);
   if (formState.lang) params.set('lang', String(formState.lang));
   if (formState.mode) params.set('mode', formState.mode);
+  if (formState.track) params.set('track', String(formState.track));
   if (formState.openslots) params.set('openslots', '1');
   if (formState.hidefinished) params.set('hidefinished', '1');
   if (formState.enginedim) params.set('enginedim', String(formState.enginedim));
   if (formState.theme) params.set('theme', String(formState.theme));
   if (formState.spotlight) params.set('spotlight', String(formState.spotlight));
   if (formState.tz) params.set('tz', String(formState.tz));
-  for (const key of ['interval', 'speed', 'scale', 'height', 'refresh']) {
+  for (const key of ['interval', 'speed', 'scale', 'height', 'refresh', 'trackfadein', 'trackfadeout']) {
     const value = formState[key];
     if (value != null && String(value).trim() !== '') params.set(key, String(value));
   }

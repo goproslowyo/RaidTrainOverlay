@@ -25,8 +25,8 @@ test('parseConfig ignores unknown and malformed params', () => {
   const config = parseConfig('?event=trainwreck-lucky-13&bogus=1&%%%');
   assert.equal(config.event, 'trainwreck-lucky-13');
   assert.deepEqual(Object.keys(config), [
-    'event', 'lang', 'mode', 'interval', 'speed', 'scale', 'openslots', 'spotlight', 'tz', 'height',
-    'hidefinished', 'enginedim', 'refresh', 'theme',
+    'event', 'lang', 'mode', 'interval', 'speed', 'track', 'trackfadein', 'trackfadeout', 'scale',
+    'openslots', 'spotlight', 'tz', 'height', 'hidefinished', 'enginedim', 'refresh', 'theme',
   ]);
 });
 
@@ -53,6 +53,31 @@ test('parseConfig parses the speed multiplier with default 1 and garbage fallbac
   assert.equal(parseConfig('?event=x').speed, 1);
   assert.equal(parseConfig('?event=x&speed=0').speed, 1);
   assert.equal(parseConfig('?event=x&speed=fast').speed, 1);
+});
+
+test('parseConfig parses track as an enum, defaulting to always', () => {
+  // Track visibility: always (default) vs periodic (fade out between Passes).
+  assert.equal(parseConfig('?event=x').track, 'always');
+  assert.equal(parseConfig('?event=x&track=periodic').track, 'periodic');
+  assert.equal(parseConfig('?event=x&track=PERIODIC').track, 'periodic');
+  assert.equal(parseConfig('?event=x&track=always').track, 'always');
+  // Garbage / blank fall back to the default (tolerance contract).
+  assert.equal(parseConfig('?event=x&track=banana').track, 'always');
+  assert.equal(parseConfig('?event=x&track=').track, 'always');
+});
+
+test('parseConfig parses track fade durations as 0..120 seconds, defaulting 15 in / 10 out', () => {
+  // Fade in/out seconds for track=periodic; 0 is a legal value (instant cut).
+  assert.equal(parseConfig('?event=x').trackfadein, 15);
+  assert.equal(parseConfig('?event=x').trackfadeout, 10);
+  assert.equal(parseConfig('?event=x&trackfadein=20').trackfadein, 20);
+  assert.equal(parseConfig('?event=x&trackfadeout=5').trackfadeout, 5);
+  assert.equal(parseConfig('?event=x&trackfadein=0').trackfadein, 0); // 0 is valid
+  assert.equal(parseConfig('?event=x&trackfadeout=0').trackfadeout, 0);
+  // Out of range or non-numeric falls back to the default (tolerance contract).
+  assert.equal(parseConfig('?event=x&trackfadein=999').trackfadein, 15);
+  assert.equal(parseConfig('?event=x&trackfadein=-5').trackfadein, 15);
+  assert.equal(parseConfig('?event=x&trackfadeout=soon').trackfadeout, 10);
 });
 
 test('parseConfig parses the scale multiplier as 0.5..2, defaulting to 1', () => {
@@ -207,6 +232,13 @@ test('serializeConfig emits only non-default params, keeping the URL minimal', (
     serializeConfig(parseConfig('?event=x&mode=marquee&interval=5&speed=2')),
     'event=x&mode=marquee&interval=5&speed=2',
   );
+  // track serializes only when periodic; the always default stays omitted.
+  assert.equal(serializeConfig(parseConfig('?event=x&track=periodic')), 'event=x&track=periodic');
+  assert.equal(serializeConfig(parseConfig('?event=x&track=always')), 'event=x');
+  // Fade durations serialize on their own non-default value; defaults (15/10) stay omitted.
+  assert.equal(serializeConfig(parseConfig('?event=x&trackfadein=20&trackfadeout=5')), 'event=x&trackfadein=20&trackfadeout=5');
+  assert.equal(serializeConfig(parseConfig('?event=x&trackfadein=15&trackfadeout=10')), 'event=x');
+  assert.equal(serializeConfig(parseConfig('?event=x&trackfadeout=0')), 'event=x&trackfadeout=0');
   // openslots serializes as 1 only when on; height only when off its default.
   assert.equal(
     serializeConfig(parseConfig('?event=x&openslots=1&height=20')),
@@ -255,6 +287,9 @@ test('parse(serialize(parse(q))) round-trips every param (the Configurator contr
   const cases = [
     'event=x',
     'event=x&mode=marquee&interval=5&speed=2&scale=1.5&openslots=1&spotlight=dj alpha,dj charlie&tz=PT,ET,GMT&height=20',
+    'event=x&track=periodic&interval=7',
+    'event=x&track=periodic&trackfadein=20&trackfadeout=5',
+    'event=x&trackfadeout=0&trackfadein=8',
     'event=x&mode=banana&interval=0&scale=0&tz=PT,Bogus,ET&height=999&bogus=1',
     'event=x&scale=999',
     'event=x&tz=Europe/Amsterdam&spotlight=Solo',

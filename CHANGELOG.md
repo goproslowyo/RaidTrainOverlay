@@ -4,6 +4,27 @@ All notable changes to RaidTrainOverlay are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and the project follows
 [Semantic Versioning](https://semver.org/).
 
+## [0.3.0] - 2026-06-17
+
+Periodic track. The rails can now clear out between passes, so the overlay reclaims your
+lower-third in the gaps.
+
+### Added
+- **Periodic track** (`track` param): `track=periodic` fades the rails out after each
+  pass and back in just before the next one, so the overlay goes completely empty between
+  passes instead of leaving the bare rails on screen. The default `track=always` keeps the
+  rails up the whole time, exactly as before. Pass mode only — the Configurator exposes it
+  under **Motion** and disables it for Marquee. The track fades (it never slides — the
+  rails stay put), fully laid down before the train arrives and cleared after it leaves.
+  Fade durations are configurable (`trackfadein` / `trackfadeout`, default 15s / 10s, also
+  under **Motion**) and clamped so even short intervals keep a beat of true-empty. The rails
+  also fade in on the very first roll (and for each shuffle theme) rather than popping in.
+
+### Fixed
+- **Pass mode**: the held-off-screen train is now hidden during the wait between passes,
+  so the trailing car's ambient sway can no longer peek a sliver back onto the left edge.
+  Most visible with `track=periodic`, where the overlay is otherwise empty.
+
 ## [0.2.0] - 2026-06-17
 
 Localization. The overlay and configurator now speak 10 languages, and the time display
@@ -56,5 +77,6 @@ for an OBS browser source. Static hosting on GitHub Pages, no build step.
 - A cache-first RaidPal client resilient to transient fetch failures, and a GitHub
   Pages landing page with a live deployed-commit stamp in the footer.
 
+[0.3.0]: https://github.com/goproslowyo/RaidTrainOverlay/releases/tag/v0.3.0
 [0.2.0]: https://github.com/goproslowyo/RaidTrainOverlay/releases/tag/v0.2.0
 [0.1.0]: https://github.com/goproslowyo/RaidTrainOverlay/releases/tag/v0.1.0

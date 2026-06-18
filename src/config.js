@@ -118,6 +118,15 @@ export function parseConfig(queryString) {
     mode: mode === 'marquee' ? 'marquee' : 'pass',
     interval: positiveNumber(params.get('interval'), 15),
     speed: positiveNumber(params.get('speed'), 1),
+    // Track visibility: `always` shows the rails the whole time (default);
+    // `periodic` fades them out between Passes so the Overlay goes fully empty,
+    // then back in before the next Pass. A pass-Mode concept (no-op otherwise).
+    track: oneOf(params.get('track'), ['always', 'periodic'], 'always'),
+    // Track fade durations in seconds (track=periodic only): how long the rails
+    // take to fade in before a Pass and out after it. 0 = an instant cut. Both
+    // are clamped to the available gap at render, so a long value degrades gracefully.
+    trackfadein: boundedNumber(params.get('trackfadein'), 0, 120, 15),
+    trackfadeout: boundedNumber(params.get('trackfadeout'), 0, 120, 10),
     // Size multiplier on the default --train-height. Distinct from
     // `height` (vertical position): `scale` is how big, `height` is where.
     // Bounded 0.5..2 (×28vh baseline = 14..56vh); 1 is the no-op default.
@@ -162,6 +171,11 @@ export function serializeConfig(config) {
   if (config.mode !== 'pass') params.set('mode', config.mode);
   if (config.interval !== 15) params.set('interval', String(config.interval));
   if (config.speed !== 1) params.set('speed', String(config.speed));
+  if (config.track !== 'always') params.set('track', config.track);
+  // Fade durations serialize on their own non-default value (independent of track,
+  // so serialize∘parse stays idempotent); they simply have no effect unless periodic.
+  if (config.trackfadein !== 15) params.set('trackfadein', String(config.trackfadein));
+  if (config.trackfadeout !== 10) params.set('trackfadeout', String(config.trackfadeout));
   if (config.scale !== 1) params.set('scale', String(config.scale));
   if (config.openslots) params.set('openslots', '1');
   if (config.spotlight.length > 0) params.set('spotlight', config.spotlight.join(','));

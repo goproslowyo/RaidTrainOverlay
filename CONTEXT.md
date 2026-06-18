@@ -61,7 +61,10 @@ The display behavior of the overlay: `pass` (train rolls across every N minutes)
 
 **Track**:
 The rails the Train rides on — a stationary, full-screen layer. The Train moves along the Track; the Track itself never moves. Styled per Theme (steel rail and ties, neon grid, wooden sleepers, etc.).
-_Avoid_: rail line, road
+_Avoid_: rail line, road, railroad
+
+**Track visibility**:
+Whether the Track is shown *always* (the default) or *periodically*. Periodic visibility shows the Track only around each **Pass** — it fades in before the Train enters and fades out after the Train clears, so the Overlay goes fully empty between Passes (reclaiming the lower-third). Honors "the Track never moves": the change is a fade, not a slide. A `pass`-Mode-only concept — marquee and preview always show the Track.
 
 **Ambient animation**:
 The Train's per-Theme idle motion — wheels turning, smoke puffing, and Cars undulating — distinct from the macro **Mode** traversal. Organic and varied rather than a uniform mechanical wave: each Theme sets its own **Ride character** and may bump a little off the rail for liveliness without ever reading as derailed. Makes the Train read as rolling, not gliding.
@@ -92,6 +95,7 @@ _Avoid_: skin, style (style is the CSS/code sense), look, art (in code; fine in 
 
 - "Conductor" was used for the Organiser's engine role; canonical split: the *person* is the **Organiser**, the *vehicle* is the **Engine**.
 - **Spotlight** vs **Now Marker**: Spotlight is user-configured emphasis; Now Marker is time-derived. A Car can have both.
+- **"Animation"** is overloaded: the macro screen traversal is a **Pass** (a Mode behavior); the per-Theme idle motion (wheels, smoke, undulation) is **Ambient animation**. Always say which — never a bare "animation".
 
 ## Example dialogue
 

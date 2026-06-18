@@ -268,13 +268,56 @@ function applyMode(track, config, buildCopy) {
   const traversalSec = (trackWidth + viewportWidth) / velocity;
   const periodSec = Math.max(intervalMins * 60, traversalSec);
   const holdFrom = (traversalSec / periodSec) * 100;
-  setModeStyle(`
+  // visibility flips to hidden exactly at the hold boundary so the held-off-screen
+  // Train can't peek back into view: at translateX(-100%) the Caboose's trailing
+  // edge sits at the left viewport edge, and its ambient sway (plus the edge-Car
+  // overflow:visible bleed) would otherwise show a stray sliver during the hold.
+  // The CSS visibility step keeps it `visible` through the whole traversal (0→hold)
+  // and only goes `hidden` for the off-screen hold (hold→100); 0% restores visible.
+  let css = `
     @keyframes rt-pass {
-      0% { transform: translateX(100vw); }
-      ${holdFrom}%, 100% { transform: translateX(-100%); }
+      0% { transform: translateX(100vw); visibility: visible; }
+      ${holdFrom}%, 100% { transform: translateX(-100%); visibility: hidden; }
     }
     .rt-track--pass { animation: rt-pass ${periodSec}s linear infinite; }
-  `);
+  `;
+  // Periodic Track visibility (track=periodic): fade the stationary rails OUT
+  // during the off-screen hold between Passes, and back IN just before the next
+  // Pass enters — so the Overlay goes fully empty between Passes. Opacity-only,
+  // on the same period as rt-pass (own animation name, so the shuffle
+  // rt-pass-boundary listener ignores it). The Track never moves: this is a fade,
+  // not a slide. A no-op when the Theme draws no rails, or when the interval is
+  // so short there's effectively no gap to fade into.
+  const rails = track.parentElement?.querySelector('.rt-rails');
+  const holdPct = 100 - holdFrom; // the empty gap, as a % of the period
+  if (config?.track === 'periodic' && rails && holdPct > 1) {
+    // Fade durations (seconds) come from config — trackfadein / trackfadeout,
+    // default 15 in / 10 out — each clamped to ≤40% of the gap so a sliver of
+    // true-empty always survives even at short intervals (graceful degradation).
+    const fadeInSec = Number.isFinite(config?.trackfadein) ? config.trackfadein : 15;
+    const fadeOutSec = Number.isFinite(config?.trackfadeout) ? config.trackfadeout : 10;
+    const fadeOutPct = Math.min((fadeOutSec / periodSec) * 100, 0.4 * holdPct);
+    const fadeInPct = Math.min((fadeInSec / periodSec) * 100, 0.4 * holdPct);
+    // The looping keyframe only fades in AHEAD of later Passes (its tail leads into
+    // the next Pass), so on load — and on every shuffle re-render — the rails would
+    // pop in at full opacity on the FIRST roll. A one-shot intro fades them up as that
+    // first Train rolls in, over the same duration, capped at the traversal so it hands
+    // opacity off to the loop (which holds 1 while the Train crosses) with no jump. It's
+    // listed last so it wins over the loop while it runs; skipped when fade-in is 0.
+    const introSec = Math.min((fadeInPct / 100) * periodSec, traversalSec);
+    const intro = fadeInSec > 0;
+    css += `
+      @keyframes rt-rails-periodic {
+        0%, ${holdFrom}% { opacity: 1; }
+        ${holdFrom + fadeOutPct}%, ${100 - fadeInPct}% { opacity: 0; }
+        100% { opacity: 1; }
+      }
+      ${intro ? '@keyframes rt-rails-intro { from { opacity: 0; } to { opacity: 1; } }' : ''}
+      .rt-rails--periodic { animation: rt-rails-periodic ${periodSec}s linear infinite${intro ? `, rt-rails-intro ${introSec}s linear` : ''}; }
+    `;
+    rails.classList.add('rt-rails--periodic');
+  }
+  setModeStyle(css);
   // Frame one is off-screen right — a Pass begins immediately on load.
   track.style.transform = 'translateX(100vw)';
   track.classList.add('rt-track--pass');

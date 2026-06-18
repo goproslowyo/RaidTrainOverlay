@@ -248,6 +248,24 @@
           <input type="number" id="f-interval" min="1" step="1" value="15">
           <div class="hint" id="interval-note">How often the train rolls across.</div>
         </div>
+        <div class="field" id="track-row">
+          <label class="lbl" for="f-track" data-i18n="configurator.trackLabel">Track between passes</label>
+          <select id="f-track">
+            <option value="always" data-i18n="configurator.trackAlways">Always show the track</option>
+            <option value="periodic" data-i18n="configurator.trackPeriodic">Fade it out between passes</option>
+          </select>
+          <div class="hint" id="track-note">With the train gone between passes, fade the rails out too so the overlay is completely empty until the next pass rolls in.</div>
+        </div>
+        <div class="field" id="trackfade-row">
+          <label class="lbl" data-i18n="configurator.trackFadeLabel">Track fade timing (seconds)</label>
+          <div class="row">
+            <label class="hint" for="f-trackfadein" style="margin:0" data-i18n="configurator.trackFadeInLabel">In</label>
+            <input type="number" id="f-trackfadein" min="0" max="120" step="1" value="15" style="width:90px">
+            <label class="hint" for="f-trackfadeout" style="margin:0" data-i18n="configurator.trackFadeOutLabel">Out</label>
+            <input type="number" id="f-trackfadeout" min="0" max="120" step="1" value="10" style="width:90px">
+          </div>
+          <div class="hint" data-i18n="configurator.trackFadeHint">How long the rails take to fade in before each pass, and out after it leaves. Long values are trimmed to fit short intervals.</div>
+        </div>
         <div class="field">
           <label class="lbl" for="f-speed" data-i18n="configurator.speedLabel">Animation speed</label>
           <input type="number" id="f-speed" min="0.1" step="0.1" value="1">
@@ -336,6 +354,8 @@
     const $ = (id) => document.getElementById(id);
     const els = {
       event: $('f-event'), mode: $('f-mode'), interval: $('f-interval'), speed: $('f-speed'),
+      track: $('f-track'), trackRow: $('track-row'), trackNote: $('track-note'),
+      trackfadein: $('f-trackfadein'), trackfadeout: $('f-trackfadeout'), trackfadeRow: $('trackfade-row'),
       refresh: $('f-refresh'),
       openslots: $('f-openslots'), spotlight: $('f-spotlight'), tz: $('f-tz'),
       hidefinished: $('f-hidefinished'), enginedim: $('f-enginedim'),
@@ -372,6 +392,9 @@
         event: els.event.value,
         mode: els.mode.value,
         interval: els.interval.value,
+        track: els.track.value,
+        trackfadein: els.trackfadein.value,
+        trackfadeout: els.trackfadeout.value,
         speed: els.speed.value,
         refresh: els.refresh.value,
         openslots: els.openslots.checked,
@@ -389,6 +412,9 @@
       els.event.value = fs.event ?? '';
       els.mode.value = fs.mode === 'marquee' ? 'marquee' : 'pass';
       els.interval.value = fs.interval ?? '15';
+      els.track.value = ['always', 'periodic'].includes(fs.track) ? fs.track : 'always';
+      els.trackfadein.value = fs.trackfadein ?? '15';
+      els.trackfadeout.value = fs.trackfadeout ?? '10';
       els.speed.value = fs.speed ?? '1';
       els.refresh.value = fs.refresh ?? '';
       els.openslots.checked = Boolean(fs.openslots);
@@ -440,6 +466,16 @@
           : isPass ? t('configurator.intervalNotePass')
             : isShuffle ? t('configurator.intervalNoteShuffle')
               : t('configurator.intervalNoteOff');
+      // Periodic Track visibility is a Pass-only behaviour (no off-screen gap in
+      // marquee), so disable + dim + explain it whenever Mode isn't Pass.
+      els.track.disabled = !isPass;
+      els.trackRow.classList.toggle('dimmed', !isPass);
+      els.trackNote.textContent = isPass ? t('configurator.trackHint') : t('configurator.intervalNoteOff');
+      // Fade durations only bite when the track actually fades (Pass + periodic).
+      const fadeActive = isPass && fs.track === 'periodic';
+      els.trackfadein.disabled = !fadeActive;
+      els.trackfadeout.disabled = !fadeActive;
+      els.trackfadeRow.classList.toggle('dimmed', !fadeActive);
       els.heightOut.textContent = fs.height;
       els.scaleOut.textContent = fs.scale;
 
@@ -602,7 +638,8 @@
     els.event.addEventListener('blur', collapseEventToSlug);
     els.event.addEventListener('paste', () => setTimeout(collapseEventToSlug, 0));
 
-    for (const el of [els.event, els.mode, els.interval, els.speed, els.refresh, els.openslots,
+    for (const el of [els.event, els.mode, els.interval, els.track, els.trackfadein, els.trackfadeout,
+      els.speed, els.refresh, els.openslots,
       els.hidefinished, els.enginedim, els.spotlight, els.tz, els.theme, els.scale, els.height]) {
       el.addEventListener('input', onFormChange);
     }
@@ -693,6 +730,9 @@
         event: c.event ?? '',
         mode: c.mode,
         interval: String(c.interval),
+        track: c.track,
+        trackfadein: String(c.trackfadein),
+        trackfadeout: String(c.trackfadeout),
         speed: String(c.speed),
         refresh: c.refresh ? String(c.refresh) : '',
         openslots: c.openslots,
