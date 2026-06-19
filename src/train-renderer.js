@@ -18,6 +18,10 @@ import departures from './themes/departures.js';
 import paper from './themes/paper.js';
 import tron from './themes/tron.js';
 import pixel from './themes/pixel.js';
+import highvibes from './themes/highvibes.js';
+import jazz from './themes/jazz.js';
+import bullet from './themes/bullet.js';
+import lava from './themes/lava.js';
 // A Theme registers the same way whether it is a single file (./themes/<key>.js) or
 // a folder that bundles its own assets (./themes/<key>/index.js) — both are ES
 // modules with a default export. `starter` is the folder form: the
@@ -29,7 +33,7 @@ import starter from './themes/starter/index.js';
  *  via the URL/Configurator. Single-file and folder-form Themes register identically.
  *  `starter` is registered (renderable via the manual harness #theme=starter) but
  *  kept out of the user-facing enum — it is the authoring reference, not a roster Theme. */
-export const THEMES = { classic, flat, synthwave, ticket, wood, comic, departures, paper, tron, pixel, starter };
+export const THEMES = { classic, flat, synthwave, ticket, wood, comic, departures, paper, tron, pixel, highvibes, jazz, bullet, lava, starter };
 
 /** config.theme → Theme, falling back to classic for unknown/unshipped keys. */
 export function resolveTheme(key) {
@@ -113,7 +117,9 @@ function ensureBaseStyles() {
        bright slab, so it marks without overpowering the art. */
     .rt-lead {
       position: absolute; z-index: 5; pointer-events: none; white-space: nowrap;
-      transform: translate(-50%, -118%);
+      /* Anchored at the loco body top (pinLeadBadges); -108% sits the badge a small,
+         size-scaled gap just above it — no longer floating high off the old -118%. */
+      transform: translate(-50%, -108%);
       font: 700 calc(var(--rt-th) / 19) system-ui, "Segoe UI", sans-serif; letter-spacing: 0.08em;
       padding: 0.12em 0.6em; border-radius: 1em; background: rgba(18, 20, 26, 0.8);
       color: #f6cf5a; border: 1px solid rgba(244, 196, 48, 0.45); box-shadow: 0 0.1em 0.3em #0006;
@@ -121,6 +127,14 @@ function ensureBaseStyles() {
     /* Once the whole Event is over, the lead loco dims deeper than a played coach,
        so it reads clearly as finished (a played coach stays light + stamped). */
     .rt-stage [data-engine].rt-car--departed { opacity: 0.45; }
+    /* The locomotive IS the organiser — it has no Slot, so it never "plays" one and
+       must never carry a per-slot stamp. Some Themes render their stamp inside every
+       car (incl. the loco) and reveal it on .rt-car--departed; post-event the engine
+       gets that class (to dim, above) and the stamp would ride along. Suppress any
+       stamp on the engine here, Theme-agnostically: every Theme names its stamp
+       *-stamp (cl-stamp, hv-stamp, tk-stamp, dp-stamp, …). The engine still dims;
+       it just isn't stamped. (Coaches are unaffected — this is scoped to [data-engine].) */
+    .rt-stage [data-engine] [class*="-stamp"] { display: none !important; visibility: hidden !important; }
 
     /* Ambient animation: per-Car undulation, spinning spoked wheels,
        puffing smoke, and the Now Marker's bob. Compositor-only (transform/opacity).
@@ -383,21 +397,26 @@ export function renderTrain(train, container, config) {
 function pinLeadBadges(track, config) {
   const conductor = config?.t ? config.t('overlay.conductor') : 'CONDUCTOR';
   const trackRect = track.getBoundingClientRect();
-  // Anchor vertically to a coach's top — the car-body line, which the loco's smoke
-  // (a taller bounding box) would otherwise push the badge way above.
-  const coach = track.querySelector('.rt-car:not([data-engine])');
-  const topY = (coach ? coach.getBoundingClientRect().top : trackRect.top) - trackRect.top;
   for (const engine of track.querySelectorAll('[data-engine]')) {
-    // Centre on the loco BODY (the `-art` group) where a Theme has one, so smoke /
-    // front wheels don't skew it; otherwise the whole Car (HTML Themes have no smoke).
-    const body = engine.querySelector('[class$="-art"]') ?? engine;
+    // Anchor the badge to the loco BODY itself — the `-art` group, which is the loco's
+    // drawn body and (crucially) EXCLUDES the smoke/front layers and the always-in-DOM
+    // (hidden) NOW pointer that inflate the car's bounding box. Earlier this anchored to
+    // the first COACH's top, but that line varies per Theme and is polluted by those
+    // hidden/tall elements, so the badge floated far above the loco (comic/paper/bullet)
+    // or dropped onto a coach's sign (departures). The body top + a small CSS gap
+    // (translateY in .rt-lead) puts it a consistent hair above every loco. Falls back to
+    // the whole car only for Themes with no `-art` group (their car top is the body top).
+    // A Theme whose loco art is tall in an awkward way (e.g. classic's smokestack
+    // sits high in cl-art) can place an explicit, invisible `.rt-lead-anchor` at the
+    // exact line the badge should sit above; otherwise use the loco body (`-art`).
+    const body = engine.querySelector('.rt-lead-anchor') ?? engine.querySelector('[class$="-art"]') ?? engine;
     const rect = body.getBoundingClientRect();
     if (!rect.width) continue;
     const badge = document.createElement('div');
     badge.className = 'rt-lead';
     badge.textContent = conductor;
     badge.style.left = `${rect.left - trackRect.left + rect.width / 2}px`;
-    badge.style.top = `${topY}px`;
+    badge.style.top = `${rect.top - trackRect.top}px`;
     track.appendChild(badge);
   }
 }

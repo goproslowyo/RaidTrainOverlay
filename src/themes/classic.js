@@ -125,6 +125,11 @@ function classicEngine(x, v, i) {
   s += `<rect x="${px}" y="${py}" width="${pw}" height="28" rx="6" fill="#1c1c1c" stroke="#f1b40a" stroke-width="2"/>`;
   s += `<text class="rt-fit" data-maxw="${pw - 10}" x="${cx}" y="${py + 13}" text-anchor="middle" font-weight="800" font-size="14" fill="#f1b40a">${esc(v.name)}</text>`;
   s += `<text class="cl-time" x="${cx}" y="${timeBaseY}" text-anchor="middle" font-weight="700" font-size="11" fill="#e9c46a">${timeTspans(v.timeLines ?? [''], cx, timeBaseY)}</text>`;
+  // Invisible CONDUCTOR-badge anchor: the smokestack/funnel sits high in cl-art, so
+  // without this the badge floats above the funnel. Anchor it to the boiler-top line,
+  // centred over the cab (the funnel is off to the left), so the badge sits just over
+  // the loco body. (The renderer's pinLeadBadges prefers .rt-lead-anchor.)
+  s += `<rect class="rt-lead-anchor" x="${cx - 1}" y="${railY - 60}" width="2" height="2" fill="none" pointer-events="none"/>`;
   // BACK (animating, behind the body): the big driving wheels — the boiler/frame
   // covers their tops so they peek out below and never block the avatar or plate.
   const back = wheel(x + 78, wy, 26, '#c92a2a', 6, '#5e0d0d') + wheel(x + 128, wy, 26, '#c92a2a', 6, '#5e0d0d') + wheel(x + 178, wy, 26, '#c92a2a', 6, '#5e0d0d')

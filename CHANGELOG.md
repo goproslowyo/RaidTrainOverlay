@@ -4,6 +4,45 @@ All notable changes to RaidTrainOverlay are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and the project follows
 [Semantic Versioning](https://semver.org/).
 
+## [0.4.0] - 2026-06-18
+
+Four "gold-standard" themes. The roster gains its most detailed scenes yet — a cannabis
+garden, a jazz vinyl lounge, an anime bullet train, and a psychedelic lava lounge — each
+with a full scene behind the train. Plus two long-standing overlay fixes that touch the
+whole roster.
+
+### Added
+- **Four new themes** (in the Configurator's theme picker, each with a friendly alias):
+  - **High Vibes** (`highvibes` / `smoke`) — leaf-forward potted cannabis plants with
+    frosted avatar medallions, over a rolling-hill landscape with drifting leaves and
+    rising spores.
+  - **Jazz** (`jazz` / `coltrane`) — spinning Blue-Note vinyl on a warm club deck, each
+    record's label an instrument matched to the player; chrome tonearm + floating notes on
+    the live cut; the spotlit cut wears a ★ STAFF pick.
+  - **Bullet** (`bullet` / `shinkansen`) — an anime art-train, each car wrapped in a
+    different Japanese art style (the lead car always sakura), gliding over scene-wide
+    rushing speed-lines with a power-up burst on the live car.
+  - **Lava Lounge** (`lava` / `lavalamp`) — one continuous psychedelic lava river that
+    churns, fuses and colour-blends across the whole train, with each broadcaster a glass
+    bead floating in the wax.
+  - Each paints a translucent lower-third "scene band" behind the train, so the scene
+    reads over a live stream while the top of the frame stays see-through. All four are
+    localized in the Configurator across the 10 supported languages.
+
+### Fixed
+- **The locomotive is no longer stamped "PLAYED."** The organiser drives the train and has
+  no slot of their own, so the engine now simply dims once the event is over instead of
+  also carrying a PLAYED stamp (which had been riding along on several themes). Fixed
+  theme-agnostically in the renderer, plus in-module for the canvas-based pixel theme.
+- **CONDUCTOR badge placement.** The lead badge now anchors to the locomotive's own body
+  rather than a coach's roofline, fixing it floating too high (classic, comic, paper,
+  bullet) or dropping onto the first car's sign (departures).
+
+### Performance
+- The new themes are filter-free except **Lava**, which deliberately keeps a per-frame
+  metaball + hue-cycle ("ultra mode") for its colour-blend; the effect is a single shared
+  layer to keep the cost bounded. Worth an OBS check before a long broadcast.
+
 ## [0.3.0] - 2026-06-17
 
 Periodic track. The rails can now clear out between passes, so the overlay reclaims your
@@ -77,6 +116,7 @@ for an OBS browser source. Static hosting on GitHub Pages, no build step.
 - A cache-first RaidPal client resilient to transient fetch failures, and a GitHub
   Pages landing page with a live deployed-commit stamp in the footer.
 
+[0.4.0]: https://github.com/goproslowyo/RaidTrainOverlay/releases/tag/v0.4.0
 [0.3.0]: https://github.com/goproslowyo/RaidTrainOverlay/releases/tag/v0.3.0
 [0.2.0]: https://github.com/goproslowyo/RaidTrainOverlay/releases/tag/v0.2.0
 [0.1.0]: https://github.com/goproslowyo/RaidTrainOverlay/releases/tag/v0.1.0

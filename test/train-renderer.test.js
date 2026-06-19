@@ -2,6 +2,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolveTheme, THEMES } from '../src/train-renderer.js';
 import classic from '../src/themes/classic.js';
+import highvibes from '../src/themes/highvibes.js';
+import jazz from '../src/themes/jazz.js';
+import bullet from '../src/themes/bullet.js';
+import lava from '../src/themes/lava.js';
 
 // The Theme strategy interface: config.theme selects a Theme by key;
 // everything else about a Theme stays inside the renderer. These tests pin the
@@ -9,6 +13,15 @@ import classic from '../src/themes/classic.js';
 
 test('resolveTheme returns the Theme registered under its key', () => {
   assert.equal(resolveTheme('classic'), classic);
+});
+
+test('resolveTheme returns the four new Themes by their canonical keys', () => {
+  // highvibes/jazz/bullet/lava ported from their MFA prototypes; each registers
+  // under its canonical key (their friendly aliases resolve in config.js).
+  assert.equal(resolveTheme('highvibes'), highvibes);
+  assert.equal(resolveTheme('jazz'), jazz);
+  assert.equal(resolveTheme('bullet'), bullet);
+  assert.equal(resolveTheme('lava'), lava);
 });
 
 test('resolveTheme falls back to classic for unknown, unshipped, or missing keys', () => {

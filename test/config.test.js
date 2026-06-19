@@ -219,6 +219,16 @@ test('parseConfig parses theme as an enum, defaulting to classic', () => {
   // `neon` is the old mockup name for synthwave — kept as an alias.
   assert.equal(parseConfig('?event=x&theme=neon').theme, 'synthwave');
   assert.equal(parseConfig('?event=x&theme=NEON').theme, 'synthwave');
+  // The four new Themes resolve by their canonical keys.
+  assert.equal(parseConfig('?event=x&theme=highvibes').theme, 'highvibes');
+  assert.equal(parseConfig('?event=x&theme=jazz').theme, 'jazz');
+  assert.equal(parseConfig('?event=x&theme=bullet').theme, 'bullet');
+  assert.equal(parseConfig('?event=x&theme=lava').theme, 'lava');
+  // …and by their friendly aliases (case-insensitive), like neon→synthwave.
+  assert.equal(parseConfig('?event=x&theme=smoke').theme, 'highvibes');
+  assert.equal(parseConfig('?event=x&theme=coltrane').theme, 'jazz');
+  assert.equal(parseConfig('?event=x&theme=SHINKANSEN').theme, 'bullet');
+  assert.equal(parseConfig('?event=x&theme=lavalamp').theme, 'lava');
   // Unknown / garbage Theme keys fall back to the default (tolerance contract).
   assert.equal(parseConfig('?event=x&theme=banana').theme, 'classic');
   assert.equal(parseConfig('?event=x&theme=').theme, 'classic');

@@ -87,7 +87,7 @@
     </section>
 
     <section>
-      <h2 data-i18n="landing.themesTitle">Ten themes</h2>
+      <h2 data-i18n="landing.themesTitle">Themes</h2>
       <p class="muted" data-i18n="landing.themesIntro">Click a theme to drop it into your overlay URL (Shuffle cycles them all):</p>
       <div class="themes">
         <button class="chip" data-theme="classic"><span data-i18n="landing.theme.classic">Classic Americana</span> <code>classic</code></button>
@@ -100,6 +100,10 @@
         <button class="chip" data-theme="paper"><span data-i18n="landing.theme.paper">Construction Paper</span> <code>paper</code></button>
         <button class="chip" data-theme="tron"><span data-i18n="landing.theme.tron">Tron</span> <code>tron</code></button>
         <button class="chip" data-theme="pixel"><span data-i18n="landing.theme.pixel">16-bit Pixel</span> <code>pixel</code></button>
+        <button class="chip" data-theme="highvibes"><span data-i18n="landing.theme.highvibes">High Vibes</span> <code>highvibes</code></button>
+        <button class="chip" data-theme="jazz"><span data-i18n="landing.theme.jazz">Jazz Vinyl</span> <code>jazz</code></button>
+        <button class="chip" data-theme="bullet"><span data-i18n="landing.theme.bullet">Anime Bullet Train</span> <code>bullet</code></button>
+        <button class="chip" data-theme="lava"><span data-i18n="landing.theme.lava">Lava Lamp</span> <code>lava</code></button>
         <button class="chip" data-theme="shuffle"><span data-i18n="landing.theme.shuffle">🔀 Shuffle</span> <code>shuffle</code></button>
       </div>
       <div class="url-box">
@@ -115,7 +119,7 @@
       <a href="https://github.com/goproslowyo/RaidTrainOverlay" data-i18n="landing.source">Source</a> &middot;
       <span data-i18n="landing.license">MIT licensed</span>
       <div class="credit"><span data-i18n="landing.credit">Built with ❤️ by a streamer, for streamers</span> &middot; <span data-i18n="landing.creditBy">by</span> <a href="https://github.com/goproslowyo">goproslowyo</a></div>
-      <div class="ver"><span id="ver">v0.2.0</span><span id="sha"></span></div>
+      <div class="ver"><span id="ver">v0.4.0</span><span id="sha"></span></div>
     </footer>
   </div>
   <script type="module">
@@ -162,6 +166,23 @@
       .then((c) => {
         if (c && c.sha) document.getElementById('sha').innerHTML =
           ' &middot; <a href="' + c.html_url + '" title="deployed commit">' + c.sha.slice(0, 7) + '</a>';
+      })
+      .catch(() => {});
+
+    // Show the latest released version, fetched live (semver-sorted) from the tags API —
+    // so the footer never goes stale when a release forgets to bump a hardcoded string
+    // (which is exactly how it got stuck at v0.2.0). The inline value is the offline
+    // fallback. Both calls fail silently.
+    fetch('https://api.github.com/repos/goproslowyo/RaidTrainOverlay/tags?per_page=100')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((tags) => {
+        if (!Array.isArray(tags)) return;
+        const parse = (n) => (n.match(/^v?(\d+)\.(\d+)\.(\d+)$/) || []).slice(1).map(Number);
+        const latest = tags
+          .map((t) => t.name)
+          .filter((n) => parse(n).length === 3)
+          .sort((a, b) => { const x = parse(a), y = parse(b); return y[0] - x[0] || y[1] - x[1] || y[2] - x[2]; })[0];
+        if (latest) document.getElementById('ver').textContent = latest[0] === 'v' ? latest : 'v' + latest;
       })
       .catch(() => {});
   </script>

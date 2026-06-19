@@ -243,7 +243,11 @@ function drawCar(ctx, ox, bob, v, img, f) {
   const handed = v.kind === 'engine' ? v.isDimmed : v.isDeparted;
   if (handed) {
     ctx.globalAlpha = 0.22; px(ctx, ox + 4, bodyTop, CW - 10, bodyH, '#555'); ctx.globalAlpha = 1;
-    drawPlayed(ctx, ox, bodyTop + bodyH - 11);
+    // The loco is the ORGANISER — it has no slot, so it never "plays" one: it dims
+    // post-event (the wash above) but is NEVER stamped PLAYED. Coaches get the stamp.
+    // (This is the canvas equivalent of the renderer's [data-engine] stamp suppression;
+    // pixel paints to a <canvas>, so that CSS rule can't reach it.)
+    if (v.kind !== 'engine') drawPlayed(ctx, ox, bodyTop + bodyH - 11);
   }
 }
 

@@ -102,7 +102,7 @@ function zoneList(value) {
 }
 
 /** Old Theme keys that map to a current one (the mockup's `neon` → `synthwave`). */
-const THEME_ALIASES = { neon: 'synthwave' };
+const THEME_ALIASES = { neon: 'synthwave', smoke: 'highvibes', coltrane: 'jazz', shinkansen: 'bullet', lavalamp: 'lava' };
 
 export function parseConfig(queryString) {
   const params = new URLSearchParams(queryString);
@@ -146,11 +146,12 @@ export function parseConfig(queryString) {
     refresh: refreshMinutes(params.get('refresh')),
     // Which Theme paints the Train. Enum over the shipped Theme keys,
     // plus `shuffle` (cycle the whole roster — the overlay picks the real Theme).
-    // Unknown keys fall back to the default. `neon` is the old mockup name for
-    // `synthwave`, kept as an alias.
+    // Unknown keys fall back to the default. Aliases (THEME_ALIASES) map friendly
+    // names to canonical keys: `neon`→synthwave, `smoke`→highvibes, `coltrane`→jazz,
+    // `shinkansen`→bullet, `lavalamp`→lava.
     theme: oneOf(
       THEME_ALIASES[(params.get('theme') ?? '').toLowerCase()] ?? params.get('theme'),
-      ['classic', 'flat', 'synthwave', 'ticket', 'wood', 'comic', 'departures', 'paper', 'tron', 'pixel', 'shuffle'],
+      ['classic', 'flat', 'synthwave', 'ticket', 'wood', 'comic', 'departures', 'paper', 'tron', 'pixel', 'highvibes', 'jazz', 'bullet', 'lava', 'shuffle'],
       'classic',
     ),
   };
