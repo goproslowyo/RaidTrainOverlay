@@ -29,6 +29,10 @@
       --line: #2c313c;
     }
     * { box-sizing: border-box; }
+    /* Render native controls (date/time picker, calendar icon, select chevrons) in dark
+       mode. Scoped to the CONTROLS — NOT :root — on purpose: a dark :root forces the
+       transparent preview iframe to an opaque white backdrop, hiding the checkerboard. */
+    input, select, textarea { color-scheme: dark; }
     html, body { margin: 0; }
     body {
       background: var(--bg);
@@ -103,6 +107,13 @@
     button:disabled { opacity: .4; cursor: not-allowed; }
     button.primary { background: var(--accent-strong); color: #08121c; border-color: var(--accent-strong); font-weight: 600; }
 
+    /* ── Lineup-source toggle (RaidPal event ⇄ Build by hand) ─────────── */
+    .source-toggle { display: inline-flex; gap: 0; margin-bottom: 14px; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+    .src-btn { border: 0; border-radius: 0; background: var(--panel-2); color: var(--muted); font-weight: 600; padding: 8px 16px; }
+    .src-btn + .src-btn { border-left: 1px solid var(--line); }
+    .src-btn.active { background: var(--accent-strong); color: #08121c; }
+    #manual-source[hidden], #raidpal-source[hidden] { display: none; }
+
     /* ── Tabs ─────────────────────────────────────────────────────────── */
     .tabs { display: flex; gap: 4px; flex-wrap: wrap; border-bottom: 1px solid var(--line); margin-bottom: 18px; }
     .tab {
@@ -132,12 +143,19 @@
 
     <!-- ───────────────────────── HERO: event + preview + URL ───────────────────────── -->
     <section class="card hero">
-      <div class="field event-field">
+      <div class="source-toggle" role="group" aria-label="Lineup source">
+        <button type="button" id="src-raidpal" class="src-btn active" aria-pressed="true" data-i18n="configurator.sourceRaidpal">RaidPal event</button>
+        <button type="button" id="src-manual" class="src-btn" aria-pressed="false" data-i18n="configurator.sourceManual">Build by hand</button>
+      </div>
+
+      <div class="field event-field" id="raidpal-source">
         <label class="lbl" for="f-event" data-i18n="configurator.eventLabel">RaidPal event</label>
-        <input type="text" id="f-event" placeholder="your-event  (or paste the RaidPal link)" data-i18n-attr="placeholder:configurator.eventPlaceholder" autocomplete="off">
-        <div class="hint" data-i18n="configurator.eventHint">Paste your event's RaidPal link or just type the slug.</div>
+        <input type="text" id="f-event" placeholder="Paste your RaidPal event link" data-i18n-attr="placeholder:configurator.eventPlaceholder" autocomplete="off">
+        <div class="hint" data-i18n="configurator.eventHint">Paste your event's RaidPal link — the whole web address works. No RaidPal event? Switch to “Build by hand” above and type your DJs in yourself.</div>
         <div class="status-dot" id="slug-status"></div>
       </div>
+      <!-- The "Build by hand" editor (src/manual-editor.js) mounts here when manual mode is on. -->
+      <div class="field" id="manual-source" hidden></div>
 
       <div class="preview-frame">
         <iframe id="preview" title="Overlay preview" data-i18n-attr="title:configurator.previewTitle"></iframe>
@@ -335,7 +353,11 @@
 
   <script type="module">
     import { extractSlug, buildOverlayQuery } from './src/configurator.js';
+    import { mountManualEditor } from './src/manual-editor.js';
+    import { decodeLineup } from './src/lineup-codec.js';
+    import { instantToZonedWallClock, snapDuration, clampCount } from './src/manual-lineup.js';
     import { parsePresets, serializePresets, upsertPreset, deletePreset, listPresetNames } from './src/presets.js';
+    import { parseStreamers, serializeStreamers, addStreamers, removeStreamer, listStreamers } from './src/streamers.js';
     import { loadEvent } from './src/raidpal-client.js';
     import { resolveZone, parseConfig } from './src/config.js';
     import { resolveLocale, loadMessages, makeT, canonicalLocale, SUPPORTED_LOCALES } from './src/i18n/index.js';
@@ -351,12 +373,41 @@
     const OVERLAY_BASE = new URL('overlay.html', window.location.href).href;
     // The built-in demo lineup (event=demo): a fresh Configurator (no shared link)
     // previews it immediately — rendered with no RaidPal fetch, so it never 404s.
-    // Swap in your own slug. Same demo the landing page links to.
+    // Swap in your own event. Same demo the landing page links to.
     const DEMO_EVENT = 'demo';
     const PRESET_KEY = 'raidtrainoverlay.configurator.presets';
 
+    // ── Lineup source: 'raidpal' (the #f-event field) or 'manual' (the editor) ──
+    let source = 'raidpal';
+    const detectedZone = (() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'; } catch { return 'UTC'; } })();
+    function freshStartISO() {
+      const d = new Date(); d.setMinutes(0, 0, 0);
+      const p = (n) => String(n).padStart(2, '0');
+      return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+    }
+    // The manual lineup the editor mutates in place; read by readForm when source==='manual'.
+    const manualState = { title: '', organiser: '', zone: detectedZone, startISO: freshStartISO(), slotMins: 60, djs: [] };
+
+    // Saved-streamers store (local-only, like presets). Harvested from a lineup only on
+    // a committed action (save preset / copy URL); surfaced as click-to-add chips + autocomplete.
+    const STREAMERS_KEY = 'raidtrainoverlay.configurator.streamers';
+    let streamers = parseStreamers(localStorage.getItem(STREAMERS_KEY));
+    function persistStreamers() { localStorage.setItem(STREAMERS_KEY, serializeStreamers(streamers)); }
+    function harvestStreamers() {
+      if (source !== 'manual') return;
+      const handles = manualState.djs.map((d) => (d.handle || '').trim()).filter(Boolean);
+      if (!handles.length) return;
+      streamers = addStreamers(streamers, handles);
+      persistStreamers();
+      if (manualEditor) manualEditor.refresh();
+    }
+    function forgetStreamer(handle) { streamers = removeStreamer(streamers, handle); persistStreamers(); }
+    function addStreamerManual(handle) { streamers = addStreamers(streamers, [handle]); persistStreamers(); } // direct add, no preset/copy needed
+
     const $ = (id) => document.getElementById(id);
     const els = {
+      srcRaidpal: $('src-raidpal'), srcManual: $('src-manual'),
+      raidpalSource: $('raidpal-source'), manualSource: $('manual-source'),
       event: $('f-event'), mode: $('f-mode'), interval: $('f-interval'), speed: $('f-speed'),
       track: $('f-track'), trackRow: $('track-row'), trackNote: $('track-note'),
       trackfadein: $('f-trackfadein'), trackfadeout: $('f-trackfadeout'), trackfadeRow: $('trackfade-row'),
@@ -393,6 +444,8 @@
     // ── Form state ↔ inputs ──────────────────────────────────────────────
     function readForm() {
       return {
+        source,
+        manual: manualState,
         event: els.event.value,
         mode: els.mode.value,
         interval: els.interval.value,
@@ -432,6 +485,41 @@
       els.lang.value = SUPPORTED_LOCALES.includes(canonicalLocale(fs.lang)) ? canonicalLocale(fs.lang) : 'en';
     }
 
+    // ── Lineup source toggle (RaidPal event ⇄ Build by hand) ──────────────
+    let manualEditor = null;
+    // Replace the manual lineup wholesale (hydrate from a shared ?lineup= link, or a preset).
+    function applyManualState(m) {
+      // Deep-copy the incoming model so the live state never ALIASES a stored preset's
+      // arrays (editing the lineup must not mutate the saved preset). Snap durations to
+      // the grid and default any missing handle so the editor + overlay stay consistent.
+      const src = m ? JSON.parse(JSON.stringify(m)) : {};
+      Object.assign(manualState,
+        { title: '', organiser: '', zone: detectedZone, startISO: freshStartISO(), slotMins: 60, djs: [] },
+        src);
+      manualState.slotMins = snapDuration(manualState.slotMins || 60);
+      manualState.djs = (Array.isArray(manualState.djs) ? manualState.djs : [])
+        .map((d) => ({ handle: d.handle ?? '', slots: clampCount(d.slots) }));
+      if (manualEditor) manualEditor.refresh();
+    }
+    function setSource(next, { silent = false } = {}) {
+      source = next === 'manual' ? 'manual' : 'raidpal';
+      els.srcRaidpal.classList.toggle('active', source === 'raidpal');
+      els.srcManual.classList.toggle('active', source === 'manual');
+      els.srcRaidpal.setAttribute('aria-pressed', String(source === 'raidpal'));
+      els.srcManual.setAttribute('aria-pressed', String(source === 'manual'));
+      els.raidpalSource.hidden = source !== 'raidpal';
+      els.manualSource.hidden = source !== 'manual';
+      // Mount the editor lazily, the first time manual mode is shown.
+      if (source === 'manual' && !manualEditor) {
+        // Pass a live translator closure so the editor relocalizes when the overlay language changes.
+        manualEditor = mountManualEditor({ root: els.manualSource, state: manualState, onChange: onFormChange, t: (k, p) => t(k, p),
+          getStreamers: () => listStreamers(streamers), onForgetStreamer: forgetStreamer, onAddStreamer: addStreamerManual });
+      }
+      if (!silent) onFormChange();
+    }
+    els.srcRaidpal.addEventListener('click', () => setSource('raidpal'));
+    els.srcManual.addEventListener('click', () => setSource('manual'));
+
     // Switch the Configurator UI + the overlay language together: load the
     // catalog, rebind `t`, re-localize the static DOM, and refresh the dynamic
     // strings (interval note, caption, status) that `t` feeds.
@@ -440,13 +528,23 @@
       t = makeT(messages);
       localizeDom(document, messages);
       document.documentElement.lang = locale;
+      if (manualEditor) manualEditor.refresh(); // relocalize the build-by-hand editor too
       onFormChange();
     }
 
     // ── Live URL (synchronous, every input) ──────────────────────────────
     function updateUrl(fs) {
       const query = buildOverlayQuery(fs);
-      if (!query) {
+      // The copyable overlay URL must always carry an event — without one the overlay
+      // renders nothing. So even if other knobs produce a query, the box stays empty
+      // (and Copy disabled) until a real event is entered. The demo previews live but
+      // is never written into the field, so it never leaks into the copied URL.
+      // Derive this from the built query (single source of truth) so the Copy-gate
+      // can't drift from what the URL actually contains. Either source counts: a
+      // RaidPal event OR a hand-built lineup makes the URL copyable.
+      const sp = new URLSearchParams(query);
+      const hasSource = sp.has('event') || sp.has('lineup');
+      if (!query || !hasSource) {
         els.url.value = '';
         els.copy.disabled = true;
       } else {
@@ -514,12 +612,16 @@
       // The Roll-it toggle (below) sweeps it across instead. preview=1 is appended
       // only here — the copied overlay URL is unaffected.
       const query = buildOverlayQuery(fs);
-      const slug = extractSlug(fs.event);
+      // The source key keys reload-vs-postMessage: the event slug for RaidPal, or the
+      // encoded lineup blob for manual. A source change OR a lineup edit changes it
+      // (→ iframe reload); a knob-only change keeps it (→ in-place postMessage).
+      const sp = new URLSearchParams(query);
+      const slug = sp.get('lineup') || sp.get('event') || null;
       els.previewPlaceholder.style.display = 'none';
       els.previewControls.hidden = false;
       if (slug !== previewSlug || !els.preview.getAttribute('src')) {
-        // Event changed (or first load): (re)load the iframe — the ONLY path that
-        // fetches RaidPal.
+        // Source changed (or first load): (re)load the iframe — the ONLY path that
+        // fetches RaidPal (manual lineups never fetch).
         els.preview.src = `${OVERLAY_BASE}?${query}&preview=1`;
         previewSlug = slug; baseQuery = query;
       } else if (query !== lastQuery) {
@@ -592,12 +694,26 @@
     let validatedSlug = null;
     const refreshPreview = debounce(async () => {
       const fs = readForm();
-      const slug = extractSlug(fs.event);
-      if (!slug) {
-        validatedSlug = null;
+      if (fs.source === 'manual') {
+        // Manual lineup: nothing to validate against RaidPal. Preview straight from the
+        // hand-built lineup once there's at least one named DJ; otherwise show a hint.
         els.slugStatus.textContent = '';
         els.slugStatus.className = 'status-dot';
-        showPreviewPlaceholder(t('configurator.previewPlaceholder'));
+        if (manualState.djs.some((d) => (d.handle || '').trim())) loadPreview(fs);
+        else showPreviewPlaceholder(t('configurator.manualPlaceholder'));
+        return;
+      }
+      const slug = extractSlug(fs.event);
+      if (!slug) {
+        // Empty field → preview the built-in demo so a fresh page is never blank,
+        // while the input itself stays empty and shows its placeholder hint. The real
+        // (empty) event still drives the copy URL via updateUrl, so the copied link
+        // never contains event=demo — Copy stays disabled until a real event is entered.
+        // Leave validatedSlug UNTOUCHED: clobbering it here would force a redundant
+        // RaidPal re-fetch when the user clears the field and then re-types the same event.
+        els.slugStatus.textContent = t('configurator.slugDemo');
+        els.slugStatus.className = 'status-dot ok';
+        loadPreview({ ...fs, event: DEMO_EVENT });
         return;
       }
       if (slug === DEMO_EVENT) { // the built-in demo — no RaidPal lookup needed
@@ -607,7 +723,14 @@
         loadPreview(fs);
         return;
       }
-      if (slug === validatedSlug) { loadPreview(fs); return; } // already valid — just re-preview, no fetch
+      if (slug === validatedSlug) {
+        // Already validated this event — re-preview with no refetch, and restore the
+        // "found" status (the empty-field branch above may have left a "demo" status up).
+        els.slugStatus.textContent = t('configurator.slugFound', { slug });
+        els.slugStatus.className = 'status-dot ok';
+        loadPreview(fs);
+        return;
+      }
       els.slugStatus.textContent = t('configurator.slugChecking');
       els.slugStatus.className = 'status-dot checking';
       const token = ++validateToken;
@@ -664,6 +787,7 @@
       const original = els.copy.textContent;
       els.copy.textContent = t('configurator.copied');
       setTimeout(() => { els.copy.textContent = original; }, 1500);
+      harvestStreamers(); // remember this lineup's DJs for future lineups
     });
 
     // ── Presets (localStorage adapter around the pure src/presets.js) ─────
@@ -696,8 +820,10 @@
       if (!name) { flashPresetMsg(t('configurator.presetNameFirst')); return; }
       if (Object.prototype.hasOwnProperty.call(store, name)
         && !confirm(t('configurator.presetReplace', { name }))) return;
-      store = upsertPreset(store, name, readForm());
+      // Snapshot the form (incl. the full manual lineup) so later edits don't mutate the saved preset.
+      store = upsertPreset(store, name, JSON.parse(JSON.stringify(readForm())));
       persist();
+      harvestStreamers(); // remember this lineup's DJs for future lineups
       refreshPresetList();
       els.presetSelect.value = name;
       els.presetName.value = '';
@@ -706,7 +832,12 @@
     els.presetLoad.addEventListener('click', () => {
       const name = els.presetSelect.value;
       if (!name || !store[name]) return;
-      writeForm(store[name]);
+      const preset = store[name];
+      writeForm(preset);
+      // Presets carry the lineup source (and the full manual lineup) too.
+      if (preset.source === 'manual') { applyManualState(preset.manual); setSource('manual', { silent: true }); }
+      else setSource('raidpal', { silent: true });
+      els.presetName.value = name; // populate the name so re-saving over it is one click
       onFormChange();
       flashPresetMsg(t('configurator.presetLoaded', { name }));
     });
@@ -723,11 +854,12 @@
     // ── Init ──────────────────────────────────────────────────────────────
     // Hydrate the form from THIS page's own query so a Configurator link is itself
     // shareable + reloadable (?event=…&theme=…&… — same params as the overlay URL)
-    // and previews on load. With no query, seed a public demo event so a fresh
-    // page still previews immediately and themes can be browsed.
+    // and previews on load. With no query, leave the event field empty (so its
+    // placeholder hint shows); the preview falls back to the built-in demo
+    // (refreshPreview), so a fresh page still previews immediately and themes can be browsed.
     (function hydrateFromUrl() {
       const qs = window.location.search.replace(/^\?/, '');
-      if (!qs) { els.event.value = DEMO_EVENT; return; }
+      if (!qs) return;
       const c = parseConfig(qs);
       const p = new URLSearchParams(qs);
       writeForm({
@@ -749,7 +881,27 @@
         height: String(c.height),
         lang: c.lang ?? '',
       });
+      // A shared / re-opened ?lineup= link rehydrates the Build-by-hand editor and switches to it.
+      if (c.lineup) {
+        const model = decodeLineup(c.lineup);
+        if (model) {
+          // Recover a sensible "default set length" from the encoded per-DJ durations.
+          const durs = (model.d || []).map((x) => snapDuration(x.d));
+          const gg = (a, b) => (b ? gg(b, a % b) : a);
+          const base = durs.length ? durs.reduce((g, n) => gg(g, n), 0) : 60;
+          applyManualState({
+            title: model.t, organiser: model.o?.n ?? '',
+            zone: model.z || detectedZone,
+            startISO: model.s ? instantToZonedWallClock(model.s, model.z || detectedZone) : freshStartISO(),
+            slotMins: base,
+            djs: (model.d || []).map((x, i) => ({ handle: x.h, slots: Math.max(1, Math.round(durs[i] / base)) })),
+          });
+          setSource('manual', { silent: true });
+        }
+      }
     })();
+    // Landing-page door: configurator.html#manual opens straight into Build-by-hand.
+    if (source !== 'manual' && window.location.hash === '#manual') setSource('manual', { silent: true });
     // Initial locale: an explicit ?lang= wins; otherwise detect from the browser.
     // applyUiLocale localizes the static DOM, binds `t`, and runs onFormChange
     // (which builds the URL + preview from the now-localized state). The preset

@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parseConfig } from '../src/config.js';
 import { extractSlug, buildOverlayQuery } from '../src/configurator.js';
+import { decodeLineup } from '../src/lineup-codec.js';
 
 test('extractSlug returns a bare slug unchanged and rejects non-slug garbage', () => {
   assert.equal(extractSlug('trainwreck-lucky-13'), 'trainwreck-lucky-13');
@@ -144,4 +145,31 @@ test('buildOverlayQuery output round-trips through parseConfig, reproducing the 
     'event=trainwreck-lucky-13&mode=marquee&interval=5&speed=2&scale=1.5&openslots=1&spotlight=dj alpha,dj charlie&tz=pt,et&height=20',
   );
   assert.deepEqual(fromForm, fromUrl);
+});
+
+test('buildOverlayQuery in manual mode emits a decodable ?lineup= and carries the same knobs', () => {
+  const q = buildOverlayQuery({
+    source: 'manual',
+    manual: {
+      title: 'Sat Bass Train', organiser: '@djhost',
+      zone: 'UTC', startISO: '2026-06-27T20:00', slotMins: 60,
+      djs: [{ handle: '@nikkid', slots: 2 }, { handle: 'https://twitch.tv/basslines', slots: 1 }],
+    },
+    theme: 'tron', mode: 'marquee',
+  });
+  const cfg = parseConfig(q);
+  assert.equal(cfg.event, null, 'no event in manual mode');
+  assert.ok(cfg.lineup, 'a lineup blob is emitted');
+  assert.equal(cfg.theme, 'tron');     // knobs shared
+  assert.equal(cfg.mode, 'marquee');
+  const model = decodeLineup(cfg.lineup);
+  assert.equal(model.t, 'Sat Bass Train');
+  assert.deepEqual(model.o, { n: 'djhost' }); // @ stripped; no avatar field (handle-only organiser)
+  assert.deepEqual(model.d, [{ h: 'nikkid', d: 120 }, { h: 'basslines', d: 60 }]); // handles cleaned
+  assert.equal(model.s, '2026-06-27T20:00:00.000Z'); // UTC wall clock → same instant
+});
+
+test('buildOverlayQuery manual mode with no usable DJs emits neither lineup nor event', () => {
+  assert.equal(buildOverlayQuery({ source: 'manual', manual: { djs: [] }, theme: 'tron' }), 'theme=tron');
+  assert.equal(buildOverlayQuery({ source: 'manual', manual: { djs: [{ handle: '   ', slots: 1 }] } }), '');
 });

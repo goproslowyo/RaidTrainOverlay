@@ -4,6 +4,8 @@
  * from raw form state. No DOM, no storage — the page wires these to inputs.
  */
 import { parseConfig, serializeConfig } from './config.js';
+import { encodeLineup } from './lineup-codec.js';
+import { zonedWallClockToInstant, normalizeHandle, snapDuration, clampCount } from './manual-lineup.js';
 
 /** A RaidPal slug: lowercase/digit start, then lowercase/digit/hyphen. */
 const SLUG = /^[a-z0-9][a-z0-9-]*$/i;
@@ -36,10 +38,40 @@ export function extractSlug(input) {
  * is what makes a copied URL reproduce the form state. `event` is run through
  * extractSlug so a pasted RaidPal URL still produces a clean slug.
  */
+/**
+ * Manual-editor state → the lineup wire model the codec encodes, or null if there are
+ * no usable DJs. Handles are cleaned; the wall-clock start resolves to an absolute
+ * instant in the chosen zone so the Overlay's times are correct for every viewer.
+ */
+function buildLineupModel(m) {
+  // Each DJ holds N slots ("×N"); the wire stores absolute minutes = N × the base set length.
+  const base = snapDuration(m.slotMins || 60);
+  const djs = (m.djs || [])
+    .map((d) => ({ h: normalizeHandle(d.handle), d: clampCount(d.slots) * base }))
+    .filter((d) => d.h);
+  if (djs.length === 0) return null;
+  const zone = m.zone || 'UTC';
+  const model = {
+    t: (m.title || '').trim() || 'My Raid Train',
+    o: { n: (m.organiser || '').trim().replace(/^@+/, '') || 'You' },
+    z: zone,
+    s: m.startISO ? zonedWallClockToInstant(m.startISO, zone) : new Date().toISOString(),
+    d: djs,
+  };
+  return model;
+}
+
 export function buildOverlayQuery(formState = {}) {
   const params = new URLSearchParams();
-  const slug = extractSlug(formState.event);
-  if (slug) params.set('event', slug);
+  // The lineup SOURCE: a hand-built manual lineup (?lineup=) or a RaidPal event
+  // (?event=). Only one is ever emitted; everything else (the knobs below) is shared.
+  if (formState.source === 'manual') {
+    const model = buildLineupModel(formState.manual || {});
+    if (model) params.set('lineup', encodeLineup(model));
+  } else {
+    const slug = extractSlug(formState.event);
+    if (slug) params.set('event', slug);
+  }
   if (formState.lang) params.set('lang', String(formState.lang));
   if (formState.mode) params.set('mode', formState.mode);
   if (formState.track) params.set('track', String(formState.track));

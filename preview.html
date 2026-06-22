@@ -106,7 +106,7 @@
       <input type="text" id="url" readonly aria-label="Overlay URL for this theme">
       <button type="button" id="copy" class="primary">Copy</button>
     </div>
-    <p class="url-hint">The overlay URL for this theme, using the demo lineup — swap <code>demo</code> for your event slug
+    <p class="url-hint">The overlay URL for this theme, using the demo lineup — swap <code>demo</code> for your event
       (or <a href="./configurator.html">build it in the Configurator</a>).</p>
 
     <div class="cta"><a class="btn primary" href="./configurator.html">Build your overlay</a></div>
@@ -120,12 +120,13 @@
     // GitHub Pages subpath). The demo lineup renders with no RaidPal fetch, so it never 404s.
     const OVERLAY_BASE = new URL('overlay.html', window.location.href).href;
     const DEMO_EVENT = 'demo';
-    // [key, chip label] for the eleven options — ten Themes + Shuffle (the default).
+    // [key, chip label] for the fifteen options — fourteen Themes + Shuffle (the default).
     const THEMES = [
       ['shuffle', '🔀 Shuffle'], ['classic', 'Classic Americana'], ['flat', 'Flat'],
       ['synthwave', 'Synthwave'], ['ticket', 'Vintage Ticket'], ['wood', 'Wooden Toy'],
       ['comic', 'Comic'], ['departures', 'Departures Board'], ['paper', 'Construction Paper'],
-      ['tron', 'Tron'], ['pixel', '16-bit Pixel'],
+      ['tron', 'Tron'], ['pixel', '16-bit Pixel'], ['highvibes', 'High Vibes'],
+      ['jazz', 'Jazz Vinyl'], ['bullet', 'Anime Bullet Train'], ['lava', 'Lava Lamp'],
     ];
     const KEYS = THEMES.map(([k]) => k);
     const $ = (id) => document.getElementById(id);

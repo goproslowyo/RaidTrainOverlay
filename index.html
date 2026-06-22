@@ -71,10 +71,10 @@
     </header>
 
     <div class="cta">
-      <a class="btn primary" href="./configurator.html" data-i18n="landing.build">Build your overlay</a>
-      <a class="btn ghost" href="./preview.html" data-i18n="landing.preview">Preview the overlay</a>
+      <a class="btn primary" href="./configurator.html" data-i18n="landing.buildRaidpal">Build from a RaidPal event</a>
+      <a class="btn ghost" href="./configurator.html#manual" data-i18n="landing.buildManual">Build by hand — no RaidPal</a>
     </div>
-    <p class="muted" style="text-align:center; font-size:0.88rem;" data-i18n="landing.demoNote">A built-in demo lineup — no event needed. Build yours with your own slug.</p>
+    <p class="muted" style="text-align:center; font-size:0.88rem;" data-i18n-html="landing.buildExplain">Got a <a href="https://raidpal.com">RaidPal</a> event? Build from its link. No RaidPal? Build by hand — just type your DJs in yourself.</p>
 
     <section>
       <h2 data-i18n="landing.howTitle">How it works</h2>
@@ -88,7 +88,7 @@
 
     <section>
       <h2 data-i18n="landing.themesTitle">Themes</h2>
-      <p class="muted" data-i18n="landing.themesIntro">Click a theme to drop it into your overlay URL (Shuffle cycles them all):</p>
+      <p class="muted" data-i18n="landing.themesIntro">Pick a theme to preview it, then build your overlay with it (Shuffle cycles them all):</p>
       <div class="themes">
         <button class="chip" data-theme="classic"><span data-i18n="landing.theme.classic">Classic Americana</span> <code>classic</code></button>
         <button class="chip" data-theme="flat"><span data-i18n="landing.theme.flat">Flat</span> <code>flat</code></button>
@@ -106,11 +106,10 @@
         <button class="chip" data-theme="lava"><span data-i18n="landing.theme.lava">Lava Lamp</span> <code>lava</code></button>
         <button class="chip" data-theme="shuffle"><span data-i18n="landing.theme.shuffle">🔀 Shuffle</span> <code>shuffle</code></button>
       </div>
-      <div class="url-box">
-        <input type="text" id="overlay-url" readonly aria-label="Overlay URL for the selected theme" data-i18n-attr="aria-label:landing.urlAria">
-        <button type="button" id="overlay-copy" data-i18n="landing.copy">Copy</button>
+      <div class="cta" style="margin-top:14px">
+        <a class="btn primary" id="theme-preview" href="./preview.html" target="_blank" rel="noopener" data-i18n="landing.themePreview">Preview this theme</a>
+        <a class="btn ghost" id="theme-build" href="./configurator.html" data-i18n="landing.themeBuild">Build with this theme</a>
       </div>
-      <p class="muted url-note" data-i18n-html="landing.urlNote">Swap <code>your-event-slug</code> for your event — everything else has a sensible default. Or build the full link in the <a href="./configurator.html">Configurator</a>.</p>
     </section>
 
     <footer>
@@ -134,29 +133,22 @@
     const messages = await loadMessages(locale);
     localizeDom(document, messages);
     document.documentElement.lang = locale;
-    const copiedLabel = messages['configurator.copied'] || 'Copied!';
 
-    // Theme chips → the overlay URL. Clicking a chip drops its theme into the minimal
-    // URL (classic is the default, so it stays omitted); Copy copies it. The base
-    // resolves to wherever this page lives (Pages, a custom domain, or local dev), so
-    // the copied link is always a working absolute URL — just swap in your event slug.
+    // Theme chips → the Preview + Build links. Clicking a chip selects it and points
+    // both buttons at that theme (preview.html?theme=… and configurator.html?theme=…),
+    // so a non-technical user never edits a URL by hand — they just click through.
     (function () {
-      const base = new URL('overlay.html', location.href).href;
-      const out = document.getElementById('overlay-url');
       const chips = [...document.querySelectorAll('.chip[data-theme]')];
+      const preview = document.getElementById('theme-preview');
+      const build = document.getElementById('theme-build');
       function pick(theme) {
         for (const c of chips) c.classList.toggle('active', c.dataset.theme === theme);
-        out.value = base + '?event=your-event-slug' + (theme === 'classic' ? '' : '&theme=' + theme);
+        const q = theme && theme !== 'classic' ? `?theme=${theme}` : '';
+        preview.href = `./preview.html${q}`;
+        build.href = `./configurator.html${q}`;
       }
       for (const c of chips) c.addEventListener('click', () => pick(c.dataset.theme));
-      pick('classic'); // classic is the default theme → the plain minimal URL
-      const copy = document.getElementById('overlay-copy');
-      copy.addEventListener('click', async () => {
-        try { await navigator.clipboard.writeText(out.value); }
-        catch { out.select(); document.execCommand('copy'); }
-        const orig = copy.textContent; copy.textContent = copiedLabel;
-        setTimeout(() => { copy.textContent = orig; }, 1500);
-      });
+      pick('classic');
     })();
 
     // Stamp the footer with the live deployed commit (fetched from the GitHub API) next
