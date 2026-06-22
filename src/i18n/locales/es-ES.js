@@ -30,7 +30,7 @@ export default {
   'configurator.urlPlaceholder': 'Introduce un evento arriba para generar tu URL',
 
   // "en vivo" (LatAm) → "en directo" (Spain)
-  'configurator.slugDemo': '✓ Programación de demostración incorporada — pega el identificador de tu propio evento para salir en directo',
+  'configurator.slugDemo': '✓ Programación de demostración incorporada — pega tu enlace de RaidPal para salir en directo',
 
   // "transmisión" (LatAm) → "emisión" (Spain)
   'configurator.scaleHint': 'Lo grande que se ve el tren en tu emisión. 1 es el valor por defecto; menos es más pequeño, más es más grande. Observa la vista previa.',
