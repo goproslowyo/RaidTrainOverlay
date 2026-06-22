@@ -384,3 +384,156 @@ test('buildTrain localizes NOW and the OPEN-slot label through config.t', async 
   assert.equal(open.relativeTime, de('overlay.now')); // localized NOW
   assert.notEqual(de('overlay.open'), 'OPEN');         // sanity: the catalog really translated it
 });
+
+// ── Back-to-back Slots: one Broadcaster, consecutive Slots → one Car ─────────
+// RaidPal lets a streamer hold several Slots in a row (a 2-hour set across two
+// 60-min Slots). The davelapalooza-4 lineup is built entirely this way — every DJ
+// books two back-to-back Slots, and one (DJMoofasa) books three. Without merging,
+// each Slot draws its own Car, so the streamer renders 2–3 times in a row (the
+// "double-train"). buildTrain must collapse a contiguous same-Broadcaster run into
+// a single Car spanning the combined window.
+
+/** One occupied wire Slot. */
+function occupiedSlot(order, starttime, name, id) {
+  return {
+    order,
+    starttime,
+    slot_occupied: true,
+    user_timezone: 'UTC',
+    broadcaster_display_name: name,
+    broadcaster_image: `https://example.test/avatars/${id}.png`,
+    broadcaster_live: false,
+    broadcaster_id: id,
+  };
+}
+
+// DJ Duo holds the first two Slots (18:00–20:00); DJ Solo holds the third (20:00–21:00).
+function makeBackToBackPayload() {
+  return makeEventPayload({
+    starttime: '2026-06-16T18:00:00Z',
+    endtime: '2026-06-16T21:00:00Z',
+    time_table: [
+      occupiedSlot(0, '2026-06-16T18:00:00Z', 'DJ Duo', 'duo-id'),
+      occupiedSlot(1, '2026-06-16T19:00:00Z', 'DJ Duo', 'duo-id'),
+      occupiedSlot(2, '2026-06-16T20:00:00Z', 'DJ Solo', 'solo-id'),
+    ],
+  });
+}
+
+test('consecutive Slots held by one Broadcaster merge into a single Car', () => {
+  const train = buildTrain(normalizeEvent(makeBackToBackPayload()), new Date('2026-06-16T17:00:00Z'), CONFIG);
+  // DJ Duo's two Slots collapse to one Car; DJ Solo is the second.
+  assert.deepEqual(train.cars.map((c) => c.broadcaster.displayName), ['DJ Duo', 'DJ Solo']);
+  // The merged Car keeps the first Slot's order.
+  assert.deepEqual(train.cars.map((c) => c.slotOrder), [0, 2]);
+});
+
+test('a merged multi-Slot Car reads NOW across its whole combined window and departs only at its end', () => {
+  const event = normalizeEvent(makeBackToBackPayload());
+
+  // First half of DJ Duo's set (18:30): DJ Duo is current.
+  assert.deepEqual(buildTrain(event, new Date('2026-06-16T18:30:00Z'), CONFIG).cars.map((c) => c.isCurrent), [true, false]);
+  // Second half (19:30) — still DJ Duo, NOT departed and NOT a second Car.
+  const secondHour = buildTrain(event, new Date('2026-06-16T19:30:00Z'), CONFIG);
+  assert.deepEqual(secondHour.cars.map((c) => c.isCurrent), [true, false]);
+  assert.deepEqual(secondHour.cars.map((c) => c.isDeparted), [false, false]);
+  // At 20:00 DJ Duo's full window has ended → departed; DJ Solo takes over.
+  const afterDuo = buildTrain(event, new Date('2026-06-16T20:00:00Z'), CONFIG);
+  assert.deepEqual(afterDuo.cars.map((c) => c.isDeparted), [true, false]);
+  assert.deepEqual(afterDuo.cars.map((c) => c.isCurrent), [false, true]);
+});
+
+test('three consecutive Slots for one Broadcaster merge into one Car (the davelapalooza triple)', () => {
+  const payload = makeEventPayload({
+    starttime: '2026-06-16T18:00:00Z',
+    endtime: '2026-06-16T21:00:00Z',
+    time_table: [
+      occupiedSlot(0, '2026-06-16T18:00:00Z', 'DJMoofasa', 'moofasa-id'),
+      occupiedSlot(1, '2026-06-16T19:00:00Z', 'DJMoofasa', 'moofasa-id'),
+      occupiedSlot(2, '2026-06-16T20:00:00Z', 'DJMoofasa', 'moofasa-id'),
+    ],
+  });
+  const train = buildTrain(normalizeEvent(payload), new Date('2026-06-16T17:00:00Z'), CONFIG);
+  assert.equal(train.cars.length, 1);
+  assert.equal(train.cars[0].broadcaster.displayName, 'DJMoofasa');
+  // Current anywhere in the 18:00–21:00 triple window.
+  assert.equal(buildTrain(normalizeEvent(payload), new Date('2026-06-16T20:30:00Z'), CONFIG).cars[0].isCurrent, true);
+});
+
+test('the same Broadcaster in non-adjacent Slots stays two Cars (two separate sets)', () => {
+  const payload = makeEventPayload({
+    starttime: '2026-06-16T18:00:00Z',
+    endtime: '2026-06-16T21:00:00Z',
+    time_table: [
+      occupiedSlot(0, '2026-06-16T18:00:00Z', 'DJ Encore', 'encore-id'),
+      occupiedSlot(1, '2026-06-16T19:00:00Z', 'DJ Other', 'other-id'),
+      occupiedSlot(2, '2026-06-16T20:00:00Z', 'DJ Encore', 'encore-id'),
+    ],
+  });
+  const train = buildTrain(normalizeEvent(payload), new Date('2026-06-16T17:00:00Z'), CONFIG);
+  // No merge across the gap — DJ Encore genuinely plays twice.
+  assert.deepEqual(train.cars.map((c) => c.broadcaster.displayName), ['DJ Encore', 'DJ Other', 'DJ Encore']);
+});
+
+test('a trailing merged Car is the Caboose, and its time counts from its first Slot', () => {
+  const payload = makeEventPayload({
+    starttime: '2026-06-16T18:00:00Z',
+    endtime: '2026-06-16T21:00:00Z',
+    time_table: [
+      occupiedSlot(0, '2026-06-16T18:00:00Z', 'DJ Opener', 'opener-id'),
+      occupiedSlot(1, '2026-06-16T19:00:00Z', 'DJ Closer', 'closer-id'),
+      occupiedSlot(2, '2026-06-16T20:00:00Z', 'DJ Closer', 'closer-id'),
+    ],
+  });
+  const train = buildTrain(normalizeEvent(payload), new Date('2026-06-16T17:00:00Z'), CONFIG);
+  assert.deepEqual(train.cars.map((c) => c.broadcaster.displayName), ['DJ Opener', 'DJ Closer']);
+  // The merged final set is the single Caboose.
+  assert.deepEqual(train.cars.map((c) => c.isCaboose), [false, true]);
+  // DJ Closer's merged set starts at its FIRST Slot (19:00), so at 17:00 it reads "in 2h".
+  assert.equal(train.cars[1].relativeTime, 'in 2h');
+});
+
+test('a positively-identified Slot never merges with an adjacent id-less Slot of the same name', () => {
+  // Identity is id-authoritative: if one Slot carries a Broadcaster id and the next
+  // does not, they are not provably the same person (a shared display name isn't proof),
+  // so they stay two Cars. The name fallback is ONLY for when NEITHER Slot has an id
+  // (hand-built lineups). RaidPal occupied slots always carry ids, so this guards the
+  // manual-lineup path against a false-merge on dirty/partial data.
+  const payload = makeEventPayload({
+    starttime: '2026-06-16T18:00:00Z',
+    endtime: '2026-06-16T20:00:00Z',
+    time_table: [
+      occupiedSlot(0, '2026-06-16T18:00:00Z', 'DJ Same', 'id-A'),
+      occupiedSlot(1, '2026-06-16T19:00:00Z', 'DJ Same', null),
+    ],
+  });
+  const train = buildTrain(normalizeEvent(payload), new Date('2026-06-16T17:00:00Z'), CONFIG);
+  assert.equal(train.cars.length, 2);
+
+  // But two id-less Slots of the same name (a hand-built lineup) DO still merge by name.
+  const manual = makeEventPayload({
+    starttime: '2026-06-16T18:00:00Z',
+    endtime: '2026-06-16T20:00:00Z',
+    time_table: [
+      occupiedSlot(0, '2026-06-16T18:00:00Z', 'DJ Hand', null),
+      occupiedSlot(1, '2026-06-16T19:00:00Z', 'DJ Hand', null),
+    ],
+  });
+  assert.equal(buildTrain(normalizeEvent(manual), new Date('2026-06-16T17:00:00Z'), CONFIG).cars.length, 1);
+});
+
+test('hidefinished keeps a merged set live through its whole window, dropping it only after the set ends', () => {
+  // Regression guard for the filter↔merge interaction: hidefinished must evaluate
+  // departure on the merged SET window, not the first Slot. DJ Duo holds 18:00–20:00.
+  const event = normalizeEvent(makeBackToBackPayload());
+
+  // 19:30 is inside DJ Duo's SECOND slot — its first slot's raw window has elapsed,
+  // but the set runs to 20:00, so hidefinished must NOT drop it mid-set.
+  const mid = buildTrain(event, new Date('2026-06-16T19:30:00Z'), { ...CONFIG, hidefinished: true });
+  assert.deepEqual(mid.cars.map((c) => c.broadcaster.displayName), ['DJ Duo', 'DJ Solo']);
+  assert.equal(mid.cars[0].isDeparted, false);
+
+  // Once the full set ends (20:00), hidefinished removes the merged car.
+  const after = buildTrain(event, new Date('2026-06-16T20:00:00Z'), { ...CONFIG, hidefinished: true });
+  assert.deepEqual(after.cars.map((c) => c.broadcaster.displayName), ['DJ Solo']);
+});

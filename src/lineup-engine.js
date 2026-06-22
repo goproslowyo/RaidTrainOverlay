@@ -66,6 +66,48 @@ export function formatAbsoluteTime(date, zone, locale = 'en-US') {
   }).format(date);
 }
 
+/**
+ * Collapse contiguous same-Broadcaster occupied Slots into Sets. RaidPal lets a
+ * streamer hold several Slots in a row (a multi-hour set); each such run becomes a
+ * single Set spanning the combined window, so the streamer draws ONE Car instead of
+ * one per Slot (the "double-train"). A run is broken by a different Broadcaster, an
+ * Open Slot, or a gap in `order` — non-adjacent Slots are two genuine sets. Open and
+ * lone Slots pass through as span-1 Sets, so nothing else changes. Input must be
+ * order-sorted. Each Set carries the first Slot's start; its window is span × a Slot.
+ *
+ * Identity is id-AUTHORITATIVE: a present Broadcaster id wins on EITHER side — if
+ * one Slot is identified and the next is not, they are not provably the same person
+ * (a shared display name isn't proof), so they stay apart. The display-name fallback
+ * fires ONLY when NEITHER Slot carries an id, so hand-built lineups (which may have
+ * no ids) still merge by name. RaidPal occupied slots always carry ids.
+ */
+function mergeRuns(slots) {
+  const sameBroadcaster = (a, b) => {
+    if (!a.occupied || !b.occupied) return false;
+    const idA = a.broadcaster.id, idB = b.broadcaster.id;
+    if (idA || idB) return idA === idB; // a present id is authoritative — both must match
+    return a.broadcaster.displayName === b.broadcaster.displayName;
+  };
+  const sets = [];
+  for (const slot of slots) {
+    const prev = sets.at(-1);
+    if (prev && slot.order === prev.lastOrder + 1 && sameBroadcaster(prev, slot)) {
+      prev.span += 1;
+      prev.lastOrder = slot.order;
+      continue;
+    }
+    sets.push({
+      order: slot.order,
+      lastOrder: slot.order,
+      starttime: slot.starttime,
+      span: 1,
+      occupied: slot.occupied,
+      broadcaster: slot.broadcaster,
+    });
+  }
+  return sets;
+}
+
 export function buildTrain(event, now, config) {
   // Display locale rides on config (attached by the overlay shell); absent in
   // unit tests, where the English fallbacks keep output identical.
@@ -75,78 +117,84 @@ export function buildTrain(event, now, config) {
 
   const slotMs = event.slotDurationMins * 60_000;
   const nowMs = now.getTime();
-  // The Slot window is [starttime, starttime + slot_duration_mins): inclusive
-  // start, exclusive end. Derived from the timetable, never broadcaster_live.
-  const slotEndMs = (slot) => slot.starttime.getTime() + slotMs;
-  const isCurrentSlot = (slot) => slot.starttime.getTime() <= nowMs && nowMs < slotEndMs(slot);
-  const isDepartedSlot = (slot) => nowMs >= slotEndMs(slot);
-  // Current reads "NOW"; departed reads "" — dimming is the departed signal.
-  const relativeTime = (slot) => {
-    if (isCurrentSlot(slot)) return NOW;
-    if (isDepartedSlot(slot)) return '';
-    return formatRelativeTime(slot.starttime, now, t);
+
+  // A Broadcaster can hold several Slots in a row (a multi-hour set). Collapse each
+  // contiguous same-Broadcaster run into ONE Set so the streamer draws a single Car
+  // spanning the combined window — otherwise they render 2–3 times in a row (the
+  // double-train). Open and lone Slots pass through as span-1 Sets, so every flag
+  // below is unchanged for an ordinary single-Slot streamer.
+  const sets = mergeRuns([...event.slots].sort((a, b) => a.order - b.order));
+
+  // A Set's window is [starttime, starttime + span × slot_duration_mins): inclusive
+  // start, exclusive end. Span is 1 for an ordinary Slot, so the math is unchanged
+  // there. Derived from the timetable, never broadcaster_live.
+  const setEndMs = (set) => set.starttime.getTime() + set.span * slotMs;
+  const isCurrentSet = (set) => set.starttime.getTime() <= nowMs && nowMs < setEndMs(set);
+  const isDepartedSet = (set) => nowMs >= setEndMs(set);
+  // Current reads "NOW"; departed reads "" — dimming is the departed signal. The
+  // relative time counts from the Set's FIRST Slot (when the streamer goes live).
+  const relativeTime = (set) => {
+    if (isCurrentSet(set)) return NOW;
+    if (isDepartedSet(set)) return '';
+    return formatRelativeTime(set.starttime, now, t);
   };
 
   // With tz set, upcoming Cars show absolute multi-zone times (flyer parity);
   // current ("NOW") and departed ("") states are untouched — dimming, not a
   // timestamp, is the departed signal. Empty tz → the relative line.
   const tz = config.tz ?? [];
-  const timeLines = (slot) => {
-    if (tz.length === 0) return [relativeTime(slot)];
-    if (isCurrentSlot(slot)) return [NOW];
-    if (isDepartedSlot(slot)) return [''];
-    return tz.map(({ token, zone }) => `${formatAbsoluteTime(slot.starttime, zone, locale)} ${token}`);
+  const timeLines = (set) => {
+    if (tz.length === 0) return [relativeTime(set)];
+    if (isCurrentSet(set)) return [NOW];
+    if (isDepartedSet(set)) return [''];
+    return tz.map(({ token, zone }) => `${formatAbsoluteTime(set.starttime, zone, locale)} ${token}`);
   };
 
-  // The Caboose is the last Broadcaster's Car — the highest-order occupied
-  // Slot — never an Open Slot, even when an Open Slot sorts after it.
-  const cabooseSlot = [...event.slots]
-    .filter((slot) => slot.occupied)
-    .sort((a, b) => a.order - b.order)
-    .at(-1);
+  // The Caboose is the last Broadcaster's Car — the highest-order occupied Set —
+  // never an Open Slot, even when an Open Slot sorts after it. `sets` is already
+  // order-sorted, so the last occupied Set is the Caboose.
+  const cabooseSet = sets.filter((set) => set.occupied).at(-1);
 
   // Open Slots are hidden by default; config.openslots opts them in as Cars.
-  // With hidefinished, departed Slots drop out entirely (vs. the default dim).
-  const includeSlot = (slot) =>
-    (slot.occupied || config.openslots) && !(config.hidefinished && isDepartedSlot(slot));
+  // With hidefinished, departed Sets drop out entirely (vs. the default dim).
+  const includeSet = (set) =>
+    (set.occupied || config.openslots) && !(config.hidefinished && isDepartedSet(set));
 
   // Spotlight: case-insensitive match on the decoded Broadcaster name. Names
   // are lowercased by parseConfig, so we lowercase the display name to match.
   const spotlight = config.spotlight ?? [];
-  const isSpotlit = (slot) => spotlight.includes(slot.broadcaster.displayName.toLowerCase());
+  const isSpotlit = (set) => spotlight.includes(set.broadcaster.displayName.toLowerCase());
 
-  // One Slot → its Car view-model.
-  const toCar = (slot) => {
+  // One Set → its Car view-model.
+  const toCar = (set) => {
     const base = {
-      slotOrder: slot.order,
-      isCaboose: slot === cabooseSlot,
-      isCurrent: isCurrentSlot(slot),
-      isDeparted: isDepartedSlot(slot),
-      relativeTime: relativeTime(slot),
-      timeLines: timeLines(slot),
+      slotOrder: set.order,
+      isCaboose: set === cabooseSet,
+      isCurrent: isCurrentSet(set),
+      isDeparted: isDepartedSet(set),
+      relativeTime: relativeTime(set),
+      timeLines: timeLines(set),
     };
     // Open Slot Cars carry no Broadcaster — just an "OPEN" label and a time.
-    return slot.occupied
+    return set.occupied
       ? {
           ...base,
           isOpen: false,
-          isSpotlit: isSpotlit(slot),
+          isSpotlit: isSpotlit(set),
           broadcaster: {
-            displayName: slot.broadcaster.displayName,
-            image: slot.broadcaster.image,
+            displayName: set.broadcaster.displayName,
+            image: set.broadcaster.image,
           },
         }
       : { ...base, isOpen: true, isSpotlit: false, broadcaster: null, displayName: t('overlay.open') };
   };
 
-  const displayed = event.slots.filter(includeSlot).sort((a, b) => a.order - b.order).map(toCar);
-
   // The ORGANISER drives the locomotive — the conductor of the raid train. Every
   // booked streamer is a passenger Car: the first one kicks off the stream but is
   // not the loco. So the Engine carries no Broadcaster — toVehicles paints the
-  // Organiser onto the loco and draws no separate tender — and every displayed Slot
+  // Organiser onto the loco and draws no separate tender — and every displayed Set
   // (including the first streamer) is a Car.
-  const cars = displayed;
+  const cars = sets.filter(includeSet).map(toCar);
 
   // Phase comes from the full timetable (Open Slots included) so it can never
   // disagree with the per-Car flags. Empty timetable reads as pre-event.
