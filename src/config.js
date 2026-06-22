@@ -107,10 +107,14 @@ const THEME_ALIASES = { neon: 'synthwave', smoke: 'highvibes', coltrane: 'jazz',
 export function parseConfig(queryString) {
   const params = new URLSearchParams(queryString);
   const event = (params.get('event') ?? '').trim();
+  // A hand-built lineup carried in the URL (base64url blob, decoded by the shell, not
+  // here — parseConfig stays codec-free). The alternative Event source to `event`.
+  const lineup = (params.get('lineup') ?? '').trim();
   const mode = (params.get('mode') ?? '').toLowerCase();
   const lang = (params.get('lang') ?? '').trim();
   return {
     event: event === '' ? null : event,
+    lineup: lineup === '' ? null : lineup,
     // The display locale, kept as the raw requested tag (or null). Resolution to
     // a supported locale + the navigator fallback happen in the overlay shell so
     // parseConfig stays pure (no `navigator`); the Configurator's selector sets it.
@@ -166,6 +170,10 @@ export function parseConfig(queryString) {
 export function serializeConfig(config) {
   const params = new URLSearchParams();
   if (config.event) params.set('event', config.event);
+  // A hand-built lineup is the alternative source. Emitted only when there's no event
+  // (event wins if both somehow present — they're mutually exclusive) and in this
+  // fixed position (right after event) so serialize∘parse stays idempotent.
+  else if (config.lineup) params.set('lineup', config.lineup);
   // Locale: emit only when set and not the default English (matches the
   // omit-defaults contract). The raw requested tag round-trips verbatim.
   if (config.lang && config.lang !== 'en') params.set('lang', config.lang);

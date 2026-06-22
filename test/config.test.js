@@ -25,9 +25,25 @@ test('parseConfig ignores unknown and malformed params', () => {
   const config = parseConfig('?event=trainwreck-lucky-13&bogus=1&%%%');
   assert.equal(config.event, 'trainwreck-lucky-13');
   assert.deepEqual(Object.keys(config), [
-    'event', 'lang', 'mode', 'interval', 'speed', 'track', 'trackfadein', 'trackfadeout', 'scale',
+    'event', 'lineup', 'lang', 'mode', 'interval', 'speed', 'track', 'trackfadein', 'trackfadeout', 'scale',
     'openslots', 'spotlight', 'tz', 'height', 'hidefinished', 'enginedim', 'refresh', 'theme',
   ]);
+});
+
+test('parseConfig carries a manual lineup blob raw, and defaults it to null', () => {
+  assert.equal(parseConfig('?lineup=eyJhYmMiOjF9').lineup, 'eyJhYmMiOjF9');
+  assert.equal(parseConfig('?event=x').lineup, null);
+  assert.equal(parseConfig('').lineup, null);
+});
+
+test('serializeConfig emits lineup= only when there is no event (event wins; mutually exclusive)', () => {
+  // lineup-only → emitted, right after where event would be.
+  assert.equal(serializeConfig(parseConfig('?lineup=ABC123')), 'lineup=ABC123');
+  // both present (a hand-crafted URL) → event wins, lineup dropped.
+  const both = serializeConfig(parseConfig('?event=foo&lineup=ABC123'));
+  assert.ok(both.includes('event=foo') && !both.includes('lineup'), both);
+  // round-trips: serialize∘parse preserves a lineup-driven config.
+  assert.equal(parseConfig(serializeConfig(parseConfig('?lineup=ABC123&theme=tron'))).lineup, 'ABC123');
 });
 
 test('parseConfig defaults mode to pass and accepts marquee case-insensitively', () => {

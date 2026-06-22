@@ -10,6 +10,8 @@ import { startEventFeed } from './event-feed.js';
 import { buildTrain } from './lineup-engine.js';
 import { renderTrain, SHIPPED_THEMES } from './train-renderer.js';
 import { DEMO_SLUG, DEMO_SPOTLIGHT, makeDemoEvent } from './demo-event.js';
+import { decodeLineup } from './lineup-codec.js';
+import { makeManualEvent } from './manual-lineup.js';
 import { resolveLocale, loadMessages, makeT } from './i18n/index.js';
 
 const config = parseConfig(window.location.search);
@@ -37,8 +39,8 @@ container.style.setProperty('--train-pos', String(config.height / 100));
 // --train-height baseline by this; inherits down to the Train SVG.
 container.style.setProperty('--train-scale', String(config.scale));
 
-if (!config.event) {
-  console.error('RaidTrainOverlay: missing required ?event=<slug> query param — nothing to render.');
+if (!config.event && !config.lineup) {
+  console.error('RaidTrainOverlay: missing required ?event=<slug> or ?lineup=<blob> query param — nothing to render.');
 } else {
   // The most recent Event + its rendered view. The feed re-renders on a lineup
   // change; the time tick re-derives from it; theme=shuffle re-renders with a
@@ -99,7 +101,7 @@ if (!config.event) {
     if (config.spotlight.length === 0) config.spotlight = DEMO_SPOTLIGHT;
     current = { event: makeDemoEvent(new Date()), view: null };
     render();
-  } else {
+  } else if (config.event) {
     startEventFeed(config.event, config, {
       fetchImpl: globalThis.fetch.bind(globalThis),
       storage: window.localStorage,
@@ -112,6 +114,17 @@ if (!config.event) {
         console.error(`RaidTrainOverlay: RaidPal fetch for "${config.event}" failed — ${state}.`, err);
       },
     });
+  } else {
+    // Hand-built lineup (?lineup=): decode the URL blob and synthesize the Event with
+    // NO RaidPal fetch — the same synchronous render path as the demo. A bad/oversized
+    // blob decodes to null and renders nothing (never broken UI), as the codec promises.
+    const model = decodeLineup(config.lineup);
+    if (!model) {
+      console.error('RaidTrainOverlay: ?lineup= blob could not be decoded — nothing to render.');
+    } else {
+      current = { event: makeManualEvent(model, new Date()), view: null };
+      render();
+    }
   }
   applyCadence();
 
