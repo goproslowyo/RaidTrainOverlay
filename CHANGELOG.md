@@ -4,6 +4,42 @@ All notable changes to RaidTrainOverlay are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and the project follows
 [Semantic Versioning](https://semver.org/).
 
+## [0.5.0] - 2026-06-22
+
+Build a raid-train overlay with **no RaidPal event at all** — type your DJs in by hand.
+The Configurator gains a "Build by hand" mode that produces the same full overlay (every
+theme and option) from a lineup you enter yourself, carried entirely in the URL so it
+still works as an OBS browser source with no backend. Plus a long-standing rendering fix
+for streamers who play back-to-back.
+
+### Added
+- **Build a lineup by hand.** A *RaidPal event ⇄ Build by hand* toggle in the Configurator.
+  In manual mode you set an event title, your handle, a start time and timezone, then a list
+  of DJs — each with a default set length and a per-DJ **×N slot** count. The lineup is
+  encoded into the overlay URL (`?lineup=…`); re-opening that link rehydrates the editor so
+  you can tweak and re-copy. Same themes, motion, live preview, copy, and OBS steps as a
+  RaidPal lineup.
+  - Paste a whole list at once (one handle per line, optional `2h`/`90m`), drag rows or
+    timeline blocks to reorder, and `@name` / `twitch.tv/…` links are cleaned up.
+  - **Saved streamers** — handles you use are remembered (when you save a preset or copy the
+    URL, or via a "save a streamer" field) and offered back as click-to-add chips and as
+    autocomplete on the handle fields. Stored locally; nothing leaves your browser.
+  - A west-to-east timezone picker with your own zone detected at the top.
+- **Landing page**: separate **Build from a RaidPal event** and **Build by hand** paths, and
+  theme chips that link straight to a preview or the builder.
+- The preview gallery now lists all 14 themes.
+
+### Changed
+- The Configurator leads with **"Paste your RaidPal event link"** — the jargon word "slug"
+  is gone from every user-facing string (and all 10 translations), replaced with plain,
+  link-first copy. A fresh page leaves the event field empty (so its hint shows) while still
+  previewing the built-in demo.
+- Native form controls (the date/time picker and the dropdowns) now render in the dark theme.
+
+### Fixed
+- **No more "double train."** A streamer holding consecutive slots (a multi-hour set) is now
+  drawn as a single car spanning the combined time, instead of one identical car per slot.
+
 ## [0.4.0] - 2026-06-18
 
 Four "gold-standard" themes. The roster gains its most detailed scenes yet — a cannabis
@@ -116,6 +152,7 @@ for an OBS browser source. Static hosting on GitHub Pages, no build step.
 - A cache-first RaidPal client resilient to transient fetch failures, and a GitHub
   Pages landing page with a live deployed-commit stamp in the footer.
 
+[0.5.0]: https://github.com/goproslowyo/RaidTrainOverlay/releases/tag/v0.5.0
 [0.4.0]: https://github.com/goproslowyo/RaidTrainOverlay/releases/tag/v0.4.0
 [0.3.0]: https://github.com/goproslowyo/RaidTrainOverlay/releases/tag/v0.3.0
 [0.2.0]: https://github.com/goproslowyo/RaidTrainOverlay/releases/tag/v0.2.0
