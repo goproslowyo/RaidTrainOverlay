@@ -240,6 +240,7 @@ test('parseConfig parses theme as an enum, defaulting to classic', () => {
   assert.equal(parseConfig('?event=x&theme=jazz').theme, 'jazz');
   assert.equal(parseConfig('?event=x&theme=bullet').theme, 'bullet');
   assert.equal(parseConfig('?event=x&theme=lava').theme, 'lava');
+  assert.equal(parseConfig('?event=x&theme=pride').theme, 'pride');
   // …and by their friendly aliases (case-insensitive), like neon→synthwave.
   assert.equal(parseConfig('?event=x&theme=smoke').theme, 'highvibes');
   assert.equal(parseConfig('?event=x&theme=coltrane').theme, 'jazz');

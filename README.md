@@ -7,7 +7,7 @@ GitHub Pages, no build step.
 The locomotive is the **organiser** — the conductor of the raid train; every booked slot is
 a coach with its broadcaster's avatar and name (the streamer who kicks things off rides the
 first coach), the **NOW** marker rides whoever's live, and departed slots get a **PLAYED**
-stamp. Ten themes, from Classic Americana to Tron to 16-bit pixel art.
+stamp. Fifteen themes, from Classic Americana to 16-bit pixel art to a rainbow Pride parade.
 
 **▶ [Open the app](https://goproslowyo.github.io/RaidTrainOverlay/)** &nbsp;·&nbsp;
 [Preview it](https://goproslowyo.github.io/RaidTrainOverlay/preview.html) &nbsp;·&nbsp;
@@ -35,7 +35,7 @@ All optional, set as query params (the Configurator writes these for you):
 |---|---|
 | `event` | **Required.** RaidPal event slug. |
 | `lang` | Overlay language: `en` (default), `es-ES`, `es-MX`, `pt-BR`, `it`, `de`, `nl`, `da`, `lt`, `fr`. Localizes the on-screen words (NOW, OPEN, PLAYED, statuses) and uses a locale-aware clock; absent, it follows the browser. |
-| `theme` | `classic` (default), `flat`, `synthwave`, `ticket`, `wood`, `comic`, `departures`, `paper`, `tron`, `pixel`. |
+| `theme` | `classic` (default), `flat`, `synthwave`, `ticket`, `wood`, `comic`, `departures`, `paper`, `tron`, `pixel`, `highvibes`, `jazz`, `bullet`, `lava`, `pride`; or `shuffle` to cycle the whole roster. |
 | `mode` | `pass` (one pass every `interval`) or `marquee` (continuous loop). |
 | `speed`, `interval` | Traversal speed; minutes between passes. |
 | `track` | `always` (default) keeps the rails on screen; `periodic` fades them out between passes so the overlay goes fully empty until the next one (Pass mode only). |

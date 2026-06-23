@@ -235,6 +235,7 @@
             <option value="jazz" data-i18n="configurator.theme.jazz">Jazz vinyl</option>
             <option value="bullet" data-i18n="configurator.theme.bullet">Anime bullet train</option>
             <option value="lava" data-i18n="configurator.theme.lava">Lava lamp</option>
+            <option value="pride" data-i18n="configurator.theme.pride">Pride</option>
             <option value="shuffle" data-i18n="configurator.theme.shuffle">🔀 Shuffle — cycle every theme</option>
           </select>
           <div class="hint" data-i18n-html="configurator.themeHint">The art style that paints your train. <strong>Shuffle</strong> rotates the whole roster — a fresh theme each pass (or every few minutes in marquee).</div>
@@ -479,7 +480,7 @@
       els.enginedim.value = ['over', 'finished', 'never'].includes(fs.enginedim) ? fs.enginedim : 'over';
       els.spotlight.value = fs.spotlight ?? '';
       els.tz.value = fs.tz ?? '';
-      els.theme.value = ['classic', 'flat', 'synthwave', 'ticket', 'wood', 'comic', 'departures', 'paper', 'tron', 'pixel', 'highvibes', 'jazz', 'bullet', 'lava', 'shuffle'].includes(fs.theme) ? fs.theme : 'classic';
+      els.theme.value = ['classic', 'flat', 'synthwave', 'ticket', 'wood', 'comic', 'departures', 'paper', 'tron', 'pixel', 'highvibes', 'jazz', 'bullet', 'lava', 'pride', 'shuffle'].includes(fs.theme) ? fs.theme : 'classic';
       els.scale.value = fs.scale ?? '1';
       els.height.value = fs.height ?? '100';
       els.lang.value = SUPPORTED_LOCALES.includes(canonicalLocale(fs.lang)) ? canonicalLocale(fs.lang) : 'en';

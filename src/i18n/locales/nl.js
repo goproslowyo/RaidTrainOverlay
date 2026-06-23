@@ -108,6 +108,7 @@ export default {
   'configurator.theme.jazz': 'Jazz-vinyl',
   'configurator.theme.bullet': 'Anime-kogeltrein',
   'configurator.theme.lava': 'Lavalamp',
+  'configurator.theme.pride': 'Pride',
   'configurator.theme.shuffle': '🔀 Shuffle — wissel door alle thema\'s',
   'configurator.themeHint': 'De kunststijl die je trein schildert. <strong>Shuffle</strong> draait de hele reeks door — een vers thema bij elke passage (of elke paar minuten in marquee).',
 
@@ -208,6 +209,7 @@ export default {
   'landing.theme.jazz': 'Jazz-vinyl',
   'landing.theme.bullet': 'Anime-kogeltrein',
   'landing.theme.lava': 'Lavalamp',
+  'landing.theme.pride': 'Pride',
   'landing.theme.shuffle': '🔀 Shuffle',
   'landing.urlAria': 'Overlay-URL voor het geselecteerde thema',
   'landing.copy': 'Kopiëren',

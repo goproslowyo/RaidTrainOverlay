@@ -22,6 +22,7 @@ import highvibes from './themes/highvibes.js';
 import jazz from './themes/jazz.js';
 import bullet from './themes/bullet.js';
 import lava from './themes/lava.js';
+import pride from './themes/pride.js';
 // A Theme registers the same way whether it is a single file (./themes/<key>.js) or
 // a folder that bundles its own assets (./themes/<key>/index.js) — both are ES
 // modules with a default export. `starter` is the folder form: the
@@ -33,7 +34,7 @@ import starter from './themes/starter/index.js';
  *  via the URL/Configurator. Single-file and folder-form Themes register identically.
  *  `starter` is registered (renderable via the manual harness #theme=starter) but
  *  kept out of the user-facing enum — it is the authoring reference, not a roster Theme. */
-export const THEMES = { classic, flat, synthwave, ticket, wood, comic, departures, paper, tron, pixel, highvibes, jazz, bullet, lava, starter };
+export const THEMES = { classic, flat, synthwave, ticket, wood, comic, departures, paper, tron, pixel, highvibes, jazz, bullet, lava, pride, starter };
 
 /** config.theme → Theme, falling back to classic for unknown/unshipped keys. */
 export function resolveTheme(key) {

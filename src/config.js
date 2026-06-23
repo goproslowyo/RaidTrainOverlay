@@ -155,7 +155,7 @@ export function parseConfig(queryString) {
     // `shinkansen`→bullet, `lavalamp`→lava.
     theme: oneOf(
       THEME_ALIASES[(params.get('theme') ?? '').toLowerCase()] ?? params.get('theme'),
-      ['classic', 'flat', 'synthwave', 'ticket', 'wood', 'comic', 'departures', 'paper', 'tron', 'pixel', 'highvibes', 'jazz', 'bullet', 'lava', 'shuffle'],
+      ['classic', 'flat', 'synthwave', 'ticket', 'wood', 'comic', 'departures', 'paper', 'tron', 'pixel', 'highvibes', 'jazz', 'bullet', 'lava', 'pride', 'shuffle'],
       'classic',
     ),
   };

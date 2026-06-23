@@ -108,6 +108,7 @@ export default {
   'configurator.theme.jazz': 'Jazz-Vinyl',
   'configurator.theme.bullet': 'Anime-Schnellzug',
   'configurator.theme.lava': 'Lavalampe',
+  'configurator.theme.pride': 'Pride',
   'configurator.theme.shuffle': '🔀 Zufall — alle Designs durchwechseln',
   'configurator.themeHint': 'Der Kunststil, der deinen Zug zeichnet. <strong>Zufall</strong> rotiert das gesamte Aufgebot — bei jeder Vorbeifahrt ein frisches Design (oder im Marquee-Modus alle paar Minuten).',
 
@@ -208,6 +209,7 @@ export default {
   'landing.theme.jazz': 'Jazz-Vinyl',
   'landing.theme.bullet': 'Anime-Schnellzug',
   'landing.theme.lava': 'Lavalampe',
+  'landing.theme.pride': 'Pride',
   'landing.theme.shuffle': '🔀 Zufall',
   'landing.urlAria': 'Overlay-URL für das ausgewählte Design',
   'landing.copy': 'Kopieren',

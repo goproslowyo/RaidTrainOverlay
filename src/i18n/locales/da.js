@@ -108,6 +108,7 @@ export default {
   'configurator.theme.jazz': 'Jazz-vinyl',
   'configurator.theme.bullet': 'Anime-lyntog',
   'configurator.theme.lava': 'Lavalampe',
+  'configurator.theme.pride': 'Pride',
   'configurator.theme.shuffle': '🔀 Bland — skift mellem alle temaer',
   'configurator.themeHint': 'Den kunststil, der maler dit tog. <strong>Bland</strong> roterer hele samlingen — et nyt tema hver passage (eller hvert par minutter i marquee).',
 
@@ -208,6 +209,7 @@ export default {
   'landing.theme.jazz': 'Jazz-vinyl',
   'landing.theme.bullet': 'Anime-lyntog',
   'landing.theme.lava': 'Lavalampe',
+  'landing.theme.pride': 'Pride',
   'landing.theme.shuffle': '🔀 Bland',
   'landing.urlAria': 'Overlay-URL for det valgte tema',
   'landing.copy': 'Kopiér',

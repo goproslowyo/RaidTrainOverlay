@@ -181,6 +181,7 @@ export const DESCRIPTIONS = {
   'configurator.theme.jazz': 'Theme name: spinning jazz vinyl records. "Jazz" is usually kept; translate "vinyl" if natural.',
   'configurator.theme.bullet': 'Theme name: an anime-styled Japanese bullet train (shinkansen). Translate "bullet train" with the local term (or keep "shinkansen").',
   'configurator.theme.lava': 'Theme name: a psychedelic lava lamp. Translate "lava lamp" with the local term.',
+  'configurator.theme.pride': 'Theme name: an LGBTQ+ Pride rainbow-parade train. Use the local term for the Pride movement (es Orgullo, pt Orgulho, it Orgoglio, fr Fierté); keep "Pride" where that loanword is standard (de/nl/da/lt). NOT the emotion — the LGBTQ+ celebration.',
   'configurator.theme.shuffle': 'Theme option: cycle through every theme. Keep the 🔀 emoji.',
   'configurator.themeHint': 'Help text under the theme picker. Contains <strong>Shuffle</strong> — keep the tag; translate "Shuffle" to match the shuffle option.',
   // Configurator — look sliders.
@@ -275,6 +276,7 @@ export const DESCRIPTIONS = {
   'landing.theme.jazz': 'Theme chip name (landing). Spinning jazz vinyl; "Jazz" usually kept.',
   'landing.theme.bullet': 'Theme chip name (landing). Anime Japanese bullet train (shinkansen).',
   'landing.theme.lava': 'Theme chip name (landing). A lava lamp; translate "lava lamp" locally.',
+  'landing.theme.pride': 'Theme chip name (landing). The LGBTQ+ Pride theme; localize as configurator.theme.pride.',
   'landing.theme.shuffle': 'Theme chip: cycle all. Keep 🔀.',
   'landing.urlAria': 'Accessible label for the overlay-URL field.',
   'landing.copy': 'Copy button on the landing page. Verb.',

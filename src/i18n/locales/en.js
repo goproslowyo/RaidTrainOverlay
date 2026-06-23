@@ -125,6 +125,7 @@ export default {
   'configurator.theme.jazz': 'Jazz vinyl',
   'configurator.theme.bullet': 'Anime bullet train',
   'configurator.theme.lava': 'Lava lamp',
+  'configurator.theme.pride': 'Pride',
   'configurator.theme.shuffle': '🔀 Shuffle — cycle every theme',
   'configurator.themeHint': 'The art style that paints your train. <strong>Shuffle</strong> rotates the whole roster — a fresh theme each pass (or every few minutes in marquee).',
 
@@ -225,6 +226,7 @@ export default {
   'landing.theme.jazz': 'Jazz Vinyl',
   'landing.theme.bullet': 'Anime Bullet Train',
   'landing.theme.lava': 'Lava Lamp',
+  'landing.theme.pride': 'Pride',
   'landing.theme.shuffle': '🔀 Shuffle',
   'landing.urlAria': 'Overlay URL for the selected theme',
   'landing.copy': 'Copy',

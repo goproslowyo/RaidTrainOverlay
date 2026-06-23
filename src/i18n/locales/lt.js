@@ -108,6 +108,7 @@ export default {
   'configurator.theme.jazz': 'Džiazo vinilas',
   'configurator.theme.bullet': 'Anime greitasis traukinys',
   'configurator.theme.lava': 'Lavos lempa',
+  'configurator.theme.pride': 'Pride',
   'configurator.theme.shuffle': '🔀 Maišymas — sukti visas temas',
   'configurator.themeHint': 'Meno stilius, kuriuo nupiešiamas tavo traukinys. <strong>Maišymas</strong> sukioja visą rinkinį — kaskart kita tema (arba kas kelias minutes slankiojimo režimu).',
 
@@ -208,6 +209,7 @@ export default {
   'landing.theme.jazz': 'Džiazo vinilas',
   'landing.theme.bullet': 'Anime greitasis traukinys',
   'landing.theme.lava': 'Lavos lempa',
+  'landing.theme.pride': 'Pride',
   'landing.theme.shuffle': '🔀 Maišymas',
   'landing.urlAria': 'Pasirinktos temos perdangos URL',
   'landing.copy': 'Kopijuoti',

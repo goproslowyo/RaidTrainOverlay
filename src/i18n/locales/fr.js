@@ -108,6 +108,7 @@ export default {
   'configurator.theme.jazz': 'Vinyle jazz',
   'configurator.theme.bullet': 'Train rapide anime',
   'configurator.theme.lava': 'Lampe à lave',
+  'configurator.theme.pride': 'Fierté',
   'configurator.theme.shuffle': '🔀 Aléatoire — fait défiler tous les thèmes',
   'configurator.themeHint': 'Le style graphique qui habille ton train. <strong>Aléatoire</strong> fait tourner tout le répertoire — un nouveau thème à chaque passage (ou toutes les quelques minutes en mode marquee).',
 
@@ -208,6 +209,7 @@ export default {
   'landing.theme.jazz': 'Vinyle jazz',
   'landing.theme.bullet': 'Train rapide anime',
   'landing.theme.lava': 'Lampe à lave',
+  'landing.theme.pride': 'Fierté',
   'landing.theme.shuffle': '🔀 Aléatoire',
   'landing.urlAria': 'URL de l’overlay pour le thème sélectionné',
   'landing.copy': 'Copier',

@@ -108,6 +108,7 @@ export default {
   'configurator.theme.jazz': 'Vinile jazz',
   'configurator.theme.bullet': 'Treno proiettile anime',
   'configurator.theme.lava': 'Lampada lava',
+  'configurator.theme.pride': 'Orgoglio',
   'configurator.theme.shuffle': '🔀 Shuffle — alterna tutti i temi',
   'configurator.themeHint': 'Lo stile grafico che dipinge il tuo treno. <strong>Shuffle</strong> fa ruotare l\'intera collezione — un tema nuovo a ogni passaggio (o ogni pochi minuti in modalità marquee).',
 
@@ -208,6 +209,7 @@ export default {
   'landing.theme.jazz': 'Vinile jazz',
   'landing.theme.bullet': 'Treno proiettile anime',
   'landing.theme.lava': 'Lampada lava',
+  'landing.theme.pride': 'Orgoglio',
   'landing.theme.shuffle': '🔀 Shuffle',
   'landing.urlAria': 'URL overlay per il tema selezionato',
   'landing.copy': 'Copia',

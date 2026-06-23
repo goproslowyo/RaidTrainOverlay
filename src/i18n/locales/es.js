@@ -116,6 +116,7 @@ export default {
   'configurator.theme.jazz': 'Vinilo de jazz',
   'configurator.theme.bullet': 'Tren bala anime',
   'configurator.theme.lava': 'Lámpara de lava',
+  'configurator.theme.pride': 'Orgullo',
   'configurator.theme.shuffle': '🔀 Aleatorio — rota por todos los temas',
   'configurator.themeHint': 'El estilo artístico que pinta tu tren. <strong>Aleatorio</strong> rota toda la colección — un tema nuevo en cada pasada (o cada pocos minutos en modo marquesina).',
 
@@ -216,6 +217,7 @@ export default {
   'landing.theme.jazz': 'Vinilo de jazz',
   'landing.theme.bullet': 'Tren bala anime',
   'landing.theme.lava': 'Lámpara de lava',
+  'landing.theme.pride': 'Orgullo',
   'landing.theme.shuffle': '🔀 Aleatorio',
   'landing.urlAria': 'URL del overlay para el tema seleccionado',
   'landing.copy': 'Copiar',
