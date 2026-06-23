@@ -266,11 +266,17 @@ export function build(train, opts = {}) {
   // Layout units: the loco (first streamer), then the Organiser tender right behind it
   // (omitted when the Organiser already drives the loco), then the Cars.
   const engine = vehicles[0];
+  // Only treat vehicles[0] as the loco when it really IS the Engine: post-event
+  // (enginedim=finished + hidefinished) toVehicles drops the Engine, so vehicles[0]
+  // is then a Car — or the list is empty — and tronCar(undefined) would throw.
+  const hasEngine = engine?.kind === 'engine';
   const units = [];
   let idx = 0;
-  units.push(tronCar(engine, idx++));
-  if (engine?.organiser) units.push(tronTender(engine.organiser, idx++));
-  for (const car of vehicles.slice(1)) units.push(tronCar(car, idx++));
+  if (hasEngine) {
+    units.push(tronCar(engine, idx++));
+    if (engine.organiser) units.push(tronTender(engine.organiser, idx++));
+  }
+  for (const car of vehicles.slice(hasEngine ? 1 : 0)) units.push(tronCar(car, idx++));
   node.innerHTML = units.join('');
 
   // Refs: Cars keyed by slotOrder; the Engine + tender tracked for the post-event dim.

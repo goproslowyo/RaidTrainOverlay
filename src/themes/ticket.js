@@ -228,9 +228,12 @@ export function build(train, opts = {}) {
   // behind it (omitted when the Organiser is already driving the loco
   // — engine.organiser is null), then the Cars.
   const engine = vehicles[0];
-  const units = [ticketCar(engine)];
-  if (engine?.organiser) units.push(tenderCar(engine.organiser));
-  for (const car of vehicles.slice(1)) units.push(ticketCar(car));
+  // Only treat vehicles[0] as the loco when it really IS the Engine: post-event the
+  // Engine is dropped, so vehicles[0] may be a Car (or absent) — ticketCar(undefined) throws.
+  const hasEngine = engine?.kind === 'engine';
+  const units = hasEngine ? [ticketCar(engine)] : [];
+  if (hasEngine && engine.organiser) units.push(tenderCar(engine.organiser));
+  for (const car of vehicles.slice(hasEngine ? 1 : 0)) units.push(ticketCar(car));
   node.innerHTML = units.join('');
 
   // Refs: Cars keyed by slotOrder; the Engine + tender tracked for the post-event

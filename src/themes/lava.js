@@ -294,7 +294,10 @@ function carArt(v, x, w, i, isEngine) {
 export function build(train, opts = {}) {
   L = themeT(opts);
   const vehicles = toVehicles(train);
-  const widthOf = (i) => (i === 0 ? ENG : CAR);
+  // Width + role key off the view-model's kind, NOT the index: post-event
+  // (enginedim=finished + hidefinished) toVehicles drops the Engine, so vehicles[0]
+  // can be a real Car and must not be drawn as the loco.
+  const widthOf = (i) => (vehicles[i].kind === 'engine' ? ENG : CAR);
 
   const xs = [];
   let acc = 0;
@@ -321,7 +324,7 @@ export function build(train, opts = {}) {
   let cars = '';
   vehicles.forEach((v, i) => {
     const w = widthOf(i);
-    const isEngine = i === 0;
+    const isEngine = v.kind === 'engine';
     const departed = isEngine ? v.isDimmed : v.isDeparted;
     const state = (v.isCurrent ? ' rt-car--current' : '') + (v.isSpotlit ? ' rt-car--spotlit' : '') + (departed ? ' rt-car--departed' : '');
     const slot = isEngine ? ' data-engine="1"' : ` data-slot="${v.slotOrder}"`;

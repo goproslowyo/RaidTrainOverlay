@@ -207,9 +207,12 @@ export function build(train, opts = {}) {
   // behind it (omitted when the Organiser is already driving the loco
   // — engine.organiser is null), then the Cars. Couplers (.sw-link) between all.
   const engine = vehicles[0];
-  const units = [neonCar(engine)];
-  if (engine?.organiser) units.push(tenderCar(engine.organiser));
-  for (const car of vehicles.slice(1)) units.push(neonCar(car));
+  // Only treat vehicles[0] as the loco when it really IS the Engine: post-event the
+  // Engine is dropped, so vehicles[0] may be a Car (or absent) — neonCar(undefined) throws.
+  const hasEngine = engine?.kind === 'engine';
+  const units = hasEngine ? [neonCar(engine)] : [];
+  if (hasEngine && engine.organiser) units.push(tenderCar(engine.organiser));
+  for (const car of vehicles.slice(hasEngine ? 1 : 0)) units.push(neonCar(car));
   node.innerHTML = units.join('<div class="sw-link"></div>');
 
   // Refs: Cars keyed by slotOrder; the Engine + tender tracked for the post-event

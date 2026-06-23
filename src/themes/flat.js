@@ -231,10 +231,16 @@ export function build(train, opts = {}) {
   L = themeT(opts);
   const vehicles = toVehicles(train);
   const units = [];
-  const engine = vehicles[0];
-  units.push({ type: 'engine', v: engine });
-  if (engine?.organiser) units.push({ type: 'tender', v: engine.organiser });
-  for (const car of vehicles.slice(1)) {
+  // The Engine is the view-model's engine vehicle, NOT just vehicles[0]: post-event
+  // (enginedim=finished + hidefinished) toVehicles DROPS the Engine, so vehicles[0] is
+  // then a real Car and must render as a Car, not the loco.
+  const hasEngine = vehicles[0]?.kind === 'engine';
+  if (hasEngine) {
+    const engine = vehicles[0];
+    units.push({ type: 'engine', v: engine });
+    if (engine?.organiser) units.push({ type: 'tender', v: engine.organiser });
+  }
+  for (const car of vehicles.slice(hasEngine ? 1 : 0)) {
     units.push({ type: car.kind === 'open' ? 'open' : car.kind === 'caboose' ? 'caboose' : 'car', v: car });
   }
 

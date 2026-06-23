@@ -468,7 +468,10 @@ function jazzCar(v, x, w, i, isEngine) {
 export function build(train, opts = {}) {
   L = themeT(opts);
   const vehicles = toVehicles(train);
-  const widthOf = (i) => (i === 0 ? ENG : CAR);
+  // Width + role key off the view-model's kind, NOT the index: post-event
+  // (enginedim=finished + hidefinished) toVehicles drops the Engine, so vehicles[0]
+  // can be a real Car and must not be drawn as the loco.
+  const widthOf = (i) => (vehicles[i].kind === 'engine' ? ENG : CAR);
   const xs = [];
   let acc = 0;
   vehicles.forEach((_, i) => { xs.push(acc); acc += widthOf(i) + GAP; });
@@ -477,7 +480,7 @@ export function build(train, opts = {}) {
   let body = '';
   vehicles.forEach((v, i) => {
     const w = widthOf(i);
-    const isEngine = i === 0;
+    const isEngine = v.kind === 'engine';
     const parts = jazzCar(v, xs[i], w, i, isEngine);
     // The loco is the Organiser — no Slot, so it dims only post-event (isDimmed),
     // never on a per-slot isDeparted. Coaches use isDeparted.
