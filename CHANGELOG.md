@@ -4,6 +4,23 @@ All notable changes to RaidTrainOverlay are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and the project follows
 [Semantic Versioning](https://semver.org/).
 
+## [0.6.0] - 2026-06-22
+
+### Added
+- **Pride theme** (`theme=pride`) — a rainbow parade train: a bright "steam-bullet"
+  locomotive (rainbow flank stripe, nose chevron, and rainbow smoke), full-flag 6-stripe
+  rainbow coaches with windows and strung bunting, a cupola-lookout caboose with a tail-lamp,
+  twinkling sparkles, and a full-width band of rushing rainbow speed-lines. Selectable in the
+  Configurator, the landing-page theme chips, the preview gallery, and `shuffle`; localized
+  across all 11 locales.
+
+### Fixed
+- Themes picked the locomotive by car position (`index 0`) instead of by role. When the
+  Engine is hidden post-event (`enginedim=finished` + `hidefinished`), the view-model drops
+  it — so the first car is a regular coach, or the train is empty. The old code mis-rendered
+  that coach as the loco (and froze its time updates) or threw while building the loco from an
+  empty list. Every theme now keys the loco off the view-model's `kind`.
+
 ## [0.5.0] - 2026-06-22
 
 Build a raid-train overlay with **no RaidPal event at all** — type your DJs in by hand.
