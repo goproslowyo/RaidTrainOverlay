@@ -71,15 +71,15 @@ test('parseConfig parses the speed multiplier with default 1 and garbage fallbac
   assert.equal(parseConfig('?event=x&speed=fast').speed, 1);
 });
 
-test('parseConfig parses track as an enum, defaulting to always', () => {
-  // Track visibility: always (default) vs periodic (fade out between Passes).
-  assert.equal(parseConfig('?event=x').track, 'always');
+test('parseConfig parses track as an enum, defaulting to periodic', () => {
+  // Track visibility: periodic (default — fade out between Passes) vs always.
+  assert.equal(parseConfig('?event=x').track, 'periodic');
   assert.equal(parseConfig('?event=x&track=periodic').track, 'periodic');
   assert.equal(parseConfig('?event=x&track=PERIODIC').track, 'periodic');
   assert.equal(parseConfig('?event=x&track=always').track, 'always');
   // Garbage / blank fall back to the default (tolerance contract).
-  assert.equal(parseConfig('?event=x&track=banana').track, 'always');
-  assert.equal(parseConfig('?event=x&track=').track, 'always');
+  assert.equal(parseConfig('?event=x&track=banana').track, 'periodic');
+  assert.equal(parseConfig('?event=x&track=').track, 'periodic');
 });
 
 test('parseConfig parses track fade durations as 0..120 seconds, defaulting 15 in / 10 out', () => {
@@ -259,9 +259,9 @@ test('serializeConfig emits only non-default params, keeping the URL minimal', (
     serializeConfig(parseConfig('?event=x&mode=marquee&interval=5&speed=2')),
     'event=x&mode=marquee&interval=5&speed=2',
   );
-  // track serializes only when periodic; the always default stays omitted.
-  assert.equal(serializeConfig(parseConfig('?event=x&track=periodic')), 'event=x&track=periodic');
-  assert.equal(serializeConfig(parseConfig('?event=x&track=always')), 'event=x');
+  // track serializes only when not the default; the periodic default stays omitted.
+  assert.equal(serializeConfig(parseConfig('?event=x&track=always')), 'event=x&track=always');
+  assert.equal(serializeConfig(parseConfig('?event=x&track=periodic')), 'event=x');
   // Fade durations serialize on their own non-default value; defaults (15/10) stay omitted.
   assert.equal(serializeConfig(parseConfig('?event=x&trackfadein=20&trackfadeout=5')), 'event=x&trackfadein=20&trackfadeout=5');
   assert.equal(serializeConfig(parseConfig('?event=x&trackfadein=15&trackfadeout=10')), 'event=x');
@@ -314,7 +314,7 @@ test('parse(serialize(parse(q))) round-trips every param (the Configurator contr
   const cases = [
     'event=x',
     'event=x&mode=marquee&interval=5&speed=2&scale=1.5&openslots=1&spotlight=dj alpha,dj charlie&tz=PT,ET,GMT&height=20',
-    'event=x&track=periodic&interval=7',
+    'event=x&track=always&interval=7',
     'event=x&track=periodic&trackfadein=20&trackfadeout=5',
     'event=x&trackfadeout=0&trackfadein=8',
     'event=x&mode=banana&interval=0&scale=0&tz=PT,Bogus,ET&height=999&bogus=1',

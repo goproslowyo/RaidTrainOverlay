@@ -63,7 +63,12 @@ export function ensureStyles() {
     .rt-theme-highvibes .rt-car--departed .hv-stamp { visibility: visible; }
 
     /* ── Ambient motion (compositor-only, reduced-motion-safe) ── */
-    .rt-theme-highvibes .hv-leaf { transform-box: fill-box; transform-origin: center; animation-timing-function: linear; animation-iteration-count: infinite; will-change: transform; }
+    /* No will-change here: these animate per-car (×every car), and a transform
+       animation already gets its own compositor layer for its duration — adding
+       will-change on hundreds of leaves just reserves backing stores up front and
+       starves the GPU (the documented over-use anti-pattern, and the stutter the
+       leaf-forward plant was hitting in OBS/CEF as a Train rolls by). */
+    .rt-theme-highvibes .hv-leaf { transform-box: fill-box; transform-origin: center; animation-timing-function: linear; animation-iteration-count: infinite; }
     /* Bigger, RIGHTWARD-biased tumble loops: the train rolls forward (LEFT), so the
        leaves waft up and trail backwards to the RIGHT (mostly +x), then settle. Larger
        amplitude than before = more movement. Closed loops so leaves never fly off. */
@@ -71,10 +76,10 @@ export function ensureStyles() {
     @keyframes hv-driftB { 0%{transform:translate(0,0) rotate(0)} 30%{transform:translate(48px,-44px) rotate(-130deg)} 64%{transform:translate(98px,-20px) rotate(-250deg)} 100%{transform:translate(0,0) rotate(-360deg)} }
     @keyframes hv-driftC { 0%{transform:translate(0,0) rotate(0)} 22%{transform:translate(52px,-18px) rotate(70deg)} 55%{transform:translate(92px,-58px) rotate(190deg)} 84%{transform:translate(42px,-12px) rotate(305deg)} 100%{transform:translate(0,0) rotate(360deg)} }
     /* The soil leaf-bed gently sways about its rooted base (compositor transform). */
-    .rt-theme-highvibes .hv-bedleaf { transform-box: fill-box; transform-origin: center bottom; animation: hv-bedsway var(--bp,6s) ease-in-out infinite; will-change: transform; }
+    .rt-theme-highvibes .hv-bedleaf { transform-box: fill-box; transform-origin: center bottom; animation: hv-bedsway var(--bp,6s) ease-in-out infinite; }
     @keyframes hv-bedsway { 0%,100%{transform:rotate(-2deg)} 50%{transform:rotate(2deg)} }
     /* Drifting spores rise + fade (opacity + transform only, never a filter/bloom). */
-    .rt-theme-highvibes .hv-spore { transform-box: fill-box; transform-origin: center; animation: hv-rise linear infinite; will-change: transform, opacity; }
+    .rt-theme-highvibes .hv-spore { transform-box: fill-box; transform-origin: center; animation: hv-rise linear infinite; }
     @keyframes hv-rise { 0%{opacity:0; transform:translateY(8px) scale(.6)} 25%{opacity:.85} 100%{opacity:0; transform:translate(12px,-66px) scale(1.1)} }
 
     /* ── The stationary SCENE BAND (buildTrack) — a translucent backing + a
@@ -400,7 +405,10 @@ function leafCloud(x, w, i) {
   // ── drifting pot-leaves above the plant — the leaf-FORWARD hero motion. Bumped
   //    toward the prototype's lush density (≈9/car) but still BOUNDED so 20+ cars ×
   //    marquee copies stay sane. A spread of sizes/depths reads richer. ──
-  const N = 13;  // more floating leaves (user wanted more); still bounded per car
+  const N = 6;   // drifting leaves per car. Each is its own compositing layer ×
+                 // every car, so this is the dominant per-frame cost as a Train
+                 // rolls by; trimmed from 13 → 6 to kill the OBS/CEF stutter while
+                 // staying lush. (Was bumped to 13 for density; the perf cost won.)
   for (let k = 0; k < N; k++) {
     const seed = i * 17 + k;
     const lx = x + (0.04 + rng(seed + 1) * 0.92) * w;
@@ -416,7 +424,7 @@ function leafCloud(x, w, i) {
   //    about their base (frames the pots like the prototype's leaf bed) ──
   //    Varied COUNT (5-7/car), scattered positions, strong SIZE variation, a per-leaflet
   //    LEAN, and mixed green/purple — so the bed reads organic, not as uniform groups of 3.
-  const B = 5 + Math.round(rng(i * 23 + 50) * 2);  // 5-7 per car, varies per car
+  const B = 2 + Math.round(rng(i * 23 + 50) * 1);  // 2-3 per car (trimmed from 5-7 for OBS perf)
   for (let k = 0; k < B; k++) {
     const seed = i * 23 + k + 100;
     const bx = x + (0.08 + rng(seed) * 0.84) * w;            // scattered, not even thirds
@@ -429,7 +437,7 @@ function leafCloud(x, w, i) {
     s += `<g transform="translate(${bx.toFixed(0)},${by.toFixed(0)}) rotate(${rot})" opacity="${op}"><g class="hv-bedleaf" style="--bp:${per}s;animation-delay:-${(k * 0.37).toFixed(1)}s">${richLeaf(sc, pur ? 'hv-leafP' : 'hv-leafG', false)}</g></g>`;
   }
   // ── a few rising frost spores (gradient dots, no bloom) ──
-  const SP = 3;  // capped per car
+  const SP = 2;  // rising spores, capped per car (trimmed from 3 for OBS perf)
   for (let k = 0; k < SP; k++) {
     const seed = i * 31 + k + 200;
     const sx = x + (0.2 + rng(seed + 1) * 0.6) * w;
@@ -525,7 +533,7 @@ export function buildTrack() {
   // ambient drifting pot-leaves scattered across the far/mid band (bounded count;
   // these belong to the scene, separate from the per-car leaf clouds). Seeded.
   let sceneLeaves = '';
-  const NL = 9;
+  const NL = 5;  // scene drifting leaves (trimmed from 9 for OBS perf)
   for (let k = 0; k < NL; k++) {
     const lx = 60 + rng(k * 7 + 1) * 1080;
     const ly = 14 + rng(k * 7 + 3) * 44;
@@ -538,7 +546,7 @@ export function buildTrack() {
 
   // a few rising motes off the ground glow (gradient dots; opacity+transform only)
   let motes = '';
-  const NM = 7;
+  const NM = 4;  // rising motes (trimmed from 7 for OBS perf)
   for (let k = 0; k < NM; k++) {
     const mx = 80 + rng(k * 11 + 1) * 1040;
     const r = (0.5 + rng(k * 11 + 4) * 0.7).toFixed(2);

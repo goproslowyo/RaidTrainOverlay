@@ -274,8 +274,8 @@
         <div class="field" id="track-row">
           <label class="lbl" for="f-track" data-i18n="configurator.trackLabel">Track between passes</label>
           <select id="f-track">
+            <option value="periodic" selected data-i18n="configurator.trackPeriodic">Fade it out between passes</option>
             <option value="always" data-i18n="configurator.trackAlways">Always show the track</option>
-            <option value="periodic" data-i18n="configurator.trackPeriodic">Fade it out between passes</option>
           </select>
           <div class="hint" id="track-note">With the train gone between passes, fade the rails out too so the overlay is completely empty until the next pass rolls in.</div>
         </div>
@@ -470,7 +470,7 @@
       els.event.value = fs.event ?? '';
       els.mode.value = fs.mode === 'marquee' ? 'marquee' : 'pass';
       els.interval.value = fs.interval ?? '15';
-      els.track.value = ['always', 'periodic'].includes(fs.track) ? fs.track : 'always';
+      els.track.value = ['always', 'periodic'].includes(fs.track) ? fs.track : 'periodic';
       els.trackfadein.value = fs.trackfadein ?? '15';
       els.trackfadeout.value = fs.trackfadeout ?? '10';
       els.speed.value = fs.speed ?? '1';

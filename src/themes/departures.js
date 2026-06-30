@@ -176,7 +176,11 @@ export function ensureStyles() {
     }
     .dp-car.rt-car--departed .dp-stamp { visibility: visible; }
 
-    @keyframes dp-flip { 0%,92%,100% { transform: none; filter: none; } 94% { transform: scaleY(.1); filter: brightness(1.6); } 96% { transform: scaleY(1); } }
+    /* The flap flip is a pure compositor scaleY — no per-frame filter. (Dropped a
+       brightness(1.6) pop at the flip apex: it re-rasterized the filtered text every
+       frame of the flip, on every letter of every car, against the no-per-frame-filter
+       OBS mandate, for a highlight barely visible at speed.) */
+    @keyframes dp-flip { 0%,92%,100% { transform: none; } 94% { transform: scaleY(.1); } 96% { transform: scaleY(1); } }
 
     /* Thin dark rail band Track (mockup .trk--dep): stationary, full-width,
        sized in fractions of --rt-th (it lives outside .dp, so no --u here). */

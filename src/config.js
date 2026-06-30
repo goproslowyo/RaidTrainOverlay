@@ -122,10 +122,12 @@ export function parseConfig(queryString) {
     mode: mode === 'marquee' ? 'marquee' : 'pass',
     interval: positiveNumber(params.get('interval'), 15),
     speed: positiveNumber(params.get('speed'), 1),
-    // Track visibility: `always` shows the rails the whole time (default);
-    // `periodic` fades them out between Passes so the Overlay goes fully empty,
-    // then back in before the next Pass. A pass-Mode concept (no-op otherwise).
-    track: oneOf(params.get('track'), ['always', 'periodic'], 'always'),
+    // Track visibility: `periodic` (default) fades the rails/scene out between
+    // Passes so the Overlay goes fully empty once the Train clears — and fades
+    // them back in as the next Pass rolls in — so a Theme's scenery never lingers
+    // on screen with no Train. `always` keeps the rails/scene up the whole time
+    // (a persistent lower-third). A pass-Mode concept (no-op for marquee/preview).
+    track: oneOf(params.get('track'), ['always', 'periodic'], 'periodic'),
     // Track fade durations in seconds (track=periodic only): how long the rails
     // take to fade in before a Pass and out after it. 0 = an instant cut. Both
     // are clamped to the available gap at render, so a long value degrades gracefully.
@@ -180,7 +182,7 @@ export function serializeConfig(config) {
   if (config.mode !== 'pass') params.set('mode', config.mode);
   if (config.interval !== 15) params.set('interval', String(config.interval));
   if (config.speed !== 1) params.set('speed', String(config.speed));
-  if (config.track !== 'always') params.set('track', config.track);
+  if (config.track !== 'periodic') params.set('track', config.track);
   // Fade durations serialize on their own non-default value (independent of track,
   // so serialize∘parse stays idempotent); they simply have no effect unless periodic.
   if (config.trackfadein !== 15) params.set('trackfadein', String(config.trackfadein));

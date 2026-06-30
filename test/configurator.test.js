@@ -53,12 +53,12 @@ test('buildOverlayQuery serializes a minimal Overlay URL from form state, omitti
     buildOverlayQuery({ event: 'x', mode: 'marquee', interval: '5', speed: '2' }),
     'event=x&mode=marquee&interval=5&speed=2',
   );
-  // track=periodic flows through; the always default is dropped by the round-trip.
-  assert.equal(buildOverlayQuery({ event: 'x', track: 'periodic' }), 'event=x&track=periodic');
-  assert.equal(buildOverlayQuery({ event: 'x', track: 'always' }), 'event=x');
+  // track=always flows through; the periodic default is dropped by the round-trip.
+  assert.equal(buildOverlayQuery({ event: 'x', track: 'always' }), 'event=x&track=always');
+  assert.equal(buildOverlayQuery({ event: 'x', track: 'periodic' }), 'event=x');
   // Fade durations flow through; defaults (15/10) drop, out-of-range falls back.
   assert.equal(buildOverlayQuery({ event: 'x', track: 'periodic', trackfadein: '20', trackfadeout: '5' }),
-    'event=x&track=periodic&trackfadein=20&trackfadeout=5');
+    'event=x&trackfadein=20&trackfadeout=5');
   assert.equal(buildOverlayQuery({ event: 'x', trackfadein: '15', trackfadeout: '10' }), 'event=x');
   assert.equal(buildOverlayQuery({ event: 'x', trackfadein: '999' }), 'event=x');
   assert.equal(buildOverlayQuery({ event: 'x', openslots: true, height: '20' }), 'event=x&openslots=1&height=20');

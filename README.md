@@ -38,7 +38,7 @@ All optional, set as query params (the Configurator writes these for you):
 | `theme` | `classic` (default), `flat`, `synthwave`, `ticket`, `wood`, `comic`, `departures`, `paper`, `tron`, `pixel`, `highvibes`, `jazz`, `bullet`, `lava`, `pride`; or `shuffle` to cycle the whole roster. |
 | `mode` | `pass` (one pass every `interval`) or `marquee` (continuous loop). |
 | `speed`, `interval` | Traversal speed; minutes between passes. |
-| `track` | `always` (default) keeps the rails on screen; `periodic` fades them out between passes so the overlay goes fully empty until the next one (Pass mode only). |
+| `track` | `periodic` (default) fades the rails/scenery out between passes so the overlay goes fully empty until the next one rolls in — nothing lingers with no train; `always` keeps them on screen the whole time (a persistent lower-third). Pass mode only. |
 | `trackfadein`, `trackfadeout` | Fade durations in seconds for `track=periodic` (default `15` / `10`; `0` = instant; long values are trimmed to fit short intervals). |
 | `scale`, `height` | Size multiplier (`0.5`–`2`); vertical position (`0`–`100`). |
 | `spotlight` | Comma-separated names to highlight. |

@@ -64,7 +64,7 @@ The rails the Train rides on — a stationary, full-screen layer. The Train move
 _Avoid_: rail line, road, railroad
 
 **Track visibility**:
-Whether the Track is shown *always* (the default) or *periodically*. Periodic visibility shows the Track only around each **Pass** — it fades in before the Train enters and fades out after the Train clears, so the Overlay goes fully empty between Passes (reclaiming the lower-third). Honors "the Track never moves": the change is a fade, not a slide. A `pass`-Mode-only concept — marquee and preview always show the Track.
+Whether the Track is shown *periodically* (the default) or *always*. Periodic visibility shows the Track only around each **Pass** — it fades in before the Train enters and fades out after the Train clears, so the Overlay goes fully empty between Passes (reclaiming the lower-third) and a Theme's scenery never lingers on screen with no Train. `always` keeps the Track up the whole time, for a persistent lower-third. Honors "the Track never moves": the change is a fade, not a slide. A `pass`-Mode-only concept — marquee and preview always show the Track.
 
 **Ambient animation**:
 The Train's per-Theme idle motion — wheels turning, smoke puffing, and Cars undulating — distinct from the macro **Mode** traversal. Organic and varied rather than a uniform mechanical wave: each Theme sets its own **Ride character** and may bump a little off the rail for liveliness without ever reading as derailed. Makes the Train read as rolling, not gliding.

@@ -4,6 +4,36 @@ All notable changes to RaidTrainOverlay are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and the project follows
 [Semantic Versioning](https://semver.org/).
 
+## [0.7.0] - 2026-06-29
+
+The overlay now clears itself between passes by default, and the leaf-forward
+"High Vibes" theme is markedly lighter on the embedded browser OBS runs.
+
+### Changed
+- **The track and scenery now clear between passes by default** (`track=periodic`).
+  Once the train rolls off-screen, a theme's track *and* its ambient scenery — the
+  Pride rainbow speed-lines, the High Vibes hills and drifting leaves, the Synthwave
+  and Tron grids, the Bullet landscape, the Jazz club glow, the Lava lounge — fade
+  out so the overlay goes fully empty between passes, then fade back in as the next
+  train rolls in. Previously the default (`track=always`) kept every theme's scene on
+  screen the whole time, so atmospheric themes left their effects lingering on an
+  otherwise-empty lower-third with no train in sight. Set `track=always` to keep the
+  old persistent-scene behavior. (Pass mode only; marquee and preview are unchanged.)
+
+### Fixed
+- **High Vibes performance** — the theme stuttered in OBS's embedded (CEF) browser as
+  the train rolled by. It animated hundreds of simultaneous SVG nodes, each carrying
+  `will-change`, with 13 drifting leaves *per car* — a compositor-layer / GPU-memory
+  explosion. Halved the ambient node count (drifting leaves 13 → 6 per car, plus trims
+  to the soil leaves, spores, scene leaves, and motes) and dropped the `will-change`
+  over-use (a transform animation already gets its own layer; the hint just reserved
+  hundreds of backing stores up front). The potted-plant scene is still lush; the
+  motion is far cheaper to composite.
+- **Departures** — the split-flap flip animated a CSS `brightness()` filter at the
+  flip apex, re-rasterizing the filtered text on every letter of every car each frame
+  it flipped (against the theme roster's no-per-frame-filter guideline for OBS). The
+  flip is now a pure compositor `scaleY`; the board looks the same.
+
 ## [0.6.0] - 2026-06-22
 
 ### Added
