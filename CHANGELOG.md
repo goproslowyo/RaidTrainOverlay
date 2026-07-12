@@ -4,6 +4,22 @@ All notable changes to RaidTrainOverlay are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and the project follows
 [Semantic Versioning](https://semver.org/).
 
+## [0.7.1] - 2026-07-12
+
+### Fixed
+- **Explicit English is no longer dropped from the overlay URL** (#1). Picking a
+  language in the Configurator now bakes it into the URL — *including* `lang=en` —
+  instead of silently omitting English as though it were the default. Previously a
+  streamer on a non-English browser who selected English got a URL with no `lang`,
+  so the overlay fell back to browser auto-detection and rendered in the browser's
+  language. An absent `lang` now means one thing only: follow the browser.
+
+### Added
+- **"Auto (browser)" language choice** in the Configurator. The picker gains an
+  explicit *Auto (browser)* option that omits `lang` and follows browser detection,
+  cleanly distinct from choosing a concrete language. Localized across all ten
+  interface languages.
+
 ## [0.7.0] - 2026-06-29
 
 The overlay now clears itself between passes by default, and the leaf-forward

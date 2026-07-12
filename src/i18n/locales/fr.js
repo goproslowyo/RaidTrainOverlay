@@ -91,7 +91,8 @@ export default {
   'configurator.tabLineup': 'Programmation',
 
   'configurator.languageLabel': 'Langue de l’overlay',
-  'configurator.languageHint': 'La langue affichée par l’overlay à l’écran (EN COURS, LIBRE, horaires…). Intégrée dans l’URL.',
+  'configurator.languageAuto': 'Auto (navigateur)',
+  'configurator.languageHint': 'Auto suit le navigateur et omet lang. Choisis une langue pour l’intégrer dans l’URL, y compris l’anglais.',
 
   'configurator.themeLabel': 'Thème',
   'configurator.theme.classic': 'Americana classique',

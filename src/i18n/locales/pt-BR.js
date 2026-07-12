@@ -101,7 +101,8 @@ export default {
   'configurator.tabLineup': 'Escalação',
 
   'configurator.languageLabel': 'Idioma do overlay',
-  'configurator.languageHint': 'O idioma que o overlay mostra na transmissão (AGORA, LIVRE, horários…). Fica gravado na URL.',
+  'configurator.languageAuto': 'Auto (navegador)',
+  'configurator.languageHint': 'Auto segue o navegador e omite lang. Escolha um idioma para gravá-lo na URL, incluindo inglês.',
 
   'configurator.themeLabel': 'Tema',
   'configurator.theme.classic': 'Clássico americano',

@@ -71,6 +71,18 @@ export function resolveLocale(requested, navigatorLanguages = []) {
 }
 
 /**
+ * Map a stored `lang` value to the configurator's language-selector value: a
+ * supported locale (canonicalized) selects that language; anything absent or
+ * unsupported selects '' — the Auto option, which omits `lang` and follows the
+ * browser. Keeps explicit `en` distinct from Auto (issue #1: a non-English
+ * browser could not force English while `en` was silently the omitted default).
+ */
+export function selectorLocale(lang) {
+  const canon = canonicalLocale(lang);
+  return canon && SUPPORTED_LOCALES.includes(canon) ? canon : '';
+}
+
+/**
  * Locale → merged message catalog (a flat key→string object). Starts from the
  * full `en` base so every key resolves, then layers the locale's module(s) on
  * top. An unknown locale degrades to the en base.

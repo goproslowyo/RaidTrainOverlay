@@ -48,6 +48,9 @@ test('buildOverlayQuery serializes a minimal Overlay URL from form state, omitti
     event: 'x', mode: 'pass', interval: '15', speed: '1',
     openslots: false, spotlight: '', tz: '', scale: '1', height: '100',
   }), 'event=x');
+  // Auto language (blank) intentionally omits lang; explicit English serializes.
+  assert.equal(buildOverlayQuery({ event: 'x', lang: '' }), 'event=x');
+  assert.equal(buildOverlayQuery({ event: 'x', lang: 'en' }), 'event=x&lang=en');
   // Non-default params are emitted in the schema's canonical order.
   assert.equal(
     buildOverlayQuery({ event: 'x', mode: 'marquee', interval: '5', speed: '2' }),

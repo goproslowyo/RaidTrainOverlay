@@ -91,7 +91,8 @@ export default {
   'configurator.tabLineup': 'Line-up',
 
   'configurator.languageLabel': 'Overlaytaal',
-  'configurator.languageHint': 'De taal die de overlay op stream toont (NU, VRIJ, tijden…). Wordt in de URL vastgelegd.',
+  'configurator.languageAuto': 'Auto (browser)',
+  'configurator.languageHint': 'Auto volgt de browser en laat lang weg. Kies een taal om die in de URL vast te leggen, ook Engels.',
 
   'configurator.themeLabel': 'Thema',
   'configurator.theme.classic': 'Klassiek Americana',
