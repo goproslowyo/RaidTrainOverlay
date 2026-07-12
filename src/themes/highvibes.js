@@ -21,7 +21,7 @@
  * no teardown is needed. (Builder functions, gradients, and @keyframes are lifted
  * from the prototype verbatim where possible.)
  */
-import { esc, initials, fitAll, undulate, toVehicles, themeT } from './shared-svg.js';
+import { esc, initials, fitAll, toVehicles, themeT } from './shared-svg.js';
 
 // The translator the builders paint with: rebound to the active locale at the top
 // of build() (themeT reads config.t), English until then. Viewer-facing words
@@ -61,6 +61,21 @@ export function ensureStyles() {
     .rt-theme-highvibes .rt-car--departed image { filter: saturate(0.55); }
     .rt-theme-highvibes .hv-stamp { visibility: hidden; }
     .rt-theme-highvibes .rt-car--departed .hv-stamp { visibility: visible; }
+
+    /* ── OPT OUT of the shared per-Car undulation (base .rt-car sway/rock). ──
+       The base rt-undulate keyframe transform-animates each .rt-car <g>. Blink
+       cannot composite a transform animation on an SVG group (will-change/contain
+       do NOT force it — measured), so an undulating .rt-car re-rasters its WHOLE
+       subtree on the main thread every frame. That's cheap for light Themes
+       (pride ≈ 380 paths) but ruinous here: one High Vibes plant is ~500 detailed
+       paths, so a 24-Car marquee re-rasters ~26k paths/frame → ~11 fps in OBS/CEF
+       (the reported stutter). Static, the very same plants composite at ~100 fps —
+       the animation, not the detail, is the cost. So High Vibes keeps its lush art
+       and drops the ±2.5px body-sway (near-invisible on a scrolling marquee); life
+       comes from the drifting leaves, swaying leaf-bed, rolling hills and rising
+       spores below, which each repaint only their own small region. build() also
+       skips undulate() for this Theme. */
+    .rt-theme-highvibes .rt-car { animation: none; }
 
     /* ── Ambient motion (compositor-only, reduced-motion-safe) ── */
     /* No will-change here: these animate per-car (×every car), and a transform
@@ -644,10 +659,11 @@ export function build(train, opts = {}) {
         engineRef.classList.toggle('rt-car--departed', Boolean(eng.isDimmed));
       }
     },
-    /* afterAttach() — fit the names (no truncation) + start the per-Car undulation. */
+    /* afterAttach() — fit the names (no truncation). High Vibes deliberately does
+     * NOT call undulate(): the per-Car sway is a main-thread SVG re-raster of the
+     * dense plant art every frame (the OBS stutter); CSS disables it above. */
     afterAttach() {
       fitAll(svg);
-      undulate(svg);
     },
   };
 }

@@ -4,6 +4,22 @@ All notable changes to RaidTrainOverlay are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and the project follows
 [Semantic Versioning](https://semver.org/).
 
+## [0.7.2] - 2026-07-12
+
+### Fixed
+- **High Vibes performance, take two** — the theme still stuttered in OBS's embedded
+  (CEF) browser after the 0.7.0 node-count trim, and profiling found the real culprit
+  was never the drifting leaves. It was the shared per-car *undulation* (the gentle
+  body sway every theme rides): it transform-animates each car's SVG `<g>`, and Blink
+  cannot composite a transform animation on an SVG group, so every frame it re-rasterizes
+  that car's entire ~500-path plant on the main thread. A 24-car marquee re-rastered
+  ~26,000 paths per frame (~11 fps); the very same plants, held still, composite at
+  ~100 fps — the motion, not the detail, was the cost. High Vibes now opts out of the
+  undulation (every other theme keeps it), lifting a 24-car marquee from 11 to ~44 fps
+  and a typical 4–12-car train to 58–120 fps, with the full, unchanged lush plant art.
+  The sway was ±2.5px and near-invisible on a scrolling marquee; the drifting leaves,
+  swaying leaf-bed, rolling hills, and rising spores still carry the scene's motion.
+
 ## [0.7.1] - 2026-07-12
 
 ### Fixed
