@@ -91,7 +91,7 @@ export default {
   'configurator.tabLineup': 'Sąrašas',
 
   'configurator.languageLabel': 'Perdangos kalba',
-  'configurator.languageHint': 'Kalba, kuria perdanga rodoma ekrane (DABAR, LAISVA, laikai…). Įrašoma į URL.',
+  'configurator.languageHint': 'Auto seka naršyklę ir praleidžia lang. Pasirink kalbą, kad ji būtų įrašyta į URL, įskaitant anglų.',
 
   'configurator.themeLabel': 'Tema',
   'configurator.theme.classic': 'Klasikinė amerikietiška',

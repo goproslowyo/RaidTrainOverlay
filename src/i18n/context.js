@@ -164,7 +164,7 @@ export const DESCRIPTIONS = {
   'configurator.tabLineup': 'Tab name: lineup options (open slots, spotlight, zones). Noun "Lineup".',
   // Configurator — language.
   'configurator.languageLabel': 'Field label for the overlay-language selector.',
-  'configurator.languageHint': 'Help text: this sets the language the on-stream overlay shows; it is saved in the URL.',
+  'configurator.languageHint': 'Help text: Auto omits lang for browser detection; explicit languages, including English, are saved in the URL.',
   // Configurator — theme.
   'configurator.themeLabel': 'Field label: art style.',
   'configurator.theme.classic': 'Theme name: vintage American steam-train look. "Classic Americana".',

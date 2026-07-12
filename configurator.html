@@ -203,6 +203,7 @@
         <div class="field">
           <label class="lbl" for="f-lang" data-i18n="configurator.languageLabel">Overlay language</label>
           <select id="f-lang">
+            <option value="">Auto (browser)</option>
             <option value="en">English</option>
             <option value="es-ES">Español (España)</option>
             <option value="es-MX">Español (México)</option>
@@ -214,7 +215,7 @@
             <option value="da">Dansk</option>
             <option value="lt">Lietuvių</option>
           </select>
-          <div class="hint" data-i18n="configurator.languageHint">The language the on-stream overlay shows (NOW, OPEN, times…). Bakes into the URL.</div>
+          <div class="hint" data-i18n="configurator.languageHint">Auto follows the browser and omits lang. Pick a language to bake it into the URL, including English.</div>
         </div>
         <div class="field">
           <label class="lbl" for="f-theme" data-i18n="configurator.themeLabel">Theme</label>
@@ -463,7 +464,9 @@
         theme: els.theme.value,
         scale: els.scale.value,
         height: els.height.value,
-        lang: els.lang.value === 'en' ? '' : els.lang.value,
+        // Blank means Auto: omit lang so the overlay follows the viewer/browser.
+        // A concrete locale, including English, is explicit and travels in the URL.
+        lang: els.lang.value,
       };
     }
     function writeForm(fs = {}) {
@@ -483,7 +486,7 @@
       els.theme.value = ['classic', 'flat', 'synthwave', 'ticket', 'wood', 'comic', 'departures', 'paper', 'tron', 'pixel', 'highvibes', 'jazz', 'bullet', 'lava', 'pride', 'shuffle'].includes(fs.theme) ? fs.theme : 'classic';
       els.scale.value = fs.scale ?? '1';
       els.height.value = fs.height ?? '100';
-      els.lang.value = SUPPORTED_LOCALES.includes(canonicalLocale(fs.lang)) ? canonicalLocale(fs.lang) : 'en';
+      els.lang.value = fs.lang && SUPPORTED_LOCALES.includes(canonicalLocale(fs.lang)) ? canonicalLocale(fs.lang) : '';
     }
 
     // ── Lineup source toggle (RaidPal event ⇄ Build by hand) ──────────────
@@ -771,9 +774,10 @@
       els.hidefinished, els.enginedim, els.spotlight, els.tz, els.theme, els.scale, els.height]) {
       el.addEventListener('input', onFormChange);
     }
-    // The overlay-language selector both bakes lang= into the URL and re-localizes
-    // THIS page (applyUiLocale runs onFormChange itself).
-    els.lang.addEventListener('change', () => applyUiLocale(els.lang.value || 'en'));
+    // The overlay-language selector either bakes an explicit lang= into the URL
+    // or, on Auto, omits lang so the overlay follows browser detection. It also
+    // re-localizes THIS page (applyUiLocale runs onFormChange itself).
+    els.lang.addEventListener('change', () => applyUiLocale(els.lang.value || resolveLocale(undefined, navigator.languages)));
 
     // ── Copy ─────────────────────────────────────────────────────────────
     els.copy.addEventListener('click', async () => {
@@ -903,14 +907,16 @@
     })();
     // Landing-page door: configurator.html#manual opens straight into Build-by-hand.
     if (source !== 'manual' && window.location.hash === '#manual') setSource('manual', { silent: true });
-    // Initial locale: an explicit ?lang= wins; otherwise detect from the browser.
+    // Initial locale: an explicit ?lang= selects that language; otherwise the
+    // selector stays on Auto and the UI/overlay preview resolve from the browser.
     // applyUiLocale localizes the static DOM, binds `t`, and runs onFormChange
     // (which builds the URL + preview from the now-localized state). The preset
     // list is rendered after `t` is bound so its strings localize too.
     (async function initLocale() {
       const urlConfig = parseConfig(window.location.search.replace(/^\?/, ''));
-      const initialLocale = canonicalLocale(urlConfig.lang) || resolveLocale(undefined, navigator.languages);
-      els.lang.value = initialLocale;
+      const explicitLocale = canonicalLocale(urlConfig.lang);
+      const initialLocale = explicitLocale || resolveLocale(undefined, navigator.languages);
+      els.lang.value = explicitLocale || '';
       await applyUiLocale(initialLocale);
       refreshPresetList();
     })();

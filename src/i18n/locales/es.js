@@ -99,7 +99,7 @@ export default {
   'configurator.tabLineup': 'Programación',
 
   'configurator.languageLabel': 'Idioma del overlay',
-  'configurator.languageHint': 'El idioma que muestra el overlay en pantalla (AHORA, LIBRE, horas…). Se integra en la URL.',
+  'configurator.languageHint': 'Auto sigue el navegador y omite lang. Elige un idioma para integrarlo en la URL, incluido inglés.',
 
   'configurator.themeLabel': 'Tema',
   'configurator.theme.classic': 'Americana clásica',

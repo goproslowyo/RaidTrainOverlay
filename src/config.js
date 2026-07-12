@@ -176,9 +176,10 @@ export function serializeConfig(config) {
   // (event wins if both somehow present — they're mutually exclusive) and in this
   // fixed position (right after event) so serialize∘parse stays idempotent.
   else if (config.lineup) params.set('lineup', config.lineup);
-  // Locale: emit only when set and not the default English (matches the
-  // omit-defaults contract). The raw requested tag round-trips verbatim.
-  if (config.lang && config.lang !== 'en') params.set('lang', config.lang);
+  // Locale: emit whenever explicitly set. Even `lang=en` is semantically
+  // meaningful because absent `lang` falls back to browser auto-detection.
+  // The raw requested tag round-trips verbatim.
+  if (config.lang) params.set('lang', config.lang);
   if (config.mode !== 'pass') params.set('mode', config.mode);
   if (config.interval !== 15) params.set('interval', String(config.interval));
   if (config.speed !== 1) params.set('speed', String(config.speed));

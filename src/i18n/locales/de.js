@@ -91,7 +91,7 @@ export default {
   'configurator.tabLineup': 'Aufstellung',
 
   'configurator.languageLabel': 'Overlay-Sprache',
-  'configurator.languageHint': 'Die Sprache, in der das Overlay im Stream angezeigt wird (JETZT, FREI, Zeiten…). Wird in die URL eingebacken.',
+  'configurator.languageHint': 'Auto folgt dem Browser und lässt lang weg. Wähle eine Sprache, um sie in die URL einzubacken, auch Englisch.',
 
   'configurator.themeLabel': 'Design',
   'configurator.theme.classic': 'Classic Americana',

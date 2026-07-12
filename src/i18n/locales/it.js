@@ -91,7 +91,7 @@ export default {
   'configurator.tabLineup': 'Scaletta',
 
   'configurator.languageLabel': 'Lingua overlay',
-  'configurator.languageHint': 'La lingua mostrata dall\'overlay in diretta (ORA, LIBERO, orari…). Viene inclusa nell\'URL.',
+  'configurator.languageHint': 'Auto segue il browser e omette lang. Scegli una lingua per includerla nell\'URL, incluso l\'inglese.',
 
   'configurator.themeLabel': 'Tema',
   'configurator.theme.classic': 'Americana classica',

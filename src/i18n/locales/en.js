@@ -108,7 +108,7 @@ export default {
   'configurator.tabLineup': 'Lineup',
 
   'configurator.languageLabel': 'Overlay language',
-  'configurator.languageHint': 'The language the on-stream overlay shows (NOW, OPEN, times…). Bakes into the URL.',
+  'configurator.languageHint': 'Auto follows the browser and omits lang. Pick a language to bake it into the URL, including English.',
 
   'configurator.themeLabel': 'Theme',
   'configurator.theme.classic': 'Classic Americana',
