@@ -91,6 +91,7 @@ export default {
   'configurator.tabLineup': 'Aufstellung',
 
   'configurator.languageLabel': 'Overlay-Sprache',
+  'configurator.languageAuto': 'Auto (Browser)',
   'configurator.languageHint': 'Auto folgt dem Browser und lässt lang weg. Wähle eine Sprache, um sie in die URL einzubacken, auch Englisch.',
 
   'configurator.themeLabel': 'Design',

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   canonicalLocale,
   resolveLocale,
+  selectorLocale,
   loadMessages,
   makeT,
   SUPPORTED_LOCALES,
@@ -50,6 +51,21 @@ test('resolveLocale: explicit request wins, then navigator, then default', () =>
   assert.equal(resolveLocale(undefined, ['ja', 'ko']), DEFAULT_LOCALE);  // none supported → en
   assert.equal(resolveLocale(null, []), DEFAULT_LOCALE);
   assert.equal(resolveLocale('es-MX', ['de']), 'es-MX');
+});
+
+test('selectorLocale: maps a stored lang to the configurator selector value', () => {
+  // Explicit English must stay selectable and distinct from Auto — the whole
+  // point of issue #1: a non-English browser could not force English before.
+  assert.equal(selectorLocale('en'), 'en');
+  assert.equal(selectorLocale('de'), 'de');
+  assert.equal(selectorLocale('es'), 'es-ES');   // canonicalized to the supported tag
+  assert.equal(selectorLocale('es-MX'), 'es-MX');
+  assert.equal(selectorLocale('en-GB'), 'en');   // region folded to the base
+  // Absent / unknown → '' (Auto: omit lang, follow the browser).
+  assert.equal(selectorLocale(''), '');
+  assert.equal(selectorLocale(null), '');
+  assert.equal(selectorLocale(undefined), '');
+  assert.equal(selectorLocale('ja'), '');        // unsupported → Auto, never a stray value
 });
 
 test('SUPPORTED_LOCALES and LOCALE_FILES stay in lockstep', () => {

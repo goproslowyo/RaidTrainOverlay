@@ -91,6 +91,7 @@ export default {
   'configurator.tabLineup': 'Sąrašas',
 
   'configurator.languageLabel': 'Perdangos kalba',
+  'configurator.languageAuto': 'Automatinis (naršyklė)',
   'configurator.languageHint': 'Auto seka naršyklę ir praleidžia lang. Pasirink kalbą, kad ji būtų įrašyta į URL, įskaitant anglų.',
 
   'configurator.themeLabel': 'Tema',

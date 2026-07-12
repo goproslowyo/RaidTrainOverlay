@@ -91,6 +91,7 @@ export default {
   'configurator.tabLineup': 'Lineup',
 
   'configurator.languageLabel': 'Overlay-sprog',
+  'configurator.languageAuto': 'Auto (browser)',
   'configurator.languageHint': 'Auto følger browseren og udelader lang. Vælg et sprog for at bage det ind i URL\'en, også engelsk.',
 
   'configurator.themeLabel': 'Tema',

@@ -91,6 +91,7 @@ export default {
   'configurator.tabLineup': 'Scaletta',
 
   'configurator.languageLabel': 'Lingua overlay',
+  'configurator.languageAuto': 'Auto (browser)',
   'configurator.languageHint': 'Auto segue il browser e omette lang. Scegli una lingua per includerla nell\'URL, incluso l\'inglese.',
 
   'configurator.themeLabel': 'Tema',

@@ -108,6 +108,7 @@ export default {
   'configurator.tabLineup': 'Lineup',
 
   'configurator.languageLabel': 'Overlay language',
+  'configurator.languageAuto': 'Auto (browser)',
   'configurator.languageHint': 'Auto follows the browser and omits lang. Pick a language to bake it into the URL, including English.',
 
   'configurator.themeLabel': 'Theme',

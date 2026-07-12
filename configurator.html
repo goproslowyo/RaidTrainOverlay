@@ -203,7 +203,7 @@
         <div class="field">
           <label class="lbl" for="f-lang" data-i18n="configurator.languageLabel">Overlay language</label>
           <select id="f-lang">
-            <option value="">Auto (browser)</option>
+            <option value="" data-i18n="configurator.languageAuto">Auto (browser)</option>
             <option value="en">English</option>
             <option value="es-ES">Español (España)</option>
             <option value="es-MX">Español (México)</option>
@@ -362,7 +362,7 @@
     import { parseStreamers, serializeStreamers, addStreamers, removeStreamer, listStreamers } from './src/streamers.js';
     import { loadEvent } from './src/raidpal-client.js';
     import { resolveZone, parseConfig } from './src/config.js';
-    import { resolveLocale, loadMessages, makeT, canonicalLocale, SUPPORTED_LOCALES } from './src/i18n/index.js';
+    import { resolveLocale, loadMessages, makeT, canonicalLocale, selectorLocale } from './src/i18n/index.js';
     import { localizeDom } from './src/i18n/dom.js';
 
     // The Configurator localizes its own UI to the chosen overlay language (the
@@ -486,7 +486,7 @@
       els.theme.value = ['classic', 'flat', 'synthwave', 'ticket', 'wood', 'comic', 'departures', 'paper', 'tron', 'pixel', 'highvibes', 'jazz', 'bullet', 'lava', 'pride', 'shuffle'].includes(fs.theme) ? fs.theme : 'classic';
       els.scale.value = fs.scale ?? '1';
       els.height.value = fs.height ?? '100';
-      els.lang.value = fs.lang && SUPPORTED_LOCALES.includes(canonicalLocale(fs.lang)) ? canonicalLocale(fs.lang) : '';
+      els.lang.value = selectorLocale(fs.lang);
     }
 
     // ── Lineup source toggle (RaidPal event ⇄ Build by hand) ──────────────
@@ -916,7 +916,7 @@
       const urlConfig = parseConfig(window.location.search.replace(/^\?/, ''));
       const explicitLocale = canonicalLocale(urlConfig.lang);
       const initialLocale = explicitLocale || resolveLocale(undefined, navigator.languages);
-      els.lang.value = explicitLocale || '';
+      els.lang.value = selectorLocale(urlConfig.lang);
       await applyUiLocale(initialLocale);
       refreshPresetList();
     })();

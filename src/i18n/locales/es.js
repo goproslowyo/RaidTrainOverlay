@@ -99,6 +99,7 @@ export default {
   'configurator.tabLineup': 'Programación',
 
   'configurator.languageLabel': 'Idioma del overlay',
+  'configurator.languageAuto': 'Auto (navegador)',
   'configurator.languageHint': 'Auto sigue el navegador y omite lang. Elige un idioma para integrarlo en la URL, incluido inglés.',
 
   'configurator.themeLabel': 'Tema',

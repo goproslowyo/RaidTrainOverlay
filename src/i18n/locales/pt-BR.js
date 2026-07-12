@@ -101,6 +101,7 @@ export default {
   'configurator.tabLineup': 'Escalação',
 
   'configurator.languageLabel': 'Idioma do overlay',
+  'configurator.languageAuto': 'Auto (navegador)',
   'configurator.languageHint': 'Auto segue o navegador e omite lang. Escolha um idioma para gravá-lo na URL, incluindo inglês.',
 
   'configurator.themeLabel': 'Tema',
