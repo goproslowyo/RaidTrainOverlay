@@ -64,6 +64,25 @@ test('loadMyRaidTrains serves a fresh cache without touching the network', async
   assert.equal(r.user.displayName, 'GoProFlowYo');
 });
 
+test('a cache hit reports NOTHING wrong — which is why the Live Link cannot trust it (#39)', async () => {
+  // The premise the whole #39 fix rests on, pinned at the seam where it lives.
+  // A six-hour-old snapshot comes back indistinguishable from a live read on
+  // every field the Configurator used to check: no `error`, no stale marker,
+  // and `fresh: true` — a claim about the CACHE being in date, not about the
+  // data having been re-verified. `fromCache` is the only thing that gives it
+  // away, so absence in this feed must never prune a train's overrides.
+  const storage = fakeStorage({
+    [userCacheKey('goproflowyo')]: cacheEntry(makeUserPayload(), NOW - HOUR),
+  });
+  const r = await loadMyRaidTrains('goproflowyo', {
+    fetchImpl: routedFetch({}), storage, clock: () => NOW,
+  });
+  assert.equal(r.error, undefined, 'nothing signals a problem…');
+  assert.equal(r.notFound, undefined, '…and nothing signals an empty profile…');
+  assert.equal(r.fresh, true, '…and it even calls itself fresh');
+  assert.equal(r.fromCache, true, 'only fromCache distinguishes it from a verified read');
+});
+
 test('loadMyRaidTrains fetches when the cache is stale, and re-caches at the injected clock', async () => {
   const storage = fakeStorage({
     [userCacheKey('goproflowyo')]: cacheEntry(makeUserPayload({ display_name: 'Old' }), NOW - 7 * HOUR),

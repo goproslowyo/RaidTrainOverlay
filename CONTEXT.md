@@ -117,7 +117,12 @@ A per-Event saved settings record, keyed by the Event's slug and scoped to a Pro
 _Avoid_: train setup, booking, override set (for the whole record)
 
 **Orphaned Config**:
-A Raid Train Config whose slug is absent from the Profile's current My Raid Trains feed — the Event ended, was deleted, or was renamed. The store cannot tell these apart, and does not need to: the Overlay resolves against that same feed, so none of the three can ever be selected again. The Live Link therefore drops an Orphaned Config, on the strict condition that the read was *good* — a failed or stale read makes no train an orphan.
+A Raid Train Config whose slug is absent from the Profile's current My Raid Trains feed — the Event ended, was deleted, or was renamed. The store cannot tell these apart, and does not need to: the Overlay resolves against that same feed, so none of the three can ever be selected again. The Live Link therefore drops an Orphaned Config, on the strict condition that the read was both *good* and **Verified** — a failed or stale read makes no train an orphan, and neither does a cached one.
+
+**Good read / Verified read** _(two different bars)_:
+A **good** read is one nothing is visibly wrong with: it completed, it returned a `{ user: … }` payload, and no stale cache was substituted for it. A **verified** read is a good read that also actually *reached RaidPal* on this attempt rather than being served from the ~6h cache.
+
+The distinction exists because the two things the feed is used for need different evidence. When a train **ends** is a fact RaidPal reported, and a fact does not decay — a good read is enough. That a train is **absent** is an inference, and it does decay: a cached feed can be six hours old, and one degraded-but-well-formed response poisons it for that whole window. So absence only prunes on a verified read (`configurator.html`'s `feedVerified`, `buildTrainMap`'s `verified` option); end times prune on any good read.
 _Avoid_: stale config, dead config, dangling train
 
 **Live Link**:

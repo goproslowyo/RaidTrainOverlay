@@ -136,14 +136,16 @@ test('a train absent from a GOOD read is dropped — ended, deleted or renamed a
   // against that same endpoint — so a slug it doesn't list can never be
   // selected, whatever the reason. Carrying it is pure weight in the URL.
   const map = buildTrainMap(library, store, 'gostreamcore', {
-    now: NOW, events: [feedEvent('still-listed', NOW + 86_400_000)],
+    now: NOW, events: [feedEvent('still-listed', NOW + 86_400_000)], verified: true,
   });
   assert.deepEqual(Object.keys(map), ['still-listed']);
 });
 
 test('absence is read without a clock — the two grounds are independent', () => {
   const { library, store } = scheduled({ 'gone-from-the-feed': null, kept: null });
-  const map = buildTrainMap(library, store, 'gostreamcore', { events: [feedEvent('kept', NOW)] });
+  const map = buildTrainMap(library, store, 'gostreamcore', {
+    events: [feedEvent('kept', NOW)], verified: true,
+  });
   assert.deepEqual(Object.keys(map), ['kept']);
 });
 
@@ -171,6 +173,43 @@ test('the feed outranks the stored end time, so a rescheduled train comes back',
   assert.deepEqual(Object.keys(buildTrainMap(l2, s2, 'gostreamcore', {
     now: NOW, events: [ended(feedEvent('moved-earlier', 0))],
   })), []);
+});
+
+// ── Absence needs a VERIFIED read (#39) ────────────────────────────────────
+// The two grounds do not need the same evidence. A recorded end time is a fact
+// that does not decay; absence is an inference that does — it is only worth
+// anything against a feed just checked with RaidPal.
+
+test('a cache-served read cannot prune on absence, however healthy it looks', () => {
+  const { library, store } = scheduled({ 'not-in-the-snapshot': null, listed: null });
+  // loadMyRaidTrains serves a cache hit inside the 6h window as
+  // `{ fromCache: true, fresh: true }` — no error, no stale flag — so the old
+  // "ready && !stale && !error" test called it good. Nothing was verified
+  // against RaidPal, and one degraded-but-well-formed response caches for six
+  // hours. Absence in that snapshot must not blank a train's overrides.
+  const map = buildTrainMap(library, store, 'gostreamcore', {
+    now: NOW, events: [feedEvent('listed', NOW + 86_400_000)], verified: false,
+  });
+  assert.deepEqual(Object.keys(map).sort(), ['listed', 'not-in-the-snapshot']);
+});
+
+test('an unverified read still ends a train whose recorded end time has passed', () => {
+  const { library, store } = scheduled({
+    'ended-yesterday': NOW - 86_400_000, 'still-upcoming': NOW + 86_400_000,
+  });
+  const map = buildTrainMap(library, store, 'gostreamcore', {
+    now: NOW, events: [feedEvent('still-upcoming', NOW + 86_400_000)], verified: false,
+  });
+  assert.deepEqual(Object.keys(map), ['still-upcoming'], 'ground 2 needs no live read');
+});
+
+test('verification defaults to OFF — a caller that has not thought about it prunes nothing', () => {
+  const { library, store } = scheduled({ 'never-mentioned': null, listed: null });
+  const map = buildTrainMap(library, store, 'gostreamcore', {
+    now: NOW, events: [feedEvent('listed', NOW + 86_400_000)],
+  });
+  assert.deepEqual(Object.keys(map).sort(), ['listed', 'never-mentioned'],
+    'fail closed: the caller must SAY the read was verified');
 });
 
 test('with no clock nothing is filtered — no evidence without a now', () => {
