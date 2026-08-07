@@ -20,6 +20,7 @@ export default {
   'overlay.open': 'OPEN',
   'overlay.signUp': 'sign up!',
   'overlay.played': 'PLAYED',
+  'overlay.upcoming': 'UPCOMING RAID TRAINS',
   'overlay.conductor': 'CONDUCTOR',
   'overlay.organisedBy': 'ORGANISED BY',
   'overlay.staff': 'STAFF',

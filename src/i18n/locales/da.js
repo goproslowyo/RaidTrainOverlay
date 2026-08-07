@@ -5,6 +5,7 @@ export default {
   'overlay.open': 'LEDIG',
   'overlay.signUp': 'tilmeld dig!',
   'overlay.played': 'FÆRDIG',
+  'overlay.upcoming': 'KOMMENDE RAID-TOG',
   'overlay.conductor': 'KONDUKTØR',
   'overlay.organisedBy': 'ARRANGERET AF',
   'overlay.staff': 'CREW',

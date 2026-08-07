@@ -5,6 +5,7 @@ export default {
   'overlay.open': 'FREI',
   'overlay.signUp': 'mitmachen!',
   'overlay.played': 'GELAUFEN',
+  'overlay.upcoming': 'KOMMENDE RAID-ZÜGE',
   'overlay.conductor': 'LOKFÜHRER',
   'overlay.organisedBy': 'ORGANISIERT VON',
   'overlay.staff': 'TEAM',

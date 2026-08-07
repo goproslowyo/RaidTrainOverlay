@@ -127,3 +127,32 @@ test('effectiveQuery with no mapping entry returns the base query as-is', () => 
   const base = 'user=goproflowyo&theme=neon';
   assert.equal(new URLSearchParams(effectiveQuery(base, null)).get('theme'), 'neon');
 });
+
+// ---- upcoming horizon + self-reload (#15) ----
+
+import { filterUpcoming, shouldSelfReload, IDLE_RELOAD_MS } from '../src/live-link.js';
+
+const UP = [
+  summary('a', '2026-08-08T00:00:00Z', '2026-08-08T06:00:00Z'),   // +4h
+  summary('b', '2026-08-12T00:00:00Z', '2026-08-12T06:00:00Z'),   // +4.2d
+  summary('c', '2026-08-25T00:00:00Z', '2026-08-25T06:00:00Z'),   // +18d
+  summary('d', '2026-10-01T00:00:00Z', '2026-10-01T06:00:00Z'),   // +55d
+];
+
+test('filterUpcoming: off (null spec) lists nothing — the overlay stays empty', () => {
+  assert.deepEqual(filterUpcoming(UP, null, NOW), []);
+});
+
+test('filterUpcoming honors each horizon grammar: count, weeks, months, all', () => {
+  assert.deepEqual(filterUpcoming(UP, { kind: 'count', n: 2 }, NOW).map((e) => e.slug), ['a', 'b']);
+  assert.deepEqual(filterUpcoming(UP, { kind: 'weeks', n: 1 }, NOW).map((e) => e.slug), ['a', 'b']);
+  assert.deepEqual(filterUpcoming(UP, { kind: 'months', n: 1 }, NOW).map((e) => e.slug), ['a', 'b', 'c']);
+  assert.deepEqual(filterUpcoming(UP, { kind: 'all' }, NOW).map((e) => e.slug), ['a', 'b', 'c', 'd']);
+});
+
+test('shouldSelfReload: only when idle AND the page is over an hour old', () => {
+  const loadedAt = NOW.getTime() - IDLE_RELOAD_MS - 1;
+  assert.equal(shouldSelfReload({ loadedAt, now: NOW.getTime() }), true);
+  assert.equal(shouldSelfReload({ loadedAt: NOW.getTime() - 10 * MIN, now: NOW.getTime() }), false);
+  assert.equal(IDLE_RELOAD_MS, 60 * MIN);
+});

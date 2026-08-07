@@ -101,6 +101,22 @@ function zoneList(value) {
     .slice(0, 3);
 }
 
+/**
+ * The Live Link idle card's horizon grammar: `N` (next N trains), `Nw`
+ * (N weeks), `Nm` (N months), `all`. Anything else — including absence, the
+ * default — is null: card off, an idle Live Link renders nothing.
+ */
+function upcomingSpec(raw) {
+  const value = (raw ?? '').trim().toLowerCase();
+  if (value === 'all') return { kind: 'all' };
+  const match = /^(\d+)(w|m)?$/.exec(value);
+  const n = match ? Number(match[1]) : 0;
+  if (n <= 0) return null;
+  return { kind: match[2] === 'w' ? 'weeks' : match[2] === 'm' ? 'months' : 'count', n };
+}
+
+const UPCOMING_SUFFIX = { count: '', weeks: 'w', months: 'm' };
+
 /** Old Theme keys that map to a current one (the mockup's `neon` → `synthwave`). */
 const THEME_ALIASES = { neon: 'synthwave', smoke: 'highvibes', coltrane: 'jazz', shinkansen: 'bullet', lavalamp: 'lava' };
 
@@ -122,6 +138,7 @@ export function parseConfig(queryString) {
     lineup: lineup === '' ? null : lineup,
     user: user === '' ? null : user,
     trains: trains === '' ? null : trains,
+    upcoming: upcomingSpec(params.get('upcoming')),
     // The display locale, kept as the raw requested tag (or null). Resolution to
     // a supported locale + the navigator fallback happen in the overlay shell so
     // parseConfig stays pure (no `navigator`); the Configurator's selector sets it.
@@ -184,6 +201,9 @@ export function serializeConfig(config) {
   if (config.user) {
     params.set('user', config.user);
     if (config.trains) params.set('trains', config.trains);
+    if (config.upcoming) {
+      params.set('upcoming', config.upcoming.kind === 'all' ? 'all' : `${config.upcoming.n}${UPCOMING_SUFFIX[config.upcoming.kind]}`);
+    }
   } else if (config.event) params.set('event', config.event);
   else if (config.lineup) params.set('lineup', config.lineup);
   // Locale: emit whenever explicitly set. Even `lang=en` is semantically

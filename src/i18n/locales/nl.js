@@ -5,6 +5,7 @@ export default {
   'overlay.open': 'VRIJ',
   'overlay.signUp': 'doe mee!',
   'overlay.played': 'GEWEEST',
+  'overlay.upcoming': 'AANKOMENDE RAID-TREINEN',
   'overlay.conductor': 'MACHINIST',
   'overlay.organisedBy': 'GEORGANISEERD DOOR',
   'overlay.staff': 'CREW',

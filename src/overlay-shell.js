@@ -8,6 +8,8 @@
 import { parseConfig } from './config.js';
 import { startEventFeed } from './event-feed.js';
 import { startLiveLinkFeed } from './live-link-feed.js';
+import { filterUpcoming, shouldSelfReload } from './live-link.js';
+import { renderUpcomingCard } from './upcoming-card.js';
 import { buildTrain } from './lineup-engine.js';
 import { renderTrain, SHIPPED_THEMES } from './train-renderer.js';
 import { DEMO_SLUG, DEMO_SPOTLIGHT, makeDemoEvent } from './demo-event.js';
@@ -16,6 +18,7 @@ import { makeManualEvent } from './manual-lineup.js';
 import { resolveLocale, loadMessages, makeT } from './i18n/index.js';
 
 const config = parseConfig(window.location.search);
+const LOADED_AT = Date.now(); // page age, for the Live Link idle self-reload
 // Preview/showcase (?preview=1): a static, centred Train (no traversal) for the
 // Configurator's live preview and for screenshotting an overlay. Read raw so it
 // stays out of the URL schema (parseConfig) and the Configurator's copied link.
@@ -120,12 +123,19 @@ if (!config.event && !config.lineup && !config.user) {
         current = { event, view: null };
         render();
       },
-      onIdle() {
-        // Nothing live and nothing near departure: a fully empty overlay (the
-        // opt-in upcoming card is a follow-up). An ended train must never roll
-        // over a live stream.
+      onIdle({ upcoming }) {
+        // Nothing live and nothing near departure. Idle is the ONLY safe
+        // moment to self-heal: reload the page once it's over an hour old
+        // (JS-leak insurance for always-on sources) — never mid-render,
+        // never inside the T-60 lead.
+        if (shouldSelfReload({ loadedAt: LOADED_AT, now: Date.now() })) {
+          window.location.reload();
+          return;
+        }
+        // Default: fully empty — an ended train must never roll over a live
+        // stream. With ?upcoming=, the compact card lists the next trains.
         current = null;
-        container.replaceChildren();
+        renderUpcomingCard(container, filterUpcoming(upcoming, config.upcoming, new Date()), config);
       },
       onError(err) {
         const state = current ? 'showing the last-good state' : 'nothing rendered yet';
