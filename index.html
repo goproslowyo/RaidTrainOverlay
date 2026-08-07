@@ -4,159 +4,379 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>RaidTrainOverlay</title>
-  <meta name="description" content="A stream overlay that turns a RaidPal raid train into an animated train of streamer cars for OBS.">
+  <meta name="description" content="A stream overlay that turns a RaidPal raid train into an animated train of streamer cars for OBS. One link follows your whole schedule.">
+  <!-- Shared design tokens (#34's Q4). Layout below stays page-local. -->
+  <link rel="stylesheet" href="./assets/app.css">
   <style>
-    :root {
-      --bg: #0e1116; --panel: #161b22; --ink: #e6edf3; --muted: #9aa7b4;
-      --line: #2a313b; --accent: #f4c430; --accent2: #22d3ee; --rail: #6b7280;
-      font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
-    }
     * { box-sizing: border-box; }
-    html, body { margin: 0; background: var(--bg); color: var(--ink); }
-    body { line-height: 1.6; }
-    a { color: var(--accent2); text-decoration: none; }
-    a:hover { text-decoration: underline; }
-    .wrap { max-width: 760px; margin: 0 auto; padding: 48px 24px 64px; }
-    header { text-align: center; margin-bottom: 8px; }
-    h1 { font-size: 2.1rem; margin: 0 0 6px; letter-spacing: -0.5px; }
-    h1 .a { color: var(--accent); }
-    .tag { color: var(--muted); font-size: 1.05rem; margin: 0; }
-    /* A tiny CSS train motif rolling on a rail. */
-    .train { display: flex; align-items: flex-end; gap: 6px; justify-content: center; height: 60px; margin: 26px 0 2px; }
-    .car { width: 54px; height: 38px; border-radius: 6px; position: relative; border: 2px solid #0006; }
-    .car::after { content: ""; position: absolute; left: 8px; right: 8px; bottom: -7px; height: 10px;
-      background: radial-gradient(circle at 9px 3px, #222 3px, transparent 4px), radial-gradient(circle at calc(100% - 9px) 3px, #222 3px, transparent 4px); }
-    .loco { width: 60px; background: #b45309; border-color: var(--accent); }
-    .c1 { background: #1e3a5f; } .c2 { background: #5b2a78; } .c3 { background: #14361f; border-color: #37b24d; }
-    .rail { height: 4px; background: var(--rail); border-radius: 2px; max-width: 320px; margin: 0 auto 30px; }
-    .cta { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin: 26px 0 8px; }
-    .btn { display: inline-block; padding: 11px 20px; border-radius: 8px; font-weight: 700; border: 1px solid var(--line); }
-    .btn.primary { background: var(--accent); color: #1f2937; border-color: var(--accent); }
-    .btn.ghost { background: var(--panel); color: var(--ink); }
-    section { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 20px 22px; margin: 22px 0; }
-    h2 { font-size: 1.15rem; margin: 0 0 12px; }
-    ol { margin: 0; padding-left: 20px; } ol li { margin: 8px 0; }
-    code, pre { font-family: ui-monospace, "SF Mono", Menlo, monospace; }
-    code { background: #0c0f14; border: 1px solid var(--line); border-radius: 5px; padding: 1px 6px; font-size: 0.92em; }
-    pre { background: #0c0f14; border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; overflow-x: auto; font-size: 0.9rem; }
-    .muted { color: var(--muted); }
-    .themes { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
-    .chip { font-family: inherit; font-size: 0.85rem; background: #0c0f14; border: 1px solid var(--line); border-radius: 999px; padding: 5px 12px; color: var(--muted); cursor: pointer; line-height: 1.5; transition: color .12s, background-color .12s, border-color .12s; }
-    .chip:hover { color: var(--ink); border-color: var(--accent); }
-    .chip.active { background: var(--accent); color: #1f2937; border-color: var(--accent); }
-    .chip:focus-visible { outline: 2px solid var(--accent2); outline-offset: 2px; }
-    .chip code { background: transparent; border: 0; padding: 0 0 0 5px; color: var(--accent); font-size: 0.95em; }
-    .chip.active code { color: #1f2937; }
-    .url-box { display: flex; gap: 8px; margin-top: 12px; }
-    .url-box input { flex: 1; min-width: 0; background: #0c0f14; border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; color: var(--ink); font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.82rem; }
-    .url-box button { padding: 10px 16px; border-radius: 8px; border: 1px solid var(--accent); background: var(--accent); color: #1f2937; font-family: inherit; font-weight: 700; cursor: pointer; white-space: nowrap; }
-    .url-box button:hover { filter: brightness(1.06); }
-    .url-note { font-size: 0.85rem; margin-top: 8px; }
-    .credit { margin-top: 9px; }
-    .credit a { color: var(--accent); }
-    .ver { margin-top: 6px; font-size: 0.8rem; opacity: 0.7; }
-    .ver a { color: var(--muted); font-family: ui-monospace, "SF Mono", Menlo, monospace; }
-    footer { text-align: center; color: var(--muted); margin-top: 34px; font-size: 0.9rem; }
+    html, body { margin: 0; }
+    body {
+      background: radial-gradient(1200px 500px at 70% -200px, #1a2230 0%, transparent 60%), var(--bg);
+      color: var(--ink);
+      font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      min-height: 100vh;
+    }
+    a { color: var(--accent); }
+
+    /* ── Top bar: the Configurator's, minus its sidebar (#30) ───────────── */
+    .top {
+      display: flex; align-items: center; gap: 16px;
+      padding: 14px 28px; border-bottom: 1px solid var(--line);
+      background: rgba(15, 18, 22, .85); backdrop-filter: blur(6px);
+      position: sticky; top: 0; z-index: 40;
+    }
+    .brand { display: flex; align-items: baseline; gap: 12px; }
+    .brand h1 { font-size: 17px; margin: 0; letter-spacing: -.3px; white-space: nowrap; }
+    .brand h1 .a { color: var(--gold); }
+    .brand-train { display: flex; align-items: flex-end; gap: 3px; padding-bottom: 3px; }
+    .brand-train i { display: block; width: 14px; height: 9px; border-radius: 2px; border: 1px solid #0007; }
+    .brand-train i:nth-child(1) { background: #b45309; border-color: var(--gold); width: 16px; height: 11px; }
+    .brand-train i:nth-child(2) { background: #1e3a5f; }
+    .brand-train i:nth-child(3) { background: #5b2a78; }
+    .top .spacer { margin-left: auto; }
+    .top .toplink { color: var(--muted); text-decoration: none; font-size: 13.5px; font-weight: 600; }
+    .top .toplink:hover { color: var(--ink); }
+
+    .btn {
+      padding: 8px 15px; border-radius: 7px; border: 1px solid var(--line);
+      background: var(--panel-2); color: var(--ink); font-weight: 600; white-space: nowrap;
+      text-decoration: none; display: inline-block;
+    }
+    .btn.gold { background: var(--gold); border-color: var(--gold); color: #1f2937; font-weight: 700; }
+    .btn.gold:hover { filter: brightness(1.06); }
+    .btn.lg { padding: 13px 26px; font-size: 16px; border-radius: 9px; }
+    .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+    /* ── Hero ───────────────────────────────────────────────────────────── */
+    .hero {
+      position: relative; overflow: hidden; border-bottom: 1px solid var(--line);
+      padding: 70px 24px 0;
+      background:
+        radial-gradient(760px 300px at 50% 8%, rgba(244, 196, 48, .16), transparent 62%),
+        radial-gradient(900px 400px at 80% 120%, rgba(87, 182, 255, .10), transparent 60%);
+    }
+    .hero-inner { max-width: 780px; margin: 0 auto; text-align: center; }
+    .hero h2 { font-size: 46px; line-height: 1.08; margin: 0 0 14px; letter-spacing: -1.4px; font-weight: 800; }
+    .hero h2 .g { color: var(--gold); }
+    .hero p.lede { color: var(--muted); font-size: 18px; margin: 0 auto 26px; max-width: 560px; }
+    .doors { color: var(--muted); font-size: 13.5px; margin: 18px 0 0; }
+    .doors a { color: var(--accent-dim); }
+
+    /* ── Live example ───────────────────────────────────────────────────── */
+    /* The Overlay sizes its Train as a fraction of ITS OWN viewport height and
+       bottoms it onto that viewport's floor, so a tall iframe cropped to a short
+       stage gives a big Train and no dead air. Shrinking the iframe would shrink
+       the Train instead. `height=93` in the query then lifts the Train off the
+       floor so Themes whose scenery bleeds downward aren't shaved by the edge. */
+    .example { max-width: 900px; margin: 34px auto 0; padding: 0 4px 30px; }
+    .stage {
+      position: relative; overflow: hidden; height: 220px;
+      border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 24px 70px #0009;
+      background: repeating-conic-gradient(#141922 0% 25%, #11161d 0% 50%) 50% / 22px 22px;
+    }
+    .stage iframe { position: absolute; left: 0; bottom: 0; width: 100%; height: 560px; border: 0; display: block; }
+    /* The demo lineup runs past the right edge at this size. Faded, that reads
+       as a train continuing out of frame; chopped, it reads as a bug. */
+    .stage::after {
+      content: ""; position: absolute; inset: 0; pointer-events: none;
+      background: linear-gradient(90deg, transparent 82%, #10141a 99%);
+    }
+    .stage-ph { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 13.5px; }
+    /* `display: flex` outranks the UA's [hidden] rule, so without this the
+       placeholder keeps painting over the loaded example. */
+    .stage-ph[hidden] { display: none; }
+    .example-cap {
+      display: flex; align-items: center; justify-content: center; gap: 9px;
+      color: var(--muted); font-size: 12.5px; margin-top: 10px; min-height: 18px;
+    }
+    .example-cap .name { color: var(--ink); font-weight: 600; }
+    .example-cap .dot { color: var(--gold); animation: blink 1.6s steps(1, end) infinite; }
+
+    /* ── The little train, on the seam ──────────────────────────────────── */
+    .strip {
+      position: relative; overflow: hidden; height: 74px;
+      border-bottom: 1px solid var(--line);
+      background: linear-gradient(180deg, #ffffff04, transparent);
+    }
+    .rail { position: relative; height: 74px; }
+    .rail::after {
+      content: ""; position: absolute; left: 0; right: 0; bottom: 18px; height: 3px;
+      background: linear-gradient(90deg, transparent, var(--line) 12%, var(--line) 88%, transparent);
+    }
+    .rolling { position: absolute; bottom: 21px; display: flex; align-items: flex-end; gap: 7px; animation: roll 26s linear infinite; }
+    @keyframes roll { from { left: -340px; } to { left: 100%; } }
+    .rolling .car { width: 58px; height: 40px; border-radius: 6px; border: 2px solid #0006; position: relative; animation: bob 1.1s ease-in-out infinite; }
+    @keyframes bob { 50% { transform: translateY(-1.5px); } }
+    .rolling .car::after {
+      content: ""; position: absolute; left: 8px; right: 8px; bottom: -7px; height: 10px;
+      background: radial-gradient(circle at 9px 3px, #222 3px, transparent 4px),
+                  radial-gradient(circle at calc(100% - 9px) 3px, #222 3px, transparent 4px);
+    }
+    .rolling .loco { width: 66px; height: 46px; background: #b45309; border-color: var(--gold); }
+    .rolling .c1 { background: #1e3a5f; animation-delay: .08s; }
+    .rolling .c2 { background: #5b2a78; animation-delay: .16s; }
+    .rolling .c3 { background: #14361f; border-color: #37b24d; animation-delay: .24s; }
+    .rolling .c4 { background: #7c2d12; animation-delay: .32s; }
+
+    /* ── Departures board ───────────────────────────────────────────────── */
+    .body { max-width: 940px; margin: 0 auto; padding: 40px 24px 0; }
+    .board-kicker {
+      font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 11.5px; letter-spacing: .26em;
+      color: var(--gold); text-transform: uppercase; margin: 0 0 12px; text-align: center;
+    }
+    .board {
+      border: 1px solid #3a3222; border-radius: 12px; overflow: hidden;
+      background: linear-gradient(180deg, #0d1015, #090b0f);
+      box-shadow: inset 0 1px 0 #ffffff0d, inset 0 -30px 60px #0006, 0 22px 60px #0008;
+    }
+    .row {
+      display: grid; grid-template-columns: 108px 1fr 152px; align-items: center; gap: 14px;
+      padding: 16px 22px; border-bottom: 1px solid #1a1e26;
+      font-family: ui-monospace, "SF Mono", Menlo, monospace;
+      transform-origin: top center; animation: flap .5s cubic-bezier(.2, .8, .3, 1) backwards;
+    }
+    @keyframes flap {
+      from { opacity: 0; transform: perspective(600px) rotateX(-72deg); }
+      to   { opacity: 1; transform: perspective(600px) rotateX(0); }
+    }
+    .row:nth-child(2) { animation-delay: .06s; }
+    .row:nth-child(3) { animation-delay: .16s; }
+    .row:nth-child(4) { animation-delay: .26s; }
+    .row:nth-child(5) { animation-delay: .38s; }
+    .row:last-child { border-bottom: 0; }
+    .row:not(.head):not(.cta):hover { background: #ffffff05; }
+    .row.head {
+      background: #12161d; color: var(--muted); font-size: 10.5px;
+      letter-spacing: .18em; text-transform: uppercase; padding: 10px 22px; animation-delay: 0s;
+    }
+    .when { color: var(--gold); font-size: 13.5px; font-weight: 700; letter-spacing: .06em; text-shadow: 0 0 14px #f4c43055; }
+    .what { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; font-size: 15.5px; }
+    .what b { font-weight: 700; }
+    .what > span { display: block; color: var(--muted); font-size: 13px; margin-top: 3px; }
+    .flag { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; text-align: right; color: var(--muted); }
+    .flag.on { color: var(--live); text-shadow: 0 0 12px #ff5a6766; }
+    .flag.on::before { content: "●"; margin-right: 6px; animation: blink 1.6s steps(1, end) infinite; }
+    @keyframes blink { 50% { opacity: .2; } }
+    .flag.auto { color: var(--ok); }
+    .row.cta {
+      background: linear-gradient(90deg, #f4c4301a, #f4c4300a 60%, transparent);
+      padding: 22px; border-top: 1px solid #3a3222;
+    }
+    .row.cta .what { font-size: 17.5px; font-weight: 700; }
+    /* The one honest limit on "one link", kept to a line so it informs without
+       reading as a warning. Same sentence the Live Link panel already uses. */
+    .cta-note {
+      display: block; color: var(--muted); font-size: 12.5px; font-weight: 400; margin-top: 4px;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    }
+
+    .themes-door { color: var(--muted); font-size: 13.5px; text-align: center; margin: 22px 0 0; }
+    .themes-door a { color: var(--accent-dim); }
+
+    .foot { color: var(--muted); font-size: 13px; text-align: center; padding: 44px 20px 40px; }
+    .foot a { color: var(--accent-dim); }
+    .foot .credit { margin-top: 9px; }
+    .foot .credit a { color: var(--gold); }
+    .foot .ver { margin-top: 6px; font-size: 12px; opacity: .7; }
+    .foot .ver a { color: var(--muted); font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+
+    @media (prefers-reduced-motion: reduce) {
+      .rolling, .flag.on::before, .example-cap .dot, .row { animation: none; }
+    }
+    @media (max-width: 820px) {
+      .top { padding: 12px 16px; gap: 12px; }
+      .hero { padding-left: 16px; padding-right: 16px; }
+      .hero h2 { font-size: 33px; }
+      /* The stage and the iframe have to be retuned TOGETHER, not just made
+         smaller. The Train is 28vh of the iframe, so a shorter iframe means a
+         smaller Train — which is what a narrow screen wants, since it fits more
+         cars in. But the crop window is `stage height` measured up from the
+         iframe's bottom, and height=93 lifts the Train 7% off that bottom, so
+         shrinking the stage alone crops the Train's roof off (measured: the
+         CONDUCTOR badge and the loco's top went missing at 180/560). 170 of 380
+         leaves ~37px of headroom for the badges that bleed upward. */
+      .stage { height: 170px; }
+      .stage iframe { height: 380px; }
+      .row { grid-template-columns: 74px 1fr; padding: 14px 16px; }
+      /* The status column drops; the header's third cell has no .flag class of
+         its own, so it needs hiding too or "STATUS" wraps to its own line. */
+      .flag, .row.head span:last-child { display: none; }
+      .row.cta { grid-template-columns: 74px 1fr; }
+      .row.cta .go-btn { grid-column: 2; margin-top: 12px; }
+    }
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <header>
-      <div class="train" aria-hidden="true">
-        <div class="car loco"></div><div class="car c1"></div><div class="car c2"></div><div class="car c3"></div>
-      </div>
-      <div class="rail" aria-hidden="true"></div>
+  <div class="top">
+    <div class="brand">
+      <span class="brand-train" aria-hidden="true"><i></i><i></i><i></i></span>
       <h1>RaidTrain<span class="a">Overlay</span></h1>
-      <p class="tag" data-i18n-html="landing.tagline">Your <a href="https://raidpal.com">RaidPal</a> raid train, as an animated train of streamer cars — for OBS.</p>
-    </header>
-
-    <div class="cta">
-      <a class="btn primary" href="./configurator.html" data-i18n="landing.buildRaidpal">Build from a RaidPal event</a>
-      <a class="btn ghost" href="./configurator.html#manual" data-i18n="landing.buildManual">Build by hand — no RaidPal</a>
     </div>
-    <p class="muted" style="text-align:center; font-size:0.88rem;" data-i18n-html="landing.buildExplain">Got a <a href="https://raidpal.com">RaidPal</a> event? Build from its link. No RaidPal? Build by hand — just type your DJs in yourself.</p>
-
-    <section>
-      <h2 data-i18n="landing.howTitle">How it works</h2>
-      <ol>
-        <li data-i18n-html="landing.how1"><strong>Open the <a href="./configurator.html">Configurator</a>.</strong> Paste your event's RaidPal
-          link — the whole URL is fine, it grabs the event for you — then pick a theme and options and copy the overlay URL.</li>
-        <li data-i18n-html="landing.how2"><strong>Add it to OBS.</strong> In OBS: <em>Sources → + → Browser</em>, paste the URL, and size the source
-          to your canvas. The overlay background is transparent.</li>
-      </ol>
-    </section>
-
-    <section>
-      <h2 data-i18n="landing.themesTitle">Themes</h2>
-      <p class="muted" data-i18n="landing.themesIntro">Pick a theme to preview it, then build your overlay with it (Shuffle cycles them all):</p>
-      <div class="themes">
-        <button class="chip" data-theme="classic"><span data-i18n="landing.theme.classic">Classic Americana</span> <code>classic</code></button>
-        <button class="chip" data-theme="flat"><span data-i18n="landing.theme.flat">Flat</span> <code>flat</code></button>
-        <button class="chip" data-theme="synthwave"><span data-i18n="landing.theme.synthwave">Synthwave</span> <code>synthwave</code></button>
-        <button class="chip" data-theme="ticket"><span data-i18n="landing.theme.ticket">Vintage Ticket</span> <code>ticket</code></button>
-        <button class="chip" data-theme="wood"><span data-i18n="landing.theme.wood">Wooden Toy</span> <code>wood</code></button>
-        <button class="chip" data-theme="comic"><span data-i18n="landing.theme.comic">Comic</span> <code>comic</code></button>
-        <button class="chip" data-theme="departures"><span data-i18n="landing.theme.departures">Departures Board</span> <code>departures</code></button>
-        <button class="chip" data-theme="paper"><span data-i18n="landing.theme.paper">Construction Paper</span> <code>paper</code></button>
-        <button class="chip" data-theme="tron"><span data-i18n="landing.theme.tron">Tron</span> <code>tron</code></button>
-        <button class="chip" data-theme="pixel"><span data-i18n="landing.theme.pixel">16-bit Pixel</span> <code>pixel</code></button>
-        <button class="chip" data-theme="highvibes"><span data-i18n="landing.theme.highvibes">High Vibes</span> <code>highvibes</code></button>
-        <button class="chip" data-theme="jazz"><span data-i18n="landing.theme.jazz">Jazz Vinyl</span> <code>jazz</code></button>
-        <button class="chip" data-theme="bullet"><span data-i18n="landing.theme.bullet">Anime Bullet Train</span> <code>bullet</code></button>
-        <button class="chip" data-theme="lava"><span data-i18n="landing.theme.lava">Lava Lamp</span> <code>lava</code></button>
-        <button class="chip" data-theme="pride"><span data-i18n="landing.theme.pride">Pride</span> <code>pride</code></button>
-        <button class="chip" data-theme="shuffle"><span data-i18n="landing.theme.shuffle">🔀 Shuffle</span> <code>shuffle</code></button>
-      </div>
-      <div class="cta" style="margin-top:14px">
-        <a class="btn primary" id="theme-preview" href="./preview.html" target="_blank" rel="noopener" data-i18n="landing.themePreview">Preview this theme</a>
-        <a class="btn ghost" id="theme-build" href="./configurator.html" data-i18n="landing.themeBuild">Build with this theme</a>
-      </div>
-    </section>
-
-    <footer>
-      <a href="https://github.com/goproslowyo/RaidTrainOverlay#readme" data-i18n="landing.readme">README</a> &middot;
-      <a href="https://github.com/goproslowyo/RaidTrainOverlay/blob/main/docs/authoring-a-theme.md" data-i18n="landing.authorTheme">Author a theme</a> &middot;
-      <a href="https://github.com/goproslowyo/RaidTrainOverlay" data-i18n="landing.source">Source</a> &middot;
-      <span data-i18n="landing.license">MIT licensed</span>
-      <div class="credit"><span data-i18n="landing.credit">Built with ❤️ by a streamer, for streamers</span> &middot; <span data-i18n="landing.creditBy">by</span> <a href="https://github.com/goproslowyo">goproslowyo</a></div>
-      <div class="ver"><span id="ver">v0.5.0</span><span id="sha"></span></div>
-    </footer>
+    <span class="spacer"></span>
+    <a class="toplink" href="./preview.html" data-i18n="landing.navThemes">Themes</a>
+    <a class="toplink" href="https://github.com/goproslowyo/RaidTrainOverlay#readme" data-i18n="landing.readme">README</a>
   </div>
-  <script type="module">
-    import { resolveLocale, loadMessages } from './src/i18n/index.js';
-    import { localizeDom } from './src/i18n/dom.js';
 
-    // Localize the landing page to ?lang= or the browser's preference; the inline
-    // English stays as the fallback. The chips build minimal demo URLs (no lang —
-    // the Configurator is where the overlay language is set), so a copied link is
-    // just event + theme, exactly as the note describes.
+  <section class="hero">
+    <div class="hero-inner">
+      <h2 data-i18n-html="landing.heroTitle">Your raid train, <span class="g">live on stream</span> — from one link.</h2>
+      <p class="lede" data-i18n="landing.heroLede">Paste it into OBS once. It finds whichever train you're running today, and every train after that, on its own.</p>
+      <p class="doors" data-i18n-html="landing.doors">Got a single <a href="https://raidpal.com">RaidPal</a> event? <a href="./configurator.html?event=">Build a one-off link</a>. No RaidPal? <a href="./configurator.html#manual">Build one by hand</a>.</p>
+    </div>
+    <div class="example">
+      <div class="stage">
+        <iframe id="example" title="Overlay preview" hidden></iframe>
+        <div class="stage-ph" id="example-ph" data-i18n="landing.exampleLoading">Loading a live example…</div>
+      </div>
+      <p class="example-cap">
+        <span class="dot" aria-hidden="true">●</span>
+        <span data-i18n="landing.liveExample">Live example</span> — <span class="name" id="example-name"></span>
+      </p>
+    </div>
+  </section>
+
+  <div class="strip" aria-hidden="true">
+    <div class="rail">
+      <div class="rolling">
+        <span class="car loco"></span><span class="car c1"></span><span class="car c2"></span>
+        <span class="car c3"></span><span class="car c4"></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="body">
+    <p class="board-kicker" data-i18n="landing.boardKicker">Now boarding</p>
+    <div class="board">
+      <div class="row head">
+        <span data-i18n="landing.colWhen">When</span>
+        <span data-i18n="landing.colWhat">What you see</span>
+        <span style="text-align:right" data-i18n="landing.colStatus">Status</span>
+      </div>
+      <!-- The three NOW words are filled in by script from `overlay.now`, the
+           badge the Overlay actually paints on the live Car. #13's review found
+           eight locales telling streamers to look for OPEN while their overlay
+           painted FREI/LIBRE/LEDIG; a landing page promising a "NOW marker"
+           against an overlay that paints JETZT would be the same bug. -->
+      <div class="row">
+        <span class="when" id="when-now">NOW</span>
+        <span class="what">
+          <b id="now-title">Whoever's live is marked NOW</b>
+          <span id="now-body">As your train moves from streamer to streamer, the NOW marker moves with it.</span>
+        </span>
+        <span class="flag on" data-i18n="landing.flagOnAir">On air</span>
+      </div>
+      <div class="row">
+        <span class="when" data-i18n="landing.whenNext">NEXT</span>
+        <span class="what">
+          <b data-i18n="landing.nextTitle">Your next train, already loaded</b>
+          <span data-i18n="landing.nextBody">When this one ends, the overlay switches over by itself.</span>
+        </span>
+        <span class="flag auto" data-i18n="landing.flagAuto">Automatic</span>
+      </div>
+      <div class="row">
+        <span class="when" data-i18n="landing.whenEvery">EVERY</span>
+        <span class="what">
+          <b data-i18n="landing.everyTitle">Every train after that too</b>
+          <span data-i18n="landing.everyBody">One URL covers your whole schedule.</span>
+        </span>
+        <span class="flag auto" data-i18n="landing.flagAuto">Automatic</span>
+      </div>
+      <div class="row cta">
+        <span class="when" data-i18n="landing.whenGo">GO</span>
+        <span class="what">
+          <span data-i18n="landing.goTitle">Take your link and paste it into OBS.</span>
+          <span class="cta-note" data-i18n="landing.goNote">Change your settings later? Copy it again.</span>
+        </span>
+        <span style="text-align:right"><a class="btn gold lg go-btn" href="./configurator.html" data-i18n="landing.goCta">Get my link</a></span>
+      </div>
+    </div>
+    <p class="themes-door" data-i18n-html="landing.themesDoor">Fifteen themes to choose from — <a href="./preview.html">see them all</a>.</p>
+  </div>
+
+  <footer class="foot">
+    <a href="https://github.com/goproslowyo/RaidTrainOverlay#readme" data-i18n="landing.readme">README</a> &middot;
+    <a href="https://github.com/goproslowyo/RaidTrainOverlay/blob/main/docs/authoring-a-theme.md" data-i18n="landing.authorTheme">Author a theme</a> &middot;
+    <a href="https://github.com/goproslowyo/RaidTrainOverlay" data-i18n="landing.source">Source</a> &middot;
+    <span data-i18n="landing.license">MIT licensed</span>
+    <div class="credit"><span data-i18n="landing.credit">Built with ❤️ by a streamer, for streamers</span> &middot; <span data-i18n="landing.creditBy">by</span> <a href="https://github.com/goproslowyo">goproslowyo</a></div>
+    <div class="ver"><span id="ver">v0.5.0</span><span id="sha"></span></div>
+  </footer>
+
+  <script type="module">
+    import { resolveLocale, loadMessages, makeT } from './src/i18n/index.js';
+    import { localizeDom } from './src/i18n/dom.js';
+    import { THEME_OPTION_KEYS } from './src/settings-schema.js';
+
     const locale = resolveLocale(new URLSearchParams(location.search).get('lang'), navigator.languages);
     const messages = await loadMessages(locale);
     localizeDom(document, messages);
     document.documentElement.lang = locale;
+    const t = makeT(messages);
 
-    // Theme chips → the Preview + Build links. Clicking a chip selects it and points
-    // both buttons at that theme (preview.html?theme=… and configurator.html?theme=…),
-    // so a non-technical user never edits a URL by hand — they just click through.
-    (function () {
-      const chips = [...document.querySelectorAll('.chip[data-theme]')];
-      const preview = document.getElementById('theme-preview');
-      const build = document.getElementById('theme-build');
-      function pick(theme) {
-        for (const c of chips) c.classList.toggle('active', c.dataset.theme === theme);
-        const q = theme && theme !== 'classic' ? `?theme=${theme}` : '';
-        preview.href = `./preview.html${q}`;
-        // Always carry the theme to the Configurator, even `classic`: the param is
-        // what opens the one-off builder rather than My Raid Trains, so dropping it
-        // for the default landed "Build with this theme" somewhere else entirely.
-        build.href = `./configurator.html?theme=${theme || 'classic'}`;
+    // The board's NOW cells carry the Overlay's OWN badge word, so the page can
+    // never promise a marker the overlay doesn't paint (see the markup note).
+    const nowBadge = t('overlay.now');
+    document.getElementById('when-now').textContent = nowBadge;
+    document.getElementById('now-title').textContent = t('landing.nowTitle', { now: nowBadge });
+    document.getElementById('now-body').textContent = t('landing.nowBody', { now: nowBadge });
+
+    // The live example: the real Overlay on the built-in demo lineup, cycling
+    // themes so a visitor sees the range without a wall of buttons.
+    //
+    // Theme names come from THEME_OPTION_KEYS — the same map the Configurator's
+    // theme <select> renders from — so the landing page cannot drift from it and
+    // owns no `landing.theme.*` strings of its own (#30). `shuffle` is excluded:
+    // it is a mode, not a look, and cycling to it would show one of the others
+    // under the wrong name.
+    const THEMES = Object.entries(THEME_OPTION_KEYS).filter(([slug]) => slug !== 'shuffle');
+
+    const frame = document.getElementById('example');
+    const placeholder = document.getElementById('example-ph');
+    const caption = document.getElementById('example-name');
+    const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let i = 0, loaded = false;
+
+    function showTheme() {
+      const [slug, key] = THEMES[i];
+      // height=93 lifts the Train off the canvas floor. The Overlay's default of
+      // 100 drops the Baseline onto the bottom edge, which is right in OBS but
+      // shaves Themes whose scenery bleeds downward on purpose (jazz's console
+      // deck, lava's floor line, tie strips). `height` is where, not how big.
+      const query = `event=demo&theme=${slug}&height=93&lang=${encodeURIComponent(locale)}`;
+      if (!loaded) {
+        frame.src = `./overlay.html?${query}&preview=1`;
+        frame.hidden = false;
+        placeholder.hidden = true;
+        loaded = true;
+      } else {
+        // Same event slug, so the Overlay re-renders in place over its own
+        // `rto-preview` protocol — no reload, no refetch, no flicker.
+        frame.contentWindow?.postMessage({ type: 'rto-preview', query, roll: false }, location.origin);
       }
-      for (const c of chips) c.addEventListener('click', () => pick(c.dataset.theme));
-      pick('classic');
-    })();
+      caption.textContent = t(key);
+      i = (i + 1) % THEMES.length;
+    }
 
-    // Stamp the footer with the live deployed commit (fetched from the GitHub API) next
-    // to the version, so you can tell exactly what's running. Fails silently offline.
+    // Loaded immediately, and deliberately NOT deferred. #34 raised page weight
+    // as a real cost — this pulls the whole renderer plus an iframe onto a page
+    // many visitors reach on mobile — and lazy-loading was the obvious answer
+    // while the preview was a section further down the page. It is not one now:
+    // the example sits IN the hero, above the fold, so a viewport gate would
+    // fire on load for virtually every visitor while adding a way for the panel
+    // to stay blank forever if the gate ever misjudged (a hidden or unpainted
+    // document reports innerHeight 0, and paint-driven callbacks never run at
+    // all — the hazard PR #29 fixed in the Overlay).
+    //
+    // So the weight is inherent to putting the example above the fold, not
+    // something a loading strategy can recover. It is bounded instead: ONE
+    // iframe, loaded once, and every theme change after that re-renders in
+    // place over postMessage rather than fetching anything.
+    showTheme();
+    if (!still) setInterval(showTheme, 4000);
+
+    // Footer: the live deployed commit and the latest released tag, so the
+    // version never goes stale when a release forgets to bump a string. Both
+    // fail silently offline.
     fetch('https://api.github.com/repos/goproslowyo/RaidTrainOverlay/commits/main')
       .then((r) => (r.ok ? r.json() : null))
       .then((c) => {
@@ -165,17 +385,13 @@
       })
       .catch(() => {});
 
-    // Show the latest released version, fetched live (semver-sorted) from the tags API —
-    // so the footer never goes stale when a release forgets to bump a hardcoded string
-    // (which is exactly how it got stuck at v0.2.0). The inline value is the offline
-    // fallback. Both calls fail silently.
     fetch('https://api.github.com/repos/goproslowyo/RaidTrainOverlay/tags?per_page=100')
       .then((r) => (r.ok ? r.json() : null))
       .then((tags) => {
         if (!Array.isArray(tags)) return;
         const parse = (n) => (n.match(/^v?(\d+)\.(\d+)\.(\d+)$/) || []).slice(1).map(Number);
         const latest = tags
-          .map((t) => t.name)
+          .map((t2) => t2.name)
           .filter((n) => parse(n).length === 3)
           .sort((a, b) => { const x = parse(a), y = parse(b); return y[0] - x[0] || y[1] - x[1] || y[2] - x[2]; })[0];
         if (latest) document.getElementById('ver').textContent = latest[0] === 'v' ? latest : 'v' + latest;
