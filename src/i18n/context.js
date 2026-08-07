@@ -186,8 +186,8 @@ export const DESCRIPTIONS = {
   'configurator.staleNotFound': 'Shown when RaidPal returned nothing but a cached list is being displayed. {login} is already bold.',
   'configurator.staleError': 'Same, when the request failed rather than returning nothing.',
   'configurator.noTrains': 'Empty state when the Profile has no live or upcoming raid trains.',
-  'configurator.departedOne': 'Expander label, SINGULAR: one finished train. Keep {n}.',
-  'configurator.departedMany': 'Expander label, PLURAL: finished trains. Keep {n}.',
+  'configurator.endedOne': 'Expander label, SINGULAR: one train that has FINISHED — it reached the last streamer. Not "departed": a train departs when it STARTS. Keep {n}.',
+  'configurator.endedMany': 'Expander label, PLURAL: trains that have FINISHED. Not "departed" — see the singular. Keep {n}.',
   'configurator.customPreset': 'Stands in for a Preset name when the referenced Preset is gone. Short noun/adjective.',
 
   // Configurator — one raid-train card.
@@ -197,7 +197,7 @@ export const DESCRIPTIONS = {
   'configurator.chipConfigTitle': 'Tooltip on the chip showing which Preset a train uses.',
   'configurator.slotsFilled': 'How many lineup slots are taken, e.g. "11/12 slots filled". Keep the <b> tag around {filled}/{slots}.',
   'configurator.cardRefreshFailed': 'Inline note when a train\'s details could not be re-fetched. Lowercase, reads mid-sentence.',
-  'configurator.stampDeparted': 'Stamp on a train that has finished. Rail sense ("departed"), short — it is a diagonal stamp.',
+  'configurator.stampEnded': 'Diagonal stamp on a train that has FINISHED — it reached the last streamer. Short. NOT "departed": a train departs when it STARTS.',
   'configurator.cardRefreshTitle': 'Tooltip on the ⟳ button that re-fetches one train.',
   'configurator.cardRefreshAria': 'Screen-reader label for that button. {title} is the event name.',
   'configurator.cardCopyTitle': 'Tooltip on the ⧉ button that copies this train\'s overlay link.',

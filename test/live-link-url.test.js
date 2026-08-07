@@ -130,7 +130,7 @@ test('the filter drops a train known to have ended and keeps the live and lead o
   assert.deepEqual(Object.keys(map).sort(), ['departs-in-an-hour', 'on-stage-now']);
 });
 
-test('a train absent from a GOOD read is dropped — departed, deleted or renamed alike', () => {
+test('a train absent from a GOOD read is dropped — ended, deleted or renamed alike', () => {
   const { library, store } = scheduled({ 'renamed-underneath-us': null, 'still-listed': NOW + 86_400_000 });
   // The endpoint returns only upcoming events, and the Overlay resolves
   // against that same endpoint — so a slug it doesn't list can never be

@@ -8,6 +8,43 @@ reviewer only needs to eyeball the list for their language (verify live with
 
 Severity: **high** = meaning could be off; med/low = tone/word-choice polish.
 
+## All locales — `configurator.endedOne` / `endedMany` / `stampEnded` (**high**)
+
+Added by the Departed→Ended rename (#38), and **these are fresh machine
+translations with no critic pass behind them** — treat them as the least
+trustworthy strings in the catalogs.
+
+The English they replace was itself wrong, so a reviewer must not check the new
+value against the old one. `{n} departed train` meant *finished*, but a train
+**departs when it starts** — it **ends** when it reaches the last streamer. Every
+locale inherited the same inversion (`afgået tog`, `train parti`, `abgefahrener
+Zug`, `trem que já partiu`, `išvykęs traukinys`, `vertrokken trein`, `treno
+partito`, `tren ya salido` — all "left the station").
+
+What to confirm: the label sits on a collapsed expander over the list of raid
+trains that are **over and done with**, and it must not read as "under way".
+
+`stampEnded` is the diagonal stamp across an ended train's card, so it is also
+length-constrained — confirm it does not run past the card corner.
+
+| Locale | Singular | Plural | `stampEnded` |
+|---|---|---|---|
+| `es` | `{n} tren finalizado` | `{n} trenes finalizados` | `Finalizado` |
+| `pt-BR` | `{n} trem encerrado` | `{n} trens encerrados` | `Encerrado` |
+| `it` | `{n} treno concluso` | `{n} treni conclusi` | `Concluso` |
+| `de` | `{n} beendeter Zug` | `{n} beendete Züge` | `Beendet` |
+| `nl` | `{n} afgelopen trein` | `{n} afgelopen treinen` | `Afgelopen` |
+| `da` | `{n} afsluttet tog` | `{n} afsluttede tog` | `Afsluttet` |
+| `lt` | `{n} pasibaigęs traukinys` | `Pasibaigę traukiniai ({n})` | `Pasibaigęs` |
+| `fr` | `{n} train terminé` | `{n} trains terminés` | `Terminé` |
+
+`lt` keeps its existing count-in-parentheses plural pattern rather than adopting
+English's leading `{n}`.
+
+**es-ES / es-MX reviewers:** these keys are not overridden regionally, so both
+inherit the `es` row above. Confirm the neutral wording works for your region —
+if it does not, that is a new override, not an edit to `es`.
+
 ## Spanish (`es`)
 
 - **high** `status.lead` — EN CABEZA replaces GUIA

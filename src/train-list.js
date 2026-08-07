@@ -1,11 +1,11 @@
 /**
  * train-list: the My Raid Trains view's presentation logic — which trains are
- * live, upcoming or departed, how their times read, and the card markup.
+ * upcoming, live or ended, how their times read, and the card markup.
  *
- * Kept out of the page so the ordering and the departed rule are testable: a
+ * Kept out of the page so the ordering and the ended rule are testable: a
  * train's status is derived from the clock alone (RaidPal's own `status` field
  * is per-Event detail, not carried on the summaries the user endpoint returns),
- * and getting "departed" wrong would grey out a train that is still running.
+ * and getting "ended" wrong would grey out a train that is still running.
  *
  * i18n: every user-facing word comes from the injected translator `t`. Values
  * interpolated into a string (an Event title, a Preset name) are RaidPal or
@@ -17,9 +17,10 @@ const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&
 
 /**
  * Event summaries → `{ live, upcoming, past }`. Live is now ∈ [start, end];
- * everything ending in the past is departed. Live and upcoming sort ascending
- * by start (the next thing to happen first); departed sorts DESCENDING, so the
- * most recent train is at the top of the collapsed list.
+ * everything ending in the past has ENDED — it reached the last streamer. (A
+ * train *departs* when it starts, so `live` is the departed one; see CONTEXT.md.)
+ * Live and upcoming sort ascending by start (the next thing to happen first);
+ * ended sorts DESCENDING, so the most recent train tops the collapsed list.
  */
 export function classifyTrains(events, now) {
   const at = now instanceof Date ? now.getTime() : now;
@@ -97,7 +98,7 @@ export function trainCardHtml(view, t = (k) => k) {
   return `<div class="card event-card${status === 'live' ? ' is-live' : ''}${past ? ' past' : ''}" data-slug="${esc(event.slug)}">
     <div class="event-main">
       <div class="event-title-row">
-        ${past ? `<span class="stamp">${esc(t('configurator.stampDeparted'))}</span>` : ''}
+        ${past ? `<span class="stamp">${esc(t('configurator.stampEnded'))}</span>` : ''}
         <span class="event-title">${esc(event.title)}</span>
         ${chips}
       </div>

@@ -75,10 +75,10 @@ function endTimes(profile, events) {
  * match is unreachable, so dropping it changes nothing on stream:
  *
  *   1. Absent from a GOOD read. The endpoint returns only upcoming events, so
- *      a slug it does not list is one of: departed, deleted, or renamed. The
+ *      a slug it does not list is one of: ended, deleted, or renamed. The
  *      Overlay will never resolve to any of them — a renamed slug is as dead
- *      as a departed one — so the entry is pure weight in the URL.
- *   2. A known end time in the past. Catches the ~6h window where a departed
+ *      as an ended one — so the entry is pure weight in the URL.
+ *   2. A known end time in the past. Catches the ~6h window where an ended
  *      train is still listed, from `endsAt` recorded earlier or from the read
  *      itself.
  *

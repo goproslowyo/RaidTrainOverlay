@@ -935,13 +935,13 @@
     const cards = [...live, ...upcoming].map((e) => trainCardHtml(cardView(e, live.includes(e) ? 'live' : 'upcoming', now), t)).join('');
     const emptyNote = (live.length + upcoming.length) === 0
       ? `<div class="empty">${te('configurator.noTrains')}</div>` : '';
-    const departed = past.length > 0
+    const ended = past.length > 0
       ? `<button type="button" class="past-divider${state.pastOpen ? ' open' : ''}" data-act="toggle-past">
-           ${esc(plural(past.length, 'configurator.departedOne', 'configurator.departedMany'))} <span class="pd-chev" aria-hidden="true">▾</span>
+           ${esc(plural(past.length, 'configurator.endedOne', 'configurator.endedMany'))} <span class="pd-chev" aria-hidden="true">▾</span>
          </button>
          <div class="past-list"${state.pastOpen ? '' : ' hidden'}>${past.map((e) => trainCardHtml(cardView(e, 'past', now), t)).join('')}</div>`
       : '';
-    return `${head}${stale}${cards}${emptyNote}${departed}`;
+    return `${head}${stale}${cards}${emptyNote}${ended}`;
   }
 
   // ── View: Raid Train Config editor ─────────────────────────────────────
