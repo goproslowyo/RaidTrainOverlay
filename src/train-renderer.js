@@ -401,13 +401,16 @@ export function renderTrain(train, container, config) {
   container.appendChild(stage);
   applyMode(track, config, buildCopy);
   // The post-attach pass — every Theme's shrink-to-fit (fitAll) and the lead badge.
-  // NEVER defer this to requestAnimationFrame: rAF does not fire in a document that is
-  // never painted, and an OBS browser source sitting in an inactive scene is exactly
-  // that. Deferred, the pass silently never ran there: names rendered at full size, a
-  // name too wide for its Car wrapped to a second line, that Car's sub-line dropped
-  // below the rest, and the extra line pushed the Train past its baseline so `height=100`
-  // clipped it. Whether it happened came down to whether the tab was in front at load.
-  // Nothing here needs a paint — only layout, which applyMode above has already forced.
+  // NEVER defer this to requestAnimationFrame. rAF only runs at a rendering
+  // opportunity, so in a document that is never painted the callback sits queued and
+  // the pass never runs: names render at full size, a name too wide for its Car wraps
+  // to a second line, and the extra line pushes the Train past its baseline so
+  // `height=100` clips it. A permanently hidden document holds that state forever; one
+  // that is later shown gets it until the first frame after it becomes visible.
+  // Nothing here needs a paint — only layout. Every read below (scrollWidth,
+  // getBoundingClientRect, getComputedTextLength) forces the style+layout it needs, so
+  // running synchronously is correct on its own terms, not because applyMode happened
+  // to measure first (applyMode writes styles after its last read — layout is dirty here).
   for (const copy of built) copy.afterAttach?.();
   pinLeadBadges(track, config);
 
