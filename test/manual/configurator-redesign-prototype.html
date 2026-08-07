@@ -175,6 +175,11 @@
     display: inline-flex; align-items: center; justify-content: center; flex: none;
   }
   .icon-btn:hover { color: var(--ink); border-color: var(--accent); }
+  .icon-btn.accent { color: var(--accent); border-color: #2c4356; background: #57b6ff10; }
+  .icon-btn.accent:hover { color: var(--ink); background: #57b6ff22; border-color: var(--accent); }
+  .icon-btn.destructive { color: #d9737c; border-color: #4a262c; }
+  .icon-btn.destructive:hover { color: #ffb4ba; background: #52242a; border-color: #7c3540; }
+  .icon-btn svg { display: block; }
   .icon-btn.spin { animation: spin .8s linear infinite; color: var(--accent); }
   @keyframes spin { to { transform: rotate(360deg); } }
 
@@ -301,6 +306,31 @@
   .ovr-revert:hover { background: #ffb45418; }
   .range-row { display: flex; align-items: center; gap: 12px; }
   .range-out { min-width: 3ch; text-align: right; color: var(--accent); font-variant-numeric: tabular-nums; font-weight: 700; }
+  .check-row { display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 14px; }
+  .check-row input { width: 17px; height: 17px; accent-color: var(--accent); flex: none; }
+
+  /* Collapsible settings groups (mirror the old Look / Motion / Lineup tabs) */
+  details.fgroup { border: 1px solid var(--line); border-radius: 9px; margin-bottom: 10px; background: #171b22; }
+  details.fgroup:last-of-type { margin-bottom: 0; }
+  details.fgroup summary {
+    display: flex; align-items: center; gap: 10px; list-style: none; cursor: pointer;
+    padding: 10px 14px; user-select: none;
+  }
+  details.fgroup summary::-webkit-details-marker { display: none; }
+  .g-label {
+    font-size: 12px; text-transform: uppercase; letter-spacing: .07em;
+    color: var(--accent-dim); font-weight: 700;
+  }
+  details.fgroup summary:hover .g-label { color: var(--ink); }
+  .g-ovr {
+    font-size: 10.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase;
+    color: var(--warn); border: 1px solid #5a4426; background: #ffb45412;
+    border-radius: 999px; padding: 1px 8px;
+  }
+  .g-ovr:empty { display: none; }
+  .g-chev { margin-left: auto; color: var(--muted); font-size: 11px; transition: transform .15s; }
+  details.fgroup[open] .g-chev { transform: rotate(180deg); }
+  .fgroup-body { padding: 6px 14px 14px; border-top: 1px solid var(--line); }
   .spot-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 7px; }
   .spot-chip {
     font-size: 12px; color: var(--muted); border: 1px solid var(--line);
@@ -466,11 +496,61 @@ const THEMES = {
 };
 const MODES = { pass: 'Pass — rolls across every few minutes', marquee: 'Marquee — always on screen' };
 const HORIZONS = { next3: 'Next 3 trains', next5: 'Next 5 trains', w2: 'Next 2 weeks', m1: 'Next month', all: 'All upcoming' };
+const LANGS = {
+  '': 'Auto (browser)', en: 'English', 'es-ES': 'Español (España)', 'es-MX': 'Español (México)',
+  'pt-BR': 'Português (Brasil)', fr: 'Français', it: 'Italiano', de: 'Deutsch',
+  nl: 'Nederlands', da: 'Dansk', lt: 'Lietuvių',
+};
 const CAR_COLORS = ['#1e3a5f', '#5b2a78', '#14361f', '#6b3d12', '#3d1f42', '#173a3a'];
 const OVERLAY_BASE = 'https://goproslowyo.github.io/RaidTrainOverlay/overlay.html';
-// A Preset carries settings only. Spotlight is never a Preset field: standing
-// Spotlights live on the Profile, extra ones live on the Raid Train Config.
-const FIELDS = ['theme', 'mode', 'scale'];
+
+// The FULL settings-only field set (what a Preset stores, and what a Raid
+// Train Config can override per field). Spotlight is never a Preset field:
+// standing Spotlights live on the Profile, extras on the Raid Train Config.
+const FIELD_DEFS = [
+  { key: 'theme',        group: 'look',     label: 'Theme',                  type: 'select', options: THEMES },
+  { key: 'scale',        group: 'look',     label: 'Train size',             type: 'range', min: 0.5, max: 2, step: 0.1 },
+  { key: 'height',       group: 'look',     label: 'Vertical position',      type: 'range', min: 0, max: 100, step: 1,
+    hint: '0 = top, 100 = bottom. Themes ride at slightly different heights — tune it per look.' },
+  { key: 'enginedim',    group: 'look',     label: 'When the event ends',    type: 'select',
+    options: { over: 'Dim the engine', finished: 'Hide it (when hiding finished cars)', never: 'Keep the engine bright' } },
+  { key: 'mode',         group: 'motion',   label: 'Display style',          type: 'select', options: MODES },
+  { key: 'interval',     group: 'motion',   label: 'Minutes between passes', type: 'number', min: 1, step: 1 },
+  { key: 'speed',        group: 'motion',   label: 'Animation speed',        type: 'number', min: 0.1, step: 0.1,
+    hint: 'Higher is faster. 1 is the default pace.' },
+  { key: 'track',        group: 'motion',   label: 'Track between passes',   type: 'select',
+    options: { periodic: 'Fade it out between passes', always: 'Always show the track' } },
+  { key: 'trackfadein',  group: 'motion',   label: 'Track fade in (seconds)',  type: 'number', min: 0, max: 120, step: 1 },
+  { key: 'trackfadeout', group: 'motion',   label: 'Track fade out (seconds)', type: 'number', min: 0, max: 120, step: 1 },
+  { key: 'refresh',      group: 'behavior', label: 'Auto-refresh (minutes)', type: 'number', min: 15, step: 5, placeholder: 'off',
+    hint: 'How often to re-check RaidPal for lineup changes. Blank = check once on load.' },
+  { key: 'openslots',    group: 'behavior', label: 'Open slots',             type: 'check',
+    checkText: 'Show open slots as OPEN cars so viewers can sign up' },
+  { key: 'hidefinished', group: 'behavior', label: 'Finished cars',          type: 'check',
+    checkText: 'Hide cars that have already played, instead of dimming them' },
+  { key: 'tz',           group: 'behavior', label: 'Clock time zones',       type: 'text', placeholder: 'PT, ET, GMT',
+    hint: 'Up to 3 zones to show absolute times instead of "in 2h". Blank = relative times.' },
+  { key: 'lang',         group: 'behavior', label: 'Overlay language',       type: 'select', options: LANGS },
+];
+const GROUPS = [
+  { id: 'look', label: 'Look' },
+  { id: 'motion', label: 'Motion' },
+  { id: 'behavior', label: 'Behavior' },
+];
+const FIELDS = FIELD_DEFS.map((d) => d.key);
+const DEF_BY_KEY = Object.fromEntries(FIELD_DEFS.map((d) => [d.key, d]));
+// Baseline values (the real serializer's defaults) — every Preset starts here.
+const SETTING_DEFAULTS = {
+  theme: 'classic', scale: '1', height: '100', enginedim: 'over',
+  mode: 'pass', interval: '15', speed: '1', track: 'periodic', trackfadein: '15', trackfadeout: '10',
+  refresh: '', openslots: false, hidefinished: false, tz: '', lang: '',
+};
+
+const ICONS = {
+  pencil: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11.3 2.7l2 2L5.4 12.6l-2.9.9.9-2.9z"/><path d="m9.9 4.1 2 2"/></svg>',
+  copy: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5.5" y="5.5" width="8" height="8" rx="1.2"/><path d="M10.5 3.5v-.4a1 1 0 0 0-1-1H3.6a1 1 0 0 0-1 1v5.8a1 1 0 0 0 1 1h.4" transform="translate(0 0)"/></svg>',
+  trash: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 4.5h11"/><path d="M5.5 4.5V3.2a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v1.3"/><path d="m4.3 4.5.6 8.6a1 1 0 0 0 1 .9h4.2a1 1 0 0 0 1-.9l.6-8.6"/><path d="M6.7 7.3v3.9M9.3 7.3v3.9"/></svg>',
+};
 
 const DB = {
   order: ['gostreamcore', 'vinyl_veda'],
@@ -481,9 +561,9 @@ const DB = {
       defaultPreset: 'House Default',
       liveLink: { idle: false, horizon: 'next3' },
       presets: [
-        { name: 'House Default',     theme: 'classic',    mode: 'pass',    scale: '1' },
-        { name: 'Friday Night Funk', theme: 'synthwave',  mode: 'marquee', scale: '1.2' },
-        { name: 'Minimal Marquee',   theme: 'departures', mode: 'marquee', scale: '0.8' },
+        { name: 'House Default',     ...SETTING_DEFAULTS },
+        { name: 'Friday Night Funk', ...SETTING_DEFAULTS, theme: 'synthwave',  mode: 'marquee', scale: '1.2', height: '94', speed: '1.2' },
+        { name: 'Minimal Marquee',   ...SETTING_DEFAULTS, theme: 'departures', mode: 'marquee', scale: '0.8', hidefinished: true },
       ],
       configs: {
         'synthwave-saturdays-42': { preset: 'Friday Night Funk', overrides: { theme: 'tron' }, spotlight: 'guest_dj_kai' },
@@ -510,7 +590,7 @@ const DB = {
       defaultPreset: 'Jazz Nights',
       liveLink: { idle: true, horizon: 'w2' },
       presets: [
-        { name: 'Jazz Nights', theme: 'jazz', mode: 'pass', scale: '1' },
+        { name: 'Jazz Nights', ...SETTING_DEFAULTS, theme: 'jazz' },
       ],
       configs: {},
       events: [
@@ -561,6 +641,7 @@ function eventOverlayUrl(slug) {
   if (eff.theme !== 'classic') sp.set('theme', eff.theme);
   if (eff.mode !== 'pass') sp.set('mode', eff.mode);
   if (String(eff.scale) !== '1') sp.set('scale', eff.scale);
+  if (String(eff.height) !== '100') sp.set('height', eff.height);
   const raw = [...P().spotlights, ...String(cfg.spotlight || '').split(',').map((s) => s.trim()).filter(Boolean)];
   const seen = new Set(), spots = raw.filter((s) => { const k = s.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true; });
   if (spots.length) sp.set('spotlight', spots.join(','));
@@ -573,7 +654,7 @@ function liveLinkUrl() {
   if (ll.idle) sp.set('idle', ll.horizon);
   // The real Live Link carries its full settings encoded in the URL itself
   // (it never reads localStorage). Fake that with a short settings blob.
-  const blob = btoa(JSON.stringify([base.theme, base.mode, base.scale, ll.idle, ll.horizon, P().spotlights]))
+  const blob = btoa(JSON.stringify([base.theme, base.mode, base.scale, base.height, ll.idle, ll.horizon, P().spotlights]))
     .replace(/[+/=]/g, '').slice(0, 16);
   sp.set('s', blob);
   return `${OVERLAY_BASE}?${sp}`;
@@ -724,15 +805,57 @@ function overrideBadge(field) {
   const cfg = ensureConfig(state.editing);
   if (!(field in cfg.overrides)) return '';
   return `<span class="ovr-badge">Overrides preset</span>
-    <button class="ovr-revert" data-act="revert" data-field="${field}" title="Revert to the preset value">↺</button>`;
+    <button class="ovr-revert" data-act="revert" data-field="${field}" title="Revert to the preset value" aria-label="Revert ${esc(DEF_BY_KEY[field].label)} to the preset value">↺</button>`;
+}
+function fieldLabelValue(def, v) {
+  if (def.type === 'check') return v ? 'on' : 'off';
+  if (def.type === 'select') return def.options[v] ?? String(v);
+  return String(v) === '' ? 'blank' : String(v);
 }
 function presetValueHint(field) {
   const cfg = ensureConfig(state.editing);
   const base = presetByName(cfg.preset);
   if (!base || !(field in cfg.overrides)) return '';
-  const v = base[field];
-  const label = field === 'theme' ? THEMES[v] : field === 'mode' ? (v === 'pass' ? 'Pass' : 'Marquee') : v;
-  return `Preset value: ${esc(label)}`;
+  return `Preset value: ${esc(fieldLabelValue(DEF_BY_KEY[field], base[field]))}`;
+}
+
+/* Generic field renderer, shared by both editors.
+   prefix 'f' = Raid Train Config editor (override badges + revert);
+   prefix 'p' = Preset editor (plain fields). */
+function renderField(def, value, prefix) {
+  const isCfg = prefix === 'f';
+  const dattr = isCfg ? 'data-field' : 'data-pfield';
+  const id = `${prefix}-${def.key}`;
+  let control = '';
+  if (def.type === 'select') {
+    control = `<select id="${id}" ${dattr}="${def.key}">${Object.entries(def.options)
+      .map(([k, v]) => `<option value="${esc(k)}"${String(value) === String(k) ? ' selected' : ''}>${esc(v)}</option>`).join('')}</select>`;
+  } else if (def.type === 'range') {
+    control = `<div class="range-row"><input type="range" id="${id}" ${dattr}="${def.key}" min="${def.min}" max="${def.max}" step="${def.step}" value="${esc(value)}"><span class="range-out" id="${id}-out">${esc(value)}</span></div>`;
+  } else if (def.type === 'number') {
+    control = `<input type="number" id="${id}" ${dattr}="${def.key}"${def.min != null ? ` min="${def.min}"` : ''}${def.max != null ? ` max="${def.max}"` : ''}${def.step != null ? ` step="${def.step}"` : ''} value="${esc(value)}"${def.placeholder ? ` placeholder="${esc(def.placeholder)}"` : ''}>`;
+  } else if (def.type === 'check') {
+    control = `<label class="check-row"><input type="checkbox" id="${id}" ${dattr}="${def.key}"${value ? ' checked' : ''}><span>${esc(def.checkText || '')}</span></label>`;
+  } else {
+    control = `<input type="text" id="${id}" ${dattr}="${def.key}" value="${esc(value)}"${def.placeholder ? ` placeholder="${esc(def.placeholder)}"` : ''} autocomplete="off">`;
+  }
+  const head = `<div class="field-head"><label for="${id}">${esc(def.label)}</label>${isCfg ? `<span class="ovr-slot" id="ovr-${def.key}">${overrideBadge(def.key)}</span>` : ''}</div>`;
+  const hint = isCfg
+    ? `<div class="hint" id="ph-${def.key}">${presetValueHint(def.key) || esc(def.hint || '')}</div>`
+    : (def.hint ? `<div class="hint">${esc(def.hint)}</div>` : '');
+  return `<div class="field">${head}${control}${hint}</div>`;
+}
+function groupOverrideCount(gid, cfg) {
+  return FIELD_DEFS.filter((d) => d.group === gid && (d.key in cfg.overrides)).length;
+}
+function renderGroup(g, values, prefix, cfg) {
+  const fields = FIELD_DEFS.filter((d) => d.group === g.id)
+    .map((d) => renderField(d, values[d.key], prefix)).join('');
+  const n = cfg ? groupOverrideCount(g.id, cfg) : 0;
+  return `<details class="fgroup"${g.id === 'look' ? ' open' : ''}>
+    <summary><span class="g-label">${esc(g.label)}</span><span class="g-ovr" id="g-ovr-${g.id}">${n ? `${n} overridden` : ''}</span><span class="g-chev" aria-hidden="true">▾</span></summary>
+    <div class="fgroup-body">${fields}</div>
+  </details>`;
 }
 
 function renderEditor() {
@@ -765,43 +888,19 @@ function renderEditor() {
         <h2 class="card-h" style="margin:0">Settings for this train</h2>
         ${nOvr ? `<button class="reset-all" data-act="reset-overrides">Reset ${nOvr} override${nOvr === 1 ? '' : 's'}</button>` : ''}
       </div>
+      ${GROUPS.map((g) => renderGroup(g, eff, 'f', cfg)).join('')}
+    </section>
 
-      <div class="field">
-        <div class="field-head"><label for="f-theme">Theme</label><span class="ovr-slot" id="ovr-theme">${overrideBadge('theme')}</span></div>
-        <select id="f-theme" data-field="theme">
-          ${Object.entries(THEMES).map(([k, v]) => `<option value="${k}" ${eff.theme === k ? 'selected' : ''}>${esc(v)}</option>`).join('')}
-        </select>
-        <div class="hint" id="ph-theme">${presetValueHint('theme')}</div>
+    <section class="card">
+      <h2 class="card-h">Spotlights for this train</h2>
+      <div class="spot-chips">
+        ${P().spotlights.length
+          ? P().spotlights.map((s) => `<span class="spot-chip">Always on: <b>${esc(s)}</b></span>`).join('')
+          : '<span class="spot-chip">No standing Spotlights yet</span>'}
+        <button class="spot-edit-link" data-act="goto-profile">Edit in Profile settings →</button>
       </div>
-
-      <div class="field">
-        <div class="field-head"><label for="f-mode">Display style</label><span class="ovr-slot" id="ovr-mode">${overrideBadge('mode')}</span></div>
-        <select id="f-mode" data-field="mode">
-          ${Object.entries(MODES).map(([k, v]) => `<option value="${k}" ${eff.mode === k ? 'selected' : ''}>${esc(v)}</option>`).join('')}
-        </select>
-        <div class="hint" id="ph-mode">${presetValueHint('mode')}</div>
-      </div>
-
-      <div class="field">
-        <div class="field-head"><label for="f-scale">Train size</label><span class="ovr-slot" id="ovr-scale">${overrideBadge('scale')}</span></div>
-        <div class="range-row">
-          <input type="range" id="f-scale" data-field="scale" min="0.5" max="2" step="0.1" value="${esc(eff.scale)}">
-          <span class="range-out" id="f-scale-out">${esc(eff.scale)}</span>
-        </div>
-        <div class="hint" id="ph-scale">${presetValueHint('scale')}</div>
-      </div>
-
-      <div class="field">
-        <div class="field-head"><label for="f-spotlight">Extra Spotlights for this train</label></div>
-        <div class="spot-chips">
-          ${P().spotlights.length
-            ? P().spotlights.map((s) => `<span class="spot-chip">Always on: <b>${esc(s)}</b></span>`).join('')
-            : '<span class="spot-chip">No standing Spotlights yet</span>'}
-          <button class="spot-edit-link" data-act="goto-profile">Edit in Profile settings →</button>
-        </div>
-        <input type="text" id="f-spotlight" data-field="spotlight" value="${esc(cfg.spotlight || '')}" placeholder="DJ Alpha, DJ Charlie" autocomplete="off">
-        <div class="hint">Comma-separated names to glow — this train only, on top of your standing Spotlights above.</div>
-      </div>
+      <input type="text" id="f-spotlight" data-field="spotlight" value="${esc(cfg.spotlight || '')}" placeholder="DJ Alpha, DJ Charlie" autocomplete="off">
+      <div class="hint">Comma-separated names to glow — this train only, on top of your standing Spotlights above.</div>
     </section>
 
     <section class="card">
@@ -817,14 +916,28 @@ function renderEditor() {
 /* Targeted refresh after a field edit (keeps focus / slider drag alive). */
 function refreshEditorChrome() {
   const cfg = ensureConfig(state.editing);
-  for (const f of FIELDS) {
+  const eff = effective(cfg);
+  for (const def of FIELD_DEFS) {
+    const f = def.key;
     const slot = $('#ovr-' + f);
     if (slot) slot.innerHTML = overrideBadge(f);
     const ph = $('#ph-' + f);
-    if (ph) ph.textContent = presetValueHint(f);
+    if (ph) {
+      const hint = presetValueHint(f);
+      ph.innerHTML = hint || esc(def.hint || '');
+    }
+    if (def.type === 'range') {
+      const out = $(`#f-${f}-out`);
+      if (out) out.textContent = eff[f];
+    }
   }
-  const out = $('#f-scale-out');
-  if (out) out.textContent = effective(cfg).scale;
+  for (const g of GROUPS) {
+    const tag = $('#g-ovr-' + g.id);
+    if (tag) {
+      const n = groupOverrideCount(g.id, cfg);
+      tag.textContent = n ? `${n} overridden` : '';
+    }
+  }
   const url = $('#cfg-url');
   if (url) url.value = eventOverlayUrl(state.editing);
   // Re-render the toolbar reset link by count
@@ -848,6 +961,10 @@ function refreshEditorChrome() {
 
 function presetSummary(p) {
   const bits = [THEMES[p.theme], p.mode === 'pass' ? 'Pass' : 'Marquee', `size ${p.scale}`];
+  if (String(p.height) !== '100') bits.push(`Y ${p.height}`);
+  const nonDefault = FIELDS.filter((f) => !['theme', 'mode', 'scale', 'height'].includes(f)
+    && String(p[f]) !== String(SETTING_DEFAULTS[f])).length;
+  if (nonDefault) bits.push(`+${nonDefault} more`);
   return bits.map((b) => `<span class="sum-chip">${esc(b)}</span>`).join('');
 }
 
@@ -868,11 +985,10 @@ function renderPresets() {
         <div class="preset-used">${used ? `Used by <b>${used}</b> Raid Train Config${used === 1 ? '' : 's'}` : 'Not used by any Raid Train Config yet'}</div>
       </div>
       <div class="preset-actions">
-        <button class="icon-btn star-btn${isDefault ? ' on' : ''}" data-act="make-default" data-name="${esc(p.name)}" title="${isDefault ? 'This is the default Preset' : 'Make this the default Preset'}">${isDefault ? '★' : '☆'}</button>
-        <button class="btn sm" data-act="edit-preset" data-name="${esc(p.name)}">Edit</button>
-        <button class="btn sm primary" data-act="dup-preset" data-name="${esc(p.name)}">Duplicate</button>
-        <button class="btn sm" data-act="rename-preset" data-name="${esc(p.name)}">Rename</button>
-        <button class="btn sm danger" data-act="del-preset" data-name="${esc(p.name)}">Delete</button>
+        <button class="icon-btn star-btn${isDefault ? ' on' : ''}" data-act="make-default" data-name="${esc(p.name)}" title="${isDefault ? 'This is the default Preset' : 'Make this the default Preset'}" aria-label="${isDefault ? 'This is the default Preset' : 'Make this the default Preset'}">${isDefault ? '★' : '☆'}</button>
+        <button class="icon-btn" data-act="edit-preset" data-name="${esc(p.name)}" title="Edit — settings and rename" aria-label="Edit preset ${esc(p.name)}">${ICONS.pencil}</button>
+        <button class="icon-btn accent" data-act="dup-preset" data-name="${esc(p.name)}" title="Duplicate, then rename the copy" aria-label="Duplicate preset ${esc(p.name)}">${ICONS.copy}</button>
+        <button class="icon-btn destructive" data-act="del-preset" data-name="${esc(p.name)}" title="Delete this Preset" aria-label="Delete preset ${esc(p.name)}">${ICONS.trash}</button>
       </div>
     </div>`;
   }).join('');
@@ -917,30 +1033,8 @@ function renderPresetEditor() {
 
     <section class="card">
       <h2 class="card-h">Preset settings</h2>
-
-      <div class="field">
-        <div class="field-head"><label for="f-p-theme">Theme</label></div>
-        <select id="f-p-theme" data-pfield="theme">
-          ${Object.entries(THEMES).map(([k, v]) => `<option value="${k}" ${p.theme === k ? 'selected' : ''}>${esc(v)}</option>`).join('')}
-        </select>
-      </div>
-
-      <div class="field">
-        <div class="field-head"><label for="f-p-mode">Display style</label></div>
-        <select id="f-p-mode" data-pfield="mode">
-          ${Object.entries(MODES).map(([k, v]) => `<option value="${k}" ${p.mode === k ? 'selected' : ''}>${esc(v)}</option>`).join('')}
-        </select>
-      </div>
-
-      <div class="field">
-        <div class="field-head"><label for="f-p-scale">Train size</label></div>
-        <div class="range-row">
-          <input type="range" id="f-p-scale" data-pfield="scale" min="0.5" max="2" step="0.1" value="${esc(p.scale)}">
-          <span class="range-out" id="f-p-scale-out">${esc(p.scale)}</span>
-        </div>
-      </div>
-
-      <div class="hint">Spotlights are not part of a Preset — standing Spotlights live in <a href="#" data-act="goto-profile">Profile settings</a>, extras on each train's Raid Train Config.</div>
+      ${GROUPS.map((g) => renderGroup(g, p, 'p', null)).join('')}
+      <div class="hint" style="margin-top:12px">Spotlights are not part of a Preset — standing Spotlights live in <a href="#" data-act="goto-profile">Profile settings</a>, extras on each train's Raid Train Config.</div>
     </section>`;
 }
 
@@ -990,7 +1084,9 @@ function renderProfile() {
         ${P().presets.map((q) => `<option value="${esc(q.name)}" ${q.name === P().defaultPreset ? 'selected' : ''}>${esc(q.name)}</option>`).join('')}
       </select>
       <div class="hint">New Raid Train Configs and your Live Link start from this Preset. Same setting as the star in the <a href="#" data-act="goto-presets">Preset Library</a>.</div>
-    </section>`;
+    </section>
+
+    <p class="hint" style="padding:0 4px">More profile options will land here.</p>`;
 }
 
 /* ══════════════ Render: Build by hand ══════════════ */
@@ -1063,7 +1159,7 @@ function addProfile() {
     DB.profiles[name] = {
       color: '#5ed18a', spotlights: [], defaultPreset: 'House Default',
       liveLink: { idle: false, horizon: 'next3' },
-      presets: [{ name: 'House Default', theme: 'classic', mode: 'pass', scale: '1' }],
+      presets: [{ name: 'House Default', ...SETTING_DEFAULTS }],
       configs: {}, events: [],
     };
     DB.order.push(name);
@@ -1145,7 +1241,6 @@ $('#main').addEventListener('click', (e) => {
     renderSidebar();
     return;
   }
-  if (act === 'rename-preset') { state.renaming = el.dataset.name; renderPresets(); return; }
   if (act === 'edit-preset') {
     if (e.target.id === 'rename-input') return; // inline rename in progress — don't navigate
     state.renaming = null;
@@ -1209,7 +1304,8 @@ function handleFieldEdit(el) {
   const cfg = ensureConfig(state.editing);
   const base = presetByName(cfg.preset);
   const f = el.dataset.field;
-  const val = el.value;
+  const def = DEF_BY_KEY[f];
+  const val = def && def.type === 'check' ? el.checked : el.value;
   if (f === 'spotlight') {
     // Pure per-train field — not part of the Preset, so no override machinery.
     cfg.spotlight = val;
@@ -1227,9 +1323,10 @@ $('#main').addEventListener('input', (e) => {
     // Direct edit of the Preset itself — flows to every referencing Raid Train
     // Config that hasn't overridden the field (they read the Preset live).
     const p = presetByName(state.editingPreset);
-    p[el.dataset.pfield] = el.value;
-    const out = $('#f-p-scale-out');
-    if (out && el.dataset.pfield === 'scale') out.textContent = el.value;
+    const def = DEF_BY_KEY[el.dataset.pfield];
+    p[el.dataset.pfield] = def && def.type === 'check' ? el.checked : el.value;
+    const out = $(`#p-${el.dataset.pfield}-out`);
+    if (out) out.textContent = el.value;
   }
 });
 $('#main').addEventListener('change', (e) => {
@@ -1288,7 +1385,7 @@ $('#modal-scrim').addEventListener('click', (e) => {
   if (el.dataset.mact === 'confirm-del') {
     const name = el.dataset.name;
     P().presets = P().presets.filter((p) => p.name !== name);
-    if (!P().presets.length) P().presets.push({ name: 'House Default', theme: 'classic', mode: 'pass', scale: '1' });
+    if (!P().presets.length) P().presets.push({ name: 'House Default', ...SETTING_DEFAULTS });
     if (P().defaultPreset === name) P().defaultPreset = P().presets[0].name;
     for (const c of Object.values(P().configs)) if (c.preset === name) c.preset = P().defaultPreset;
     closeModal();
