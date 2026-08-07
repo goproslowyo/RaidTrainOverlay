@@ -25,7 +25,7 @@ test('parseConfig ignores unknown and malformed params', () => {
   const config = parseConfig('?event=trainwreck-lucky-13&bogus=1&%%%');
   assert.equal(config.event, 'trainwreck-lucky-13');
   assert.deepEqual(Object.keys(config), [
-    'event', 'lineup', 'user', 'trains', 'lang', 'mode', 'interval', 'speed', 'track', 'trackfadein', 'trackfadeout', 'scale',
+    'event', 'lineup', 'user', 'trains', 'upcoming', 'lang', 'mode', 'interval', 'speed', 'track', 'trackfadein', 'trackfadeout', 'scale',
     'openslots', 'spotlight', 'tz', 'height', 'hidefinished', 'enginedim', 'refresh', 'theme',
   ]);
 });
@@ -361,4 +361,22 @@ test('serializeConfig emits user (suppressing event/lineup — user wins) and tr
 test('serialize∘parse round-trips a Live Link config', () => {
   const q = serializeConfig(parseConfig('?user=goproflowyo&trains=abc&mode=marquee'));
   assert.equal(serializeConfig(parseConfig('?' + q)), q);
+});
+
+test('parseConfig reads the upcoming= horizon grammar: N, Nw, Nm, all — anything else is off', () => {
+  assert.deepEqual(parseConfig('?user=x&upcoming=3').upcoming, { kind: 'count', n: 3 });
+  assert.deepEqual(parseConfig('?user=x&upcoming=2w').upcoming, { kind: 'weeks', n: 2 });
+  assert.deepEqual(parseConfig('?user=x&upcoming=1m').upcoming, { kind: 'months', n: 1 });
+  assert.deepEqual(parseConfig('?user=x&upcoming=all').upcoming, { kind: 'all' });
+  assert.equal(parseConfig('?user=x&upcoming=bogus').upcoming, null);
+  assert.equal(parseConfig('?user=x&upcoming=0').upcoming, null);
+  assert.equal(parseConfig('?user=x').upcoming, null);
+});
+
+test('serialize∘parse round-trips upcoming=', () => {
+  for (const v of ['3', '2w', '1m', 'all']) {
+    const q = serializeConfig(parseConfig(`?user=x&upcoming=${v}`));
+    assert.equal(new URLSearchParams(q).get('upcoming'), v, v);
+  }
+  assert.equal(new URLSearchParams(serializeConfig(parseConfig('?user=x'))).get('upcoming'), null);
 });

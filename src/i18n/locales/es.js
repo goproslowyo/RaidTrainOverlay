@@ -15,6 +15,7 @@ export default {
   'overlay.open': 'LIBRE',
   'overlay.signUp': '¡anótate!',
   'overlay.played': 'EMITIDO',
+  'overlay.upcoming': 'PRÓXIMOS TRENES DE RAID',
   'overlay.conductor': 'MAQUINISTA',
   'overlay.organisedBy': 'ORGANIZADO POR',
   'overlay.staff': 'EQUIPO',

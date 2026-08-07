@@ -5,6 +5,7 @@ export default {
   'overlay.open': 'LAISVA',
   'overlay.signUp': 'registruokis!',
   'overlay.played': 'BAIGTA',
+  'overlay.upcoming': 'ARTĖJANTYS REIDŲ TRAUKINIAI',
   'overlay.conductor': 'MAŠINISTAS',
   'overlay.organisedBy': 'ORGANIZAVO',
   'overlay.staff': 'KOMANDA',

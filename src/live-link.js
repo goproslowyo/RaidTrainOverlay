@@ -79,6 +79,33 @@ export function resolveLiveTrain(events, now, leadMs = LEAD_MS) {
   return { state: 'idle', train: null, upcoming };
 }
 
+/** Idle for this long since page load → the Overlay reloads itself (JS-leak insurance). */
+export const IDLE_RELOAD_MS = 60 * 60_000;
+
+const WEEK_MS = 7 * 24 * 60 * 60_000;
+const MONTH_MS = 30 * 24 * 60 * 60_000; // a card horizon, not a calendar — 30d is plenty
+
+/**
+ * The trains the idle card lists, per the `upcoming=` spec (config.upcoming):
+ * null = card off (empty), `count` = next n, `weeks`/`months` = departing
+ * within the window, `all` = everything upcoming.
+ */
+export function filterUpcoming(upcoming, spec, now) {
+  if (!spec) return [];
+  if (spec.kind === 'all') return [...upcoming];
+  if (spec.kind === 'count') return upcoming.slice(0, spec.n);
+  const horizon = now.getTime() + spec.n * (spec.kind === 'weeks' ? WEEK_MS : MONTH_MS);
+  return upcoming.filter((e) => e.starttime.getTime() <= horizon);
+}
+
+/**
+ * Reload only from the idle state (the caller's context — never mid-render,
+ * never inside the T-60 lead) once the page is over an hour old.
+ */
+export function shouldSelfReload({ loadedAt, now }) {
+  return now - loadedAt > IDLE_RELOAD_MS;
+}
+
 // A mapping entry may only tune settings — never re-point the Overlay at a
 // different Event source or a second mapping.
 const PROTECTED_PARAMS = ['user', 'trains', 'event', 'lineup'];

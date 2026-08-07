@@ -15,6 +15,7 @@ export default {
   'overlay.open': 'LIVRE',
   'overlay.signUp': 'inscreva-se!',
   'overlay.played': 'FEITO',
+  'overlay.upcoming': 'PRÓXIMOS TRENS DE RAID',
   'overlay.conductor': 'MAQUINISTA',
   'overlay.organisedBy': 'ORGANIZADO POR',
   'overlay.staff': 'EQUIPE',
