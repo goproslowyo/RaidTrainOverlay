@@ -46,7 +46,7 @@ export default { key, ensureStyles, build, buildTrack, foot };
 | `key` | ✅ | The Theme's id. Must match its registry slot and the config enum (section 8). |
 | `ensureStyles()` | ✅ | Inject the Theme's CSS once (guard by a style-id so re-renders don't duplicate it). |
 | `build(train, opts)` | ✅ | Build the train art once; return a **handle** `{ node, update, afterAttach }`. |
-| `foot` | ✅ | The Theme's **baseline** — where its floor sits, as a fraction of the train height (section 5). |
+| `foot` | ✅ | The Theme's **baseline** — where its floor sits, as a fraction of the train height, or a function of `{ maxTimeLines }` when the box height is content-driven (section 5). Omitting it falls back to `1` (the pre-baseline behaviour), which is a silent per-Theme drift — every shipped Theme declares one. |
 | `buildTrack(opts)` | optional | Return the stationary rail/ground the train rolls over, or omit it. |
 
 ### `build` returns a handle
@@ -214,6 +214,13 @@ compensation. Rules of thumb:
 - **Ignore effects that bleed on purpose**: smoke, glows, the NOW marker, a departed
   stamp, a live-only burst. They come and go with state, and a baseline that moved
   with the live car would be worse than no baseline at all.
+- **If your box height is content-driven, declare a function, not a constant.** A
+  fixed-`viewBox` SVG Theme always has the same floor, but an HTML Theme whose card
+  grows with its content does not: `synthwave` stacks one time line per `tz` zone
+  *inside* the card, so three zones push its floor 40px further down. Those Themes
+  export `foot` as `({ maxTimeLines }) => …` and the renderer evaluates it per render.
+  Pin any line box the formula counts (`line-height` in `--u`) so the arithmetic is
+  exact rather than a platform font metric.
 - **Usually the Train, occasionally the Track.** Take the floor from the train's own
   art. Take it from `buildTrack` only when the track paints the physical ground the
   train *rests on* and that ground reads as the floor — `jazz` (the wood console the

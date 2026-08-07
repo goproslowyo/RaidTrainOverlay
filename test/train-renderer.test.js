@@ -6,6 +6,7 @@ import highvibes from '../src/themes/highvibes.js';
 import jazz from '../src/themes/jazz.js';
 import bullet from '../src/themes/bullet.js';
 import lava from '../src/themes/lava.js';
+import synthwave from '../src/themes/synthwave.js';
 
 // The Theme strategy interface: config.theme selects a Theme by key;
 // everything else about a Theme stays inside the renderer. These tests pin the
@@ -52,9 +53,32 @@ test('every registered Theme satisfies the renderer contract', () => {
     // band is generous on purpose (a Theme whose art overhangs its box, like
     // departures' slung bogies, is legitimately > 1); it only catches a typo or
     // a value expressed in design units instead of a fraction.
-    assert.equal(typeof theme.foot, 'number', `${key}: declares a numeric foot (baseline)`);
-    assert.ok(theme.foot > 0.5 && theme.foot <= 1.25, `${key}: foot ${theme.foot} is a plausible fraction of --rt-th`);
+    // A content-height Theme declares foot as a function of the render context
+    // (see synthwave); the renderer evaluates it once maxTimeLines is known.
+    const footAt = (maxTimeLines) => (typeof theme.foot === 'function' ? theme.foot({ maxTimeLines }) : theme.foot);
+    assert.ok(['number', 'function'].includes(typeof theme.foot), `${key}: declares a foot (baseline)`);
+    for (const lines of [1, 2, 3]) {
+      const foot = footAt(lines);
+      assert.equal(typeof foot, 'number', `${key}: foot resolves to a number at ${lines} time line(s)`);
+      assert.ok(foot > 0.5 && foot <= 1.5, `${key}: foot ${foot} at ${lines} time line(s) is a plausible fraction of --rt-th`);
+    }
+    // A floor may only move DOWN as the time block grows — never up, and never
+    // by so little that a stacked tz block hangs off the bottom edge again.
+    assert.ok(footAt(3) >= footAt(1), `${key}: foot does not shrink as the time block grows`);
   }
+});
+
+test('a content-height Theme grows its baseline with the tz time block', () => {
+  // synthwave stacks one .sw-time line per zone INSIDE the card, so its box — and
+  // therefore its floor — grows with tz. A constant here left tz=PT,ET,GMT hanging
+  // 40.8px off the bottom edge at height=100 (measured at 1920x1080, scale 1).
+  assert.equal(typeof synthwave.foot, 'function', 'synthwave declares a context-dependent baseline');
+  const one = synthwave.foot({ maxTimeLines: 1 });
+  const three = synthwave.foot({ maxTimeLines: 3 });
+  // Two extra pinned 14u lines in a 210u-tall design box.
+  assert.ok(Math.abs((three - one) - (2 * 14) / 210) < 1e-9, 'two extra zones add exactly two line boxes');
+  // Called bare (no context) it must still answer for the single-line case.
+  assert.equal(synthwave.foot(), one);
 });
 
 test('classic contributes a stationary Track via buildTrack', () => {

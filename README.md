@@ -40,7 +40,7 @@ All optional, set as query params (the Configurator writes these for you):
 | `speed`, `interval` | Traversal speed; minutes between passes. |
 | `track` | `periodic` (default) fades the rails/scenery out between passes so the overlay goes fully empty until the next one rolls in — nothing lingers with no train; `always` keeps them on screen the whole time (a persistent lower-third). Pass mode only. |
 | `trackfadein`, `trackfadeout` | Fade durations in seconds for `track=periodic` (default `15` / `10`; `0` = instant; long values are trimmed to fit short intervals). |
-| `scale`, `height` | Size multiplier (`0.5`–`2`); vertical position (`0`–`100`, `100` rests the train's floor on the bottom edge — the same place on every theme). |
+| `scale`, `height` | Size multiplier (`0.5`–`2`); vertical position (`0`–`100`). `100` rests the train's floor on the bottom edge, so themes no longer need per-theme nudging; `jazz` and `lava` sit their *scenery* — the console deck, the lounge floor — on that edge instead, leaving the train a little above it by design. |
 | `spotlight` | Comma-separated names to highlight. |
 | `openslots` | Show unbooked slots as **OPEN** sign-ups. |
 | `tz` | Up to three zones (e.g. `PT,ET,GMT`) for absolute times. |

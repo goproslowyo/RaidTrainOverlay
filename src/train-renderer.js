@@ -366,15 +366,21 @@ export function renderTrain(train, container, config) {
   // within the Track. Two elements so the transforms compose without clobbering.
   const stage = document.createElement('div');
   stage.className = 'rt-stage';
-  // The Theme's baseline (see --rt-foot in the base CSS): `height` drops the Train
-  // until its FLOOR — not its layout box — reaches the bottom edge, so every Theme
-  // bottoms out identically. A Theme with no declared baseline falls back to 1.
-  stage.style.setProperty('--rt-foot', String(Number.isFinite(theme.foot) ? theme.foot : 1));
   const track = document.createElement('div');
   track.className = 'rt-track';
 
   // tz zone count reserves vertical room for the stacked time block per Car.
   const maxTimeLines = config?.tz?.length || 1;
+  // The Theme's baseline (see --rt-foot in the base CSS): `height` drops the Train
+  // until its FLOOR — not its layout box — reaches the bottom edge, so every Theme
+  // bottoms out identically. A Theme with no declared baseline falls back to 1.
+  //
+  // A Theme whose box is content-driven declares `foot` as a FUNCTION of the render
+  // context instead of a constant, because its floor moves with the content: synthwave
+  // stacks one time line per tz zone inside the card, so three zones push its floor
+  // 40px further down. That is why this is stamped after maxTimeLines is known.
+  const declaredFoot = typeof theme.foot === 'function' ? theme.foot({ maxTimeLines }) : theme.foot;
+  stage.style.setProperty('--rt-foot', String(Number.isFinite(declaredFoot) ? declaredFoot : 1));
   // Every built copy (the first, plus any marquee duplicates) is collected so a
   // time tick updates all of them — and afterAttach runs once each are in the DOM.
   const built = [];
