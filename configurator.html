@@ -3,57 +3,284 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title data-i18n="configurator.title">RaidTrainOverlay — Configurator</title>
+  <title>RaidTrainOverlay — Configurator</title>
   <!--
-    The Configurator: a form that generates an Overlay URL. It builds
-    the URL via the config module's serializer (the single source of truth for
-    the param schema) and saves named Presets in its OWN localStorage. The
-    Overlay never reads those Presets — the URL is the only thing it consumes.
-    Thin wiring only; the testable logic lives in src/configurator.js + src/presets.js.
+    The Configurator: an app shell over the streamer's own RaidPal raid trains.
 
-    Layout: a wide live-preview hero on top, then settings under tabs. New param
-    groups slot in as new tabs (e.g. Style) or new fields in an existing
-    tab (e.g. Auto-refresh `refresh`, marked below) without crowding.
+    A Profile is a bare Twitch login; its My Raid Trains list comes from the
+    RaidPal user endpoint (src/my-raid-trains.js, ~6h cache). Each train gets a
+    Raid Train Config — a Preset reference plus a sparse per-field override diff
+    — and the Live Link folds all of that into ONE URL keyed to the username.
+
+    Everything local lives in this page's own localStorage; the Overlay never
+    reads it (the URL is the only thing it consumes). Thin wiring only: the
+    settings schema, both editors' form, the train list, the Live Link URL and
+    every store are testable modules under src/.
   -->
   <style>
     :root {
-      --bg: #14161a;
-      --panel: #1c1f26;
-      --panel-2: #232732;
+      --bg: #0f1216;
+      --panel: #191e25;
+      --panel-2: #222834;
+      --panel-3: #2a3140;
       --ink: #e7ecf3;
-      --muted: #9aa7b8;
-      --accent: #9ad;
-      --accent-strong: #57b6ff;
+      --muted: #96a2b4;
+      --line: #2b313c;
+      --accent: #57b6ff;
+      --accent-dim: #9ad;
+      --gold: #f4c430;
+      --live: #ff5a67;
       --ok: #5ed18a;
+      --warn: #ffb454;
       --bad: #ff6b6b;
-      --line: #2c313c;
     }
     * { box-sizing: border-box; }
-    /* Render native controls (date/time picker, calendar icon, select chevrons) in dark
-       mode. Scoped to the CONTROLS — NOT :root — on purpose: a dark :root forces the
-       transparent preview iframe to an opaque white backdrop, hiding the checkerboard. */
+    /* Dark native controls, scoped to the CONTROLS — not :root — on purpose: a dark
+       :root forces the transparent preview iframe to an opaque white backdrop. */
     input, select, textarea { color-scheme: dark; }
     html, body { margin: 0; }
     body {
-      background: var(--bg);
+      background: radial-gradient(1200px 500px at 70% -200px, #1a2230 0%, transparent 60%), var(--bg);
       color: var(--ink);
-      font: 15px/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-      padding: 24px;
+      font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      min-height: 100vh;
     }
-    a { color: var(--accent-strong); }
-    h1 { font-size: 22px; margin: 0 0 4px; }
-    h2 { font-size: 14px; text-transform: uppercase; letter-spacing: .06em; color: var(--accent); margin: 0 0 14px; }
-    .sub { color: var(--muted); margin: 0 0 20px; }
-    .wrap { max-width: 1140px; margin: 0 auto; }
-    .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px; margin-bottom: 18px; }
+    a { color: var(--accent); }
+    button { font: inherit; cursor: pointer; }
+    input[type=text], input[type=number], select, textarea {
+      width: 100%; padding: 9px 11px; border-radius: 7px; border: 1px solid var(--line);
+      background: var(--panel-2); color: var(--ink); font: inherit;
+    }
+    input:focus, select:focus, textarea:focus, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 0; }
+    input[type=range] { width: 100%; accent-color: var(--accent); }
+    input:disabled, select:disabled { cursor: not-allowed; }
 
-    /* ── Hero: event + wide preview + URL ─────────────────────────────── */
-    .hero .event-field { margin-bottom: 16px; }
+    /* ── Top bar ──────────────────────────────────────────────────────── */
+    .top {
+      display: flex; align-items: center; gap: 16px;
+      padding: 14px 28px; border-bottom: 1px solid var(--line);
+      background: rgba(15, 18, 22, .85); backdrop-filter: blur(6px);
+      position: sticky; top: 0; z-index: 40;
+    }
+    .brand { display: flex; align-items: baseline; gap: 12px; }
+    .brand h1 { font-size: 17px; margin: 0; letter-spacing: -.3px; white-space: nowrap; }
+    .brand h1 .a { color: var(--gold); }
+    .brand .sep { color: var(--line); }
+    .brand .app { color: var(--muted); font-size: 14px; font-weight: 600; }
+    .brand-train { display: flex; align-items: flex-end; gap: 3px; padding-bottom: 3px; }
+    .brand-train i { display: block; width: 14px; height: 9px; border-radius: 2px; border: 1px solid #0007; }
+    .brand-train i:nth-child(1) { background: #b45309; border-color: var(--gold); width: 16px; height: 11px; }
+    .brand-train i:nth-child(2) { background: #1e3a5f; }
+    .brand-train i:nth-child(3) { background: #5b2a78; }
+
+    /* ── Profile switcher ─────────────────────────────────────────────── */
+    .profile-wrap { position: relative; margin-left: auto; }
+    .profile-btn {
+      display: flex; align-items: center; gap: 9px;
+      background: var(--panel-2); border: 1px solid var(--line); border-radius: 999px;
+      color: var(--ink); padding: 5px 13px 5px 6px; font-weight: 600; transition: border-color .15s;
+    }
+    .profile-btn:hover { border-color: var(--accent); }
+    .avatar {
+      width: 26px; height: 26px; border-radius: 50%; flex: none;
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: 13px; font-weight: 800; color: #0c1016; background: var(--accent);
+    }
+    .profile-btn .chev { color: var(--muted); font-size: 11px; }
+    .profile-menu {
+      position: absolute; right: 0; top: calc(100% + 8px); width: 320px; z-index: 60;
+      background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+      box-shadow: 0 14px 40px #000a; padding: 8px; display: none;
+    }
+    .profile-menu.open { display: block; animation: pop .14s ease; }
+    @keyframes pop { from { opacity: 0; transform: translateY(-4px); } }
+    .menu-label {
+      font-size: 11px; text-transform: uppercase; letter-spacing: .08em;
+      color: var(--muted); padding: 6px 10px 4px; font-weight: 700;
+    }
+    .profile-item {
+      display: flex; align-items: center; gap: 10px; width: 100%;
+      background: none; border: 0; border-radius: 8px; padding: 8px 10px; color: var(--ink); text-align: left;
+    }
+    .profile-item:hover { background: var(--panel-2); }
+    .profile-item .p-name { font-weight: 700; }
+    .profile-item .p-sub { display: block; color: var(--muted); font-size: 12px; font-weight: 400; }
+    .profile-item .p-check { margin-left: auto; color: var(--ok); font-weight: 700; }
+    .profile-add { display: flex; gap: 6px; padding: 8px 6px 4px; border-top: 1px solid var(--line); margin-top: 6px; }
+    .profile-add input { flex: 1; padding: 7px 10px; font-size: 13px; }
+    .profile-add button {
+      padding: 7px 12px; border-radius: 7px; border: 1px solid var(--line);
+      background: var(--panel-2); color: var(--ink); font-weight: 600; white-space: nowrap;
+    }
+    .profile-add button:hover { border-color: var(--accent); }
+    .profile-hint { color: var(--muted); font-size: 11.5px; padding: 4px 10px 6px; }
+    .p-manage { border-top: 1px solid var(--line); margin-top: 6px; }
+    .p-gear { width: 26px; text-align: center; color: var(--muted); font-size: 15px; flex: none; }
+
+    /* ── Shell ────────────────────────────────────────────────────────── */
+    .shell { display: flex; gap: 26px; max-width: 1240px; margin: 0 auto; padding: 26px 28px 60px; }
+    .side { width: 224px; flex: none; position: sticky; top: 84px; align-self: flex-start; }
+    .nav-item {
+      display: flex; align-items: center; gap: 10px; width: 100%;
+      background: none; border: 0; border-left: 2px solid transparent; border-radius: 0 8px 8px 0;
+      padding: 9px 12px; color: var(--muted); font-weight: 600; text-align: left; font-size: 14.5px;
+    }
+    .nav-item:hover { color: var(--ink); background: #1a1f27; }
+    .nav-item.active { color: var(--ink); background: var(--panel-2); border-left-color: var(--accent); }
+    .nav-item .n-count {
+      margin-left: auto; font-size: 12px; color: var(--muted);
+      background: var(--panel-2); border: 1px solid var(--line); border-radius: 999px; padding: 0 8px; line-height: 18px;
+    }
+    .nav-item.active .n-count { background: var(--panel-3); }
+    .nav-item .n-gold { color: var(--gold); }
+    .side hr { border: 0; border-top: 1px solid var(--line); margin: 12px 0; }
+    .nav-item.secondary { font-size: 13.5px; }
+    .side .side-note { color: var(--muted); font-size: 11.5px; padding: 10px 12px 0; line-height: 1.5; }
+
+    main { flex: 1; min-width: 0; }
+    .view-title { font-size: 20px; margin: 2px 0 4px; letter-spacing: -.3px; }
+    .view-sub { color: var(--muted); margin: 0 0 18px; font-size: 14px; }
+    .view-sub b { color: var(--ink); font-weight: 600; }
+
+    .card {
+      background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+      padding: 18px 20px; margin-bottom: 16px;
+    }
+    h2.card-h {
+      font-size: 12.5px; text-transform: uppercase; letter-spacing: .07em;
+      color: var(--accent-dim); margin: 0 0 12px; font-weight: 700;
+    }
+    .hint { color: var(--muted); font-size: 13px; margin-top: 5px; }
+    .empty { color: var(--muted); text-align: center; padding: 30px 0; font-size: 14px; }
+    .meta-warn { color: var(--warn); }
+
+    .btn {
+      padding: 8px 15px; border-radius: 7px; border: 1px solid var(--line);
+      background: var(--panel-2); color: var(--ink); font-weight: 600; white-space: nowrap;
+    }
+    .btn:hover:not(:disabled) { border-color: var(--accent); }
+    .btn:disabled { opacity: .4; cursor: not-allowed; }
+    .btn.primary { background: var(--accent); border-color: var(--accent); color: #08121c; }
+    .btn.gold { background: var(--gold); border-color: var(--gold); color: #1f2937; font-weight: 700; }
+    .btn.sm { padding: 5px 11px; font-size: 13px; }
+    .icon-btn {
+      width: 30px; height: 30px; border-radius: 7px; border: 1px solid var(--line);
+      background: var(--panel-2); color: var(--muted); font-size: 15px; line-height: 1;
+      display: inline-flex; align-items: center; justify-content: center; flex: none;
+    }
+    .icon-btn:hover { color: var(--ink); border-color: var(--accent); }
+    .icon-btn.accent { color: var(--accent); border-color: #2c4356; background: #57b6ff10; }
+    .icon-btn.destructive { color: #d9737c; border-color: #4a262c; }
+    .icon-btn.destructive:hover { color: #ffb4ba; background: #52242a; border-color: #7c3540; }
+    .icon-btn svg { display: block; }
+    .icon-btn.spin { animation: spin .8s linear infinite; color: var(--accent); }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .back-link {
+      display: inline-flex; align-items: center; gap: 7px; background: none; border: 0;
+      color: var(--muted); font-weight: 600; font-size: 13.5px; padding: 0; margin-bottom: 12px;
+    }
+    .back-link:hover { color: var(--accent); }
+
+    /* ── Live Link hero ───────────────────────────────────────────────── */
+    .live-link {
+      border-color: #4a4126;
+      background: linear-gradient(180deg, rgba(244, 196, 48, .055), transparent 55%), var(--panel);
+      position: relative; overflow: hidden;
+    }
+    .live-link::before {
+      content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+      background: linear-gradient(var(--gold), #a87e0c);
+    }
+    .live-link.flash { animation: flashcard 1.1s ease; }
+    @keyframes flashcard { 0%, 40% { box-shadow: 0 0 0 2px var(--gold), 0 0 34px #f4c43055; } 100% { box-shadow: none; } }
+    .ll-head { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+    .ll-head h2 { font-size: 16px; margin: 0; color: var(--gold); }
+    .ll-badge {
+      font-size: 10.5px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase;
+      color: var(--gold); border: 1px solid #4a4126; background: #f4c43014; border-radius: 999px; padding: 2px 9px;
+    }
+    .ll-sub { color: var(--muted); font-size: 13.5px; margin: 0 0 14px; }
+    .ll-sub b { color: var(--ink); font-weight: 600; }
+    .url-row { display: flex; gap: 8px; }
+    .url-row input {
+      flex: 1; min-width: 0; font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+      font-size: 12.5px; background: #0c0f14; border-color: var(--line); color: var(--accent-dim); padding: 10px 12px;
+    }
+    .url-row .btn { padding-left: 18px; padding-right: 18px; }
+    .ll-note { display: flex; gap: 8px; align-items: flex-start; color: var(--muted); font-size: 12.5px; margin-top: 9px; }
+    .ll-note .w { color: var(--warn); flex: none; }
+    .ll-idle {
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+      margin-top: 13px; padding-top: 13px; border-top: 1px dashed var(--line);
+    }
+    .ll-idle label.chk { display: flex; align-items: center; gap: 9px; font-weight: 600; font-size: 14px; cursor: pointer; }
+    .ll-idle input[type=checkbox] { width: 17px; height: 17px; accent-color: var(--gold); }
+    .ll-idle select { width: auto; padding: 6px 10px; font-size: 13.5px; }
+    .ll-idle select:disabled { opacity: .45; }
+    .ll-meta { color: var(--muted); font-size: 12.5px; margin-top: 10px; }
+    .ll-meta a { color: var(--accent-dim); }
+
+    /* ── Event cards ──────────────────────────────────────────────────── */
+    .event-card { display: flex; align-items: flex-start; gap: 16px; padding: 15px 18px; }
+    .event-main { flex: 1; min-width: 0; }
+    .event-title-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .event-title { font-size: 15.5px; font-weight: 700; letter-spacing: -.2px; }
+    .event-meta { color: var(--muted); font-size: 13px; margin-top: 2px; }
+    .event-meta b { color: var(--ink); font-weight: 600; }
+    .event-actions { display: flex; align-items: center; gap: 7px; flex: none; padding-top: 3px; }
+    .chip-live {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 10.5px; font-weight: 800; letter-spacing: .1em;
+      color: var(--live); border: 1px solid #5c2b31; background: #ff5a6714;
+      border-radius: 999px; padding: 2px 9px 2px 7px;
+    }
+    .chip-live .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--live); animation: pulse 1.4s ease infinite; }
+    @keyframes pulse { 0%,100% { box-shadow: 0 0 0 0 #ff5a6766; } 55% { box-shadow: 0 0 0 5px #ff5a6700; } }
+    .chip-org {
+      font-size: 10.5px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase;
+      color: var(--gold); border: 1px solid #4a4126; background: #f4c43010; border-radius: 999px; padding: 2px 9px;
+    }
+    .chip-cfg {
+      font-size: 11px; font-weight: 600; color: var(--accent-dim);
+      border: 1px solid #2c4356; background: #57b6ff10; border-radius: 999px; padding: 1.5px 9px;
+    }
+    .event-card.is-live { border-color: #5c2b31; box-shadow: 0 0 22px #ff5a6712; }
+    .mini-train { display: inline-flex; align-items: flex-end; gap: 3px; margin-top: 9px; height: 14px; }
+    .mini-train .mt-e { width: 15px; height: 12px; border-radius: 2.5px 1.5px 1.5px 2.5px; background: #b45309; border: 1px solid #f4c43088; }
+    .mini-train .mt-c { width: 13px; height: 10px; border-radius: 2px; border: 1px solid #0006; background: var(--car-bg, #1e3a5f); }
+    .mini-train .mt-c[style*="--car:1"] { --car-bg: #5b2a78; }
+    .mini-train .mt-c[style*="--car:2"] { --car-bg: #14361f; }
+    .mini-train .mt-c[style*="--car:3"] { --car-bg: #6b3d12; }
+    .mini-train .mt-c[style*="--car:4"] { --car-bg: #3d1f42; }
+    .mini-train .mt-c[style*="--car:5"] { --car-bg: #173a3a; }
+    .mini-train .mt-c.open { background: transparent; border: 1px dashed #4a5568; }
+    .mini-train .mt-more { color: var(--muted); font-size: 10.5px; padding-left: 3px; align-self: center; }
+
+    .past-divider {
+      display: flex; align-items: center; gap: 14px; width: 100%;
+      background: none; border: 0; color: var(--muted); font-size: 13px; font-weight: 600;
+      padding: 10px 4px; margin: 4px 0;
+    }
+    .past-divider::before, .past-divider::after { content: ""; flex: 1; border-top: 2px dashed var(--line); }
+    .past-divider:hover { color: var(--ink); }
+    .past-divider .pd-chev { font-size: 11px; transition: transform .18s; display: inline-block; }
+    .past-divider.open .pd-chev { transform: rotate(180deg); }
+    .event-card.past {
+      filter: grayscale(1); opacity: .55; padding: 10px 18px; margin-bottom: 10px;
+      transition: opacity .15s, filter .15s;
+    }
+    .event-card.past:hover { opacity: .9; filter: grayscale(.5); }
+    .stamp {
+      font-size: 9.5px; font-weight: 800; letter-spacing: .14em; color: var(--muted);
+      border: 1.5px solid currentColor; border-radius: 4px; padding: 1px 7px;
+      transform: rotate(-5deg); user-select: none;
+    }
+
+    /* ── Preview ──────────────────────────────────────────────────────── */
     .preview-frame {
       width: 100%; aspect-ratio: 16 / 9; border: 1px solid var(--line); border-radius: 8px;
-      overflow: hidden; position: relative;
+      overflow: hidden; position: relative; background-color: #0e0f12;
       /* Checkerboard = "this is transparent" (what OBS composites over your scene). */
-      background-color: #0e0f12;
       background-image:
         linear-gradient(45deg, #20242c 25%, transparent 25%, transparent 75%, #20242c 75%),
         linear-gradient(45deg, #20242c 25%, transparent 25%, transparent 75%, #20242c 75%);
@@ -67,859 +294,1435 @@
     .preview-controls { position: absolute; top: 10px; right: 10px; z-index: 2; display: flex; gap: 6px; }
     .preview-btn {
       padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line);
-      background: rgba(14, 15, 18, 0.82); color: var(--ink); font: inherit; font-size: 13px;
-      font-weight: 600; cursor: pointer; backdrop-filter: blur(3px);
-      transition: background-color .15s, border-color .15s;
+      background: rgba(14, 15, 18, .82); color: var(--ink); font: inherit; font-size: 13px;
+      font-weight: 600; backdrop-filter: blur(3px);
     }
-    .preview-btn:hover { background: rgba(30, 33, 40, 0.92); border-color: var(--accent); }
-    .preview-btn.is-rolling { background: var(--accent); color: #1f2937; border-color: var(--accent); }
+    .preview-btn:hover { border-color: var(--accent); }
+    .preview-btn.is-rolling { background: var(--accent); color: #08121c; border-color: var(--accent); }
     .preview-caption { color: var(--muted); font-size: 13px; margin: 8px 2px 0; min-height: 18px; }
-    .url-box { display: flex; gap: 8px; margin-top: 16px; }
 
-    /* ── Fields ───────────────────────────────────────────────────────── */
+    /* ── Settings form (src/settings-form.js) ─────────────────────────── */
+    details.fgroup { border: 1px solid var(--line); border-radius: 9px; margin-bottom: 10px; background: #171b22; }
+    details.fgroup:last-of-type { margin-bottom: 0; }
+    details.fgroup summary {
+      display: flex; align-items: center; gap: 10px; list-style: none; cursor: pointer;
+      padding: 10px 14px; user-select: none;
+    }
+    details.fgroup summary::-webkit-details-marker { display: none; }
+    .g-label { font-size: 12px; text-transform: uppercase; letter-spacing: .07em; color: var(--accent-dim); font-weight: 700; }
+    details.fgroup summary:hover .g-label { color: var(--ink); }
+    .g-ovr {
+      font-size: 10.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase;
+      color: var(--warn); border: 1px solid #5a4426; background: #ffb45412; border-radius: 999px; padding: 1px 8px;
+    }
+    .g-ovr:empty { display: none; }
+    .g-chev { margin-left: auto; color: var(--muted); font-size: 11px; transition: transform .15s; }
+    details.fgroup[open] .g-chev { transform: rotate(180deg); }
+    .fgroup-body { padding: 6px 14px 14px; border-top: 1px solid var(--line); }
     .field { margin-bottom: 16px; }
     .field:last-child { margin-bottom: 0; }
     .field.dimmed { opacity: .45; }
-    label.lbl { display: block; font-weight: 600; margin-bottom: 4px; }
-    .hint { color: var(--muted); font-size: 13px; margin-top: 4px; }
-    input[type=text], input[type=number], select {
-      width: 100%; padding: 9px 11px; border-radius: 7px; border: 1px solid var(--line);
-      background: var(--panel-2); color: var(--ink); font: inherit;
+    .field-head { display: flex; align-items: center; gap: 10px; margin-bottom: 5px; min-height: 24px; }
+    .field-head label { font-weight: 600; }
+    .ovr-slot { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; }
+    .ovr-badge {
+      font-size: 10.5px; font-weight: 800; letter-spacing: .09em; text-transform: uppercase;
+      color: var(--warn); border: 1px solid #5a4426; background: #ffb45412;
+      border-radius: 999px; padding: 2px 9px; animation: pop .15s ease;
     }
-    input:focus, select:focus, button:focus-visible { outline: 2px solid var(--accent-strong); outline-offset: 0; }
-    .row { display: flex; align-items: center; gap: 10px; }
-    .check { display: flex; align-items: center; gap: 10px; }
-    .check input { width: 18px; height: 18px; }
-    input[type=range] { width: 100%; }
-    .range-out { min-width: 3ch; text-align: right; color: var(--accent); font-variant-numeric: tabular-nums; }
+    .ovr-revert {
+      width: 24px; height: 24px; border-radius: 6px; border: 1px solid #5a4426;
+      background: transparent; color: var(--warn); font-size: 13px; line-height: 1;
+      display: inline-flex; align-items: center; justify-content: center;
+    }
+    .ovr-revert:hover { background: #ffb45418; }
+    .range-row { display: flex; align-items: center; gap: 12px; }
+    .range-out { min-width: 3ch; text-align: right; color: var(--accent); font-variant-numeric: tabular-nums; font-weight: 700; }
+    .check-row { display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 14px; }
+    .check-row input { width: 17px; height: 17px; accent-color: var(--accent); flex: none; }
 
+    .preset-ref { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .preset-ref select { width: 260px; }
+    .preset-ref .lbl { font-weight: 700; font-size: 14px; }
+    .editor-head-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 0 0 2px; }
+    .editor-head-row h2 { font-size: 19px; margin: 0; letter-spacing: -.3px; }
+    .cfg-toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+    .cfg-toolbar .reset-all {
+      margin-left: auto; background: none; border: 0; color: var(--warn); font-size: 13px; font-weight: 600; padding: 0;
+    }
+    .cfg-toolbar .reset-all:hover { text-decoration: underline; }
+    .spot-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 7px; align-items: center; }
+    .spot-chip {
+      font-size: 12px; color: var(--muted); border: 1px solid var(--line);
+      background: #0c0f14; border-radius: 999px; padding: 2.5px 11px;
+    }
+    .spot-chip b { color: var(--accent-dim); font-weight: 600; }
+
+    /* ── Preset library ───────────────────────────────────────────────── */
+    .preset-row { display: flex; align-items: center; gap: 14px; padding: 13px 18px; }
+    .preset-info { flex: 1; min-width: 0; cursor: pointer; }
+    .preset-info:hover .preset-name { color: var(--accent); }
+    .preset-name-row { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+    .preset-name { font-size: 15px; font-weight: 700; }
+    .preset-name-row input { width: 230px; padding: 5px 9px; font-size: 14px; font-weight: 700; }
+    .chip-default {
+      font-size: 10.5px; font-weight: 800; letter-spacing: .09em; text-transform: uppercase;
+      color: var(--gold); border: 1px solid #4a4126; background: #f4c43010; border-radius: 999px; padding: 1.5px 9px;
+    }
+    .preset-sum { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+    .sum-chip {
+      font-size: 11.5px; color: var(--muted); border: 1px solid var(--line);
+      background: #0c0f14; border-radius: 999px; padding: 1.5px 10px;
+    }
+    .preset-used { color: var(--muted); font-size: 12px; margin-top: 6px; }
+    .preset-used b { color: var(--accent-dim); font-weight: 600; }
+    .preset-actions { display: flex; gap: 7px; flex: none; }
+    .star-btn { color: var(--muted); font-size: 16px; }
+    .star-btn.on { color: var(--gold); border-color: #4a4126; }
+    .preset-title-input {
+      width: auto; min-width: 200px; max-width: 420px;
+      font-size: 19px; font-weight: 700; letter-spacing: -.3px;
+      background: transparent; border: 1px solid transparent; border-radius: 7px;
+      padding: 4px 9px; margin-left: -9px; color: var(--ink);
+    }
+    .preset-title-input:hover { border-color: var(--line); background: var(--panel); }
+    .preset-title-input:focus { border-color: var(--accent); background: var(--panel-2); }
+
+    /* ── Profile settings ─────────────────────────────────────────────── */
+    .spot-edit-list { display: flex; gap: 7px; flex-wrap: wrap; margin-bottom: 12px; }
+    .spot-edit-chip {
+      display: inline-flex; align-items: center; gap: 7px;
+      font-size: 13px; color: var(--muted); border: 1px solid var(--line);
+      background: #0c0f14; border-radius: 999px; padding: 4px 6px 4px 13px;
+    }
+    .spot-edit-chip b { color: var(--accent-dim); font-weight: 600; }
+    .chip-x {
+      width: 20px; height: 20px; border-radius: 50%; border: 0; background: var(--panel-2);
+      color: var(--muted); font-size: 10px; line-height: 1;
+      display: inline-flex; align-items: center; justify-content: center;
+    }
+    .chip-x:hover { background: #52242a; color: #ffb4ba; }
+    .spot-add { display: flex; gap: 8px; max-width: 420px; }
+    .backup-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+    #backup-blob { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; min-height: 72px; resize: vertical; }
+
+    /* ── One-off link view ────────────────────────────────────────────── */
+    .source-toggle { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; margin-bottom: 14px; }
+    .src-btn { border: 0; border-radius: 0; background: var(--panel-2); color: var(--muted); font-weight: 600; padding: 8px 16px; }
+    .src-btn + .src-btn { border-left: 1px solid var(--line); }
+    .src-btn.active { background: var(--accent); color: #08121c; }
     .status-dot { font-size: 13px; margin-top: 4px; min-height: 18px; }
     .status-dot.ok { color: var(--ok); }
     .status-dot.bad { color: var(--bad); }
     .status-dot.checking { color: var(--muted); }
-
-    #url { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 13px; }
-    button {
-      padding: 9px 16px; border-radius: 7px; border: 1px solid var(--line);
-      background: var(--panel-2); color: var(--ink); font: inherit; cursor: pointer; white-space: nowrap;
-    }
-    button:hover:not(:disabled) { border-color: var(--accent-strong); }
-    button:disabled { opacity: .4; cursor: not-allowed; }
-    button.primary { background: var(--accent-strong); color: #08121c; border-color: var(--accent-strong); font-weight: 600; }
-
-    /* ── Lineup-source toggle (RaidPal event ⇄ Build by hand) ─────────── */
-    .source-toggle { display: inline-flex; gap: 0; margin-bottom: 14px; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
-    .src-btn { border: 0; border-radius: 0; background: var(--panel-2); color: var(--muted); font-weight: 600; padding: 8px 16px; }
-    .src-btn + .src-btn { border-left: 1px solid var(--line); }
-    .src-btn.active { background: var(--accent-strong); color: #08121c; }
-    #manual-source[hidden], #raidpal-source[hidden] { display: none; }
-
-    /* ── Tabs ─────────────────────────────────────────────────────────── */
-    .tabs { display: flex; gap: 4px; flex-wrap: wrap; border-bottom: 1px solid var(--line); margin-bottom: 18px; }
-    .tab {
-      background: transparent; border: 0; border-bottom: 2px solid transparent; border-radius: 0;
-      padding: 8px 14px; color: var(--muted); font-weight: 600;
-    }
-    .tab:hover { color: var(--ink); }
-    .tab.active { color: var(--accent-strong); border-bottom-color: var(--accent-strong); }
-    .panel { display: none; max-width: 600px; }
-    .panel.active { display: block; }
-
-    /* ── Presets ──────────────────────────────────────────────────────── */
-    .preset-bar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-    .preset-bar select, .preset-bar input { flex: 1 1 160px; }
-    .preset-msg { color: var(--muted); font-size: 13px; margin-top: 10px; min-height: 18px; }
-
     ol.obs { padding-left: 20px; margin: 0; }
     ol.obs li { margin-bottom: 8px; }
     code { background: var(--panel-2); padding: 1px 5px; border-radius: 4px; font-size: 13px; }
-    footer { color: var(--muted); font-size: 13px; margin-top: 8px; }
+
+    /* ── Toast + modal ────────────────────────────────────────────────── */
+    #toast {
+      position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%) translateY(20px);
+      background: var(--panel-3); border: 1px solid var(--line); color: var(--ink);
+      border-radius: 999px; padding: 9px 20px; font-size: 14px; font-weight: 600;
+      box-shadow: 0 10px 30px #000a; opacity: 0; pointer-events: none;
+      transition: opacity .2s, transform .2s; z-index: 90;
+    }
+    #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    #toast .ok { color: var(--ok); margin-right: 6px; }
+    #modal-scrim {
+      position: fixed; inset: 0; background: #0009; backdrop-filter: blur(2px);
+      display: none; align-items: center; justify-content: center; z-index: 80;
+    }
+    #modal-scrim.open { display: flex; }
+    .modal {
+      background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+      width: 460px; max-width: calc(100vw - 40px); padding: 20px 22px; box-shadow: 0 20px 60px #000c;
+    }
+    .modal h3 { margin: 0 0 8px; font-size: 16px; }
+    .modal p { margin: 0 0 6px; color: var(--muted); font-size: 14px; }
+    .modal p b { color: var(--warn); }
+    .modal .m-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+    .btn.danger-solid { background: #52242a; border-color: #7c3540; color: #ffb4ba; }
+    .btn.danger-solid:hover { background: #6b2d35; }
+
+    @media (max-width: 860px) {
+      .shell { flex-direction: column; gap: 12px; padding: 18px 16px 48px; }
+      .side { width: auto; position: static; display: flex; flex-wrap: wrap; gap: 4px; }
+      .side hr, .side .side-note { display: none; }
+      .nav-item { width: auto; border-left: 0; border-radius: 8px; }
+    }
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <h1 data-i18n="configurator.title">RaidTrainOverlay — Configurator</h1>
-    <p class="sub" data-i18n="configurator.sub">Enter your event, preview it, then copy the link into an OBS browser source.</p>
 
-    <!-- ───────────────────────── HERO: event + preview + URL ───────────────────────── -->
-    <section class="card hero">
-      <div class="source-toggle" role="group" aria-label="Lineup source">
-        <button type="button" id="src-raidpal" class="src-btn active" aria-pressed="true" data-i18n="configurator.sourceRaidpal">RaidPal event</button>
-        <button type="button" id="src-manual" class="src-btn" aria-pressed="false" data-i18n="configurator.sourceManual">Build by hand</button>
-      </div>
-
-      <div class="field event-field" id="raidpal-source">
-        <label class="lbl" for="f-event" data-i18n="configurator.eventLabel">RaidPal event</label>
-        <input type="text" id="f-event" placeholder="Paste your RaidPal event link" data-i18n-attr="placeholder:configurator.eventPlaceholder" autocomplete="off">
-        <div class="hint" data-i18n="configurator.eventHint">Paste your event's RaidPal link — the whole web address works. No RaidPal event? Switch to “Build by hand” above and type your DJs in yourself.</div>
-        <div class="status-dot" id="slug-status"></div>
-      </div>
-      <!-- The "Build by hand" editor (src/manual-editor.js) mounts here when manual mode is on. -->
-      <div class="field" id="manual-source" hidden></div>
-
-      <div class="preview-frame">
-        <iframe id="preview" title="Overlay preview" data-i18n-attr="title:configurator.previewTitle"></iframe>
-        <div class="preview-placeholder" id="preview-placeholder" data-i18n="configurator.previewPlaceholder">Your live preview appears here once you enter an event.</div>
-        <div class="preview-controls" id="preview-controls" hidden>
-          <button type="button" id="preview-roll" class="preview-btn"
-            title="Roll the train across — freeze it in place to study (wheels keep turning), resume anytime"
-            data-i18n-attr="title:configurator.rollTitle">▶&nbsp;<span data-i18n="configurator.rollIt">Roll it</span></button>
-          <button type="button" id="preview-still" class="preview-btn" hidden
-            title="Back to the centered still preview"
-            data-i18n-attr="title:configurator.stillTitle">◼&nbsp;<span data-i18n="configurator.recenter">Recenter</span></button>
-        </div>
-      </div>
-      <div class="preview-caption" id="preview-caption"></div>
-
-      <div class="url-box">
-        <input type="text" id="url" readonly placeholder="Enter an event above to generate your URL" data-i18n-attr="placeholder:configurator.urlPlaceholder">
-        <button id="copy" class="primary" disabled data-i18n="configurator.copy">Copy</button>
-      </div>
-    </section>
-
-    <!-- ───────────────────────── PRESETS ───────────────────────── -->
-    <section class="card">
-      <h2 data-i18n="configurator.presets">Presets</h2>
-      <div class="preset-bar">
-        <input type="text" id="preset-name" placeholder="Preset name" data-i18n-attr="placeholder:configurator.presetNamePlaceholder" autocomplete="off">
-        <button id="preset-save" data-i18n="configurator.save">Save</button>
-        <select id="preset-select"></select>
-        <button id="preset-load" data-i18n="configurator.load">Load</button>
-        <button id="preset-delete" data-i18n="configurator.delete">Delete</button>
-      </div>
-      <div class="preset-msg" id="preset-msg"></div>
-    </section>
-
-    <!-- ───────────────────────── SETTINGS (tabbed) ───────────────────────── -->
-    <section class="card">
-      <h2 data-i18n="configurator.settings">Settings</h2>
-      <div class="tabs" role="tablist">
-        <button class="tab active" data-panel="look" role="tab" data-i18n="configurator.tabLook">Look</button>
-        <button class="tab" data-panel="motion" role="tab" data-i18n="configurator.tabMotion">Motion</button>
-        <button class="tab" data-panel="lineup" role="tab" data-i18n="configurator.tabLineup">Lineup</button>
-      </div>
-
-      <div class="panel active" id="panel-look" role="tabpanel">
-        <div class="field">
-          <label class="lbl" for="f-lang" data-i18n="configurator.languageLabel">Overlay language</label>
-          <select id="f-lang">
-            <option value="" data-i18n="configurator.languageAuto">Auto (browser)</option>
-            <option value="en">English</option>
-            <option value="es-ES">Español (España)</option>
-            <option value="es-MX">Español (México)</option>
-            <option value="pt-BR">Português (Brasil)</option>
-            <option value="fr">Français</option>
-            <option value="it">Italiano</option>
-            <option value="de">Deutsch</option>
-            <option value="nl">Nederlands</option>
-            <option value="da">Dansk</option>
-            <option value="lt">Lietuvių</option>
-          </select>
-          <div class="hint" data-i18n="configurator.languageHint">Auto follows the browser and omits lang. Pick a language to bake it into the URL, including English.</div>
-        </div>
-        <div class="field">
-          <label class="lbl" for="f-theme" data-i18n="configurator.themeLabel">Theme</label>
-          <select id="f-theme">
-            <!-- The shipped Theme roster. The default (classic) is
-                 omitted from the URL; the rest serialize as theme=key. -->
-            <option value="classic" data-i18n="configurator.theme.classic">Classic Americana</option>
-            <option value="flat" data-i18n="configurator.theme.flat">Flat cartoon</option>
-            <option value="synthwave" data-i18n="configurator.theme.synthwave">Synthwave</option>
-            <option value="ticket" data-i18n="configurator.theme.ticket">Vintage ticket</option>
-            <option value="wood" data-i18n="configurator.theme.wood">Wooden toy train</option>
-            <option value="comic" data-i18n="configurator.theme.comic">Comic / halftone</option>
-            <option value="departures" data-i18n="configurator.theme.departures">Departures board</option>
-            <option value="paper" data-i18n="configurator.theme.paper">Paper cutout</option>
-            <option value="tron" data-i18n="configurator.theme.tron">Tron lightcycle</option>
-            <option value="pixel" data-i18n="configurator.theme.pixel">16-bit pixel</option>
-            <option value="highvibes" data-i18n="configurator.theme.highvibes">High Vibes</option>
-            <option value="jazz" data-i18n="configurator.theme.jazz">Jazz vinyl</option>
-            <option value="bullet" data-i18n="configurator.theme.bullet">Anime bullet train</option>
-            <option value="lava" data-i18n="configurator.theme.lava">Lava lamp</option>
-            <option value="pride" data-i18n="configurator.theme.pride">Pride</option>
-            <option value="shuffle" data-i18n="configurator.theme.shuffle">🔀 Shuffle — cycle every theme</option>
-          </select>
-          <div class="hint" data-i18n-html="configurator.themeHint">The art style that paints your train. <strong>Shuffle</strong> rotates the whole roster — a fresh theme each pass (or every few minutes in marquee).</div>
-        </div>
-        <div class="field">
-          <label class="lbl" for="f-scale" data-i18n="configurator.scaleLabel">Train size</label>
-          <div class="row">
-            <input type="range" id="f-scale" min="0.5" max="2" step="0.1" value="1">
-            <span class="range-out" id="f-scale-out">1</span>
-          </div>
-          <div class="hint" data-i18n="configurator.scaleHint">How big the train is in your broadcast. 1 is the default; lower is smaller, higher is bigger. Watch the preview.</div>
-        </div>
-        <div class="field">
-          <label class="lbl" for="f-height" data-i18n="configurator.heightLabel">Vertical position</label>
-          <div class="row">
-            <input type="range" id="f-height" min="0" max="100" step="1" value="100">
-            <span class="range-out" id="f-height-out">100</span>
-          </div>
-          <div class="hint" data-i18n="configurator.heightHint">0 = top, 100 = bottom, 50 = centered. The default sits it on the bottom edge, and the train always stays fully on screen — even when you resize it.</div>
-        </div>
-      </div>
-
-      <div class="panel" id="panel-motion" role="tabpanel">
-        <div class="field">
-          <label class="lbl" for="f-mode" data-i18n="configurator.modeLabel">Display style</label>
-          <select id="f-mode">
-            <option value="pass" data-i18n="configurator.modePass">Pass — rolls across every few minutes, then leaves</option>
-            <option value="marquee" data-i18n="configurator.modeMarquee">Marquee — scrolls continuously, always on screen</option>
-          </select>
-        </div>
-        <div class="field" id="interval-row">
-          <label class="lbl" for="f-interval" data-i18n="configurator.intervalLabel">Minutes between passes</label>
-          <input type="number" id="f-interval" min="1" step="1" value="15">
-          <div class="hint" id="interval-note">How often the train rolls across.</div>
-        </div>
-        <div class="field" id="track-row">
-          <label class="lbl" for="f-track" data-i18n="configurator.trackLabel">Track between passes</label>
-          <select id="f-track">
-            <option value="periodic" selected data-i18n="configurator.trackPeriodic">Fade it out between passes</option>
-            <option value="always" data-i18n="configurator.trackAlways">Always show the track</option>
-          </select>
-          <div class="hint" id="track-note">With the train gone between passes, fade the rails out too so the overlay is completely empty until the next pass rolls in.</div>
-        </div>
-        <div class="field" id="trackfade-row">
-          <label class="lbl" data-i18n="configurator.trackFadeLabel">Track fade timing (seconds)</label>
-          <div class="row">
-            <label class="hint" for="f-trackfadein" style="margin:0" data-i18n="configurator.trackFadeInLabel">In</label>
-            <input type="number" id="f-trackfadein" min="0" max="120" step="1" value="15" style="width:90px">
-            <label class="hint" for="f-trackfadeout" style="margin:0" data-i18n="configurator.trackFadeOutLabel">Out</label>
-            <input type="number" id="f-trackfadeout" min="0" max="120" step="1" value="10" style="width:90px">
-          </div>
-          <div class="hint" data-i18n="configurator.trackFadeHint">How long the rails take to fade in before each pass, and out after it leaves. Long values are trimmed to fit short intervals.</div>
-        </div>
-        <div class="field">
-          <label class="lbl" for="f-speed" data-i18n="configurator.speedLabel">Animation speed</label>
-          <input type="number" id="f-speed" min="0.1" step="0.1" value="1">
-          <div class="hint" data-i18n="configurator.speedHint">Higher is faster. 1 is the default pace.</div>
-        </div>
-        <div class="field">
-          <label class="lbl" for="f-refresh" data-i18n="configurator.refreshLabel">Auto-refresh (minutes)</label>
-          <input type="number" id="f-refresh" min="15" step="5" placeholder="off" data-i18n-attr="placeholder:configurator.refreshPlaceholder">
-          <div class="hint" data-i18n="configurator.refreshHint">How often to re-check RaidPal for lineup changes. Blank or 0 = check once on load. Minimum 15 to stay easy on RaidPal.</div>
-        </div>
-      </div>
-
-      <div class="panel" id="panel-lineup" role="tabpanel">
-        <div class="field">
-          <div class="check"><input type="checkbox" id="f-openslots"><label class="lbl" for="f-openslots" style="margin:0" data-i18n="configurator.openslotsLabel">Show open slots</label></div>
-          <div class="hint" data-i18n-html="configurator.openslotsHint">Display unfilled slots as <strong>OPEN</strong> cars so viewers can sign up.</div>
-        </div>
-        <div class="field">
-          <div class="check"><input type="checkbox" id="f-hidefinished"><label class="lbl" for="f-hidefinished" style="margin:0" data-i18n="configurator.hidefinishedLabel">Hide finished cars</label></div>
-          <div class="hint" data-i18n="configurator.hidefinishedHint">Remove cars that have already played, instead of dimming them.</div>
-        </div>
-        <div class="field">
-          <label class="lbl" for="f-spotlight" data-i18n="configurator.spotlightLabel">Spotlight broadcasters</label>
-          <input type="text" id="f-spotlight" placeholder="DJ Alpha, DJ Charlie" data-i18n-attr="placeholder:configurator.spotlightPlaceholder" autocomplete="off">
-          <div class="hint" data-i18n="configurator.spotlightHint">Comma-separated names to highlight with a glow. Capitalization doesn't matter.</div>
-        </div>
-        <div class="field">
-          <label class="lbl" for="f-enginedim" data-i18n="configurator.enginedimLabel">When the event ends</label>
-          <select id="f-enginedim">
-            <option value="over" data-i18n="configurator.enginedimOver">Dim the engine</option>
-            <option value="finished" data-i18n="configurator.enginedimFinished">Hide it (when hiding finished cars)</option>
-            <option value="never" data-i18n="configurator.enginedimNever">Keep the engine bright</option>
-          </select>
-          <div class="hint" data-i18n="configurator.enginedimHint">How the lead engine reacts once the whole event is over.</div>
-        </div>
-        <div class="field">
-          <label class="lbl" for="f-tz" data-i18n="configurator.tzLabel">Show clock times in these zones</label>
-          <input type="text" id="f-tz" placeholder="PT, ET, GMT" data-i18n-attr="placeholder:configurator.tzPlaceholder" autocomplete="off">
-          <div class="hint" data-i18n-html="configurator.tzHint">Up to 3 zones to show absolute times instead of "in 2h". Leave blank for relative times.<br>
-            Known: <code>PT MT CT ET GMT UTC CET BST JST AEST</code> (or any IANA name).</div>
-          <div class="status-dot" id="tz-hint"></div>
-        </div>
-      </div>
-    </section>
-
-    <!-- ───────────────────────── OBS INSTRUCTIONS ───────────────────────── -->
-    <div class="card">
-      <h2 data-i18n="configurator.obsTitle">Add this to OBS</h2>
-      <ol class="obs">
-        <li data-i18n-html="configurator.obs1"><strong>Copy your overlay URL</strong> with the Copy button above.</li>
-        <li data-i18n-html="configurator.obs2">In OBS, under <strong>Sources</strong> click <strong>+</strong> and choose <strong>Browser</strong>. Name it (e.g. "Raid Train").</li>
-        <li data-i18n-html="configurator.obs3"><strong>Paste your URL</strong> into the URL field.</li>
-        <li data-i18n-html="configurator.obs4">Set <strong>Width 1920</strong> and <strong>Height 1080</strong> (a standard 1080p canvas).</li>
-        <li data-i18n-html="configurator.obs5">Leave the background transparent — the overlay is already see-through, so don't add a color.</li>
-        <li data-i18n-html="configurator.obs6">Click <strong>OK</strong>. Your train appears.</li>
-        <li data-i18n-html="configurator.obs7"><strong>Leave the source at full size, positioned at 0, 0</strong> — don't drag or scale it in OBS. Set the train's <strong>Train size</strong> and <strong>Vertical position</strong> (both under <strong>Look</strong>) with the sliders here instead. They bake into the overlay and travel with the URL across scenes and machines, and the train always stays fully on screen.</li>
-      </ol>
-      <p class="hint" data-i18n="configurator.obsChanged">Changed something? Copy the new URL and paste it back into the same Browser source's URL field.</p>
-    </div>
-
-    <footer data-i18n-html="configurator.footer">The overlay link is the single source of truth — anyone with it gets the same overlay. <a href="overlay.html" target="_blank" rel="noopener">Open a blank overlay</a>.</footer>
+<header class="top">
+  <div class="brand">
+    <span class="brand-train" aria-hidden="true"><i></i><i></i><i></i></span>
+    <h1>RaidTrain<span class="a">Overlay</span></h1>
+    <span class="sep">/</span>
+    <span class="app">Configurator</span>
   </div>
+  <div class="profile-wrap">
+    <button type="button" class="profile-btn" id="profile-btn" aria-haspopup="true" aria-expanded="false">
+      <span class="avatar" id="pb-avatar">+</span>
+      <span id="pb-name">Add a profile</span>
+      <span class="chev" aria-hidden="true">▾</span>
+    </button>
+    <div class="profile-menu" id="profile-menu">
+      <div class="menu-label">Profiles</div>
+      <div id="profile-list"></div>
+      <div class="profile-add">
+        <input type="text" id="profile-add-input" placeholder="Twitch username" autocomplete="off">
+        <button type="button" id="profile-add-btn">Add</button>
+      </div>
+      <div class="profile-hint">A Profile is just a Twitch login name. Each Profile keeps its own raid trains, Raid Train Configs and Live Link.</div>
+    </div>
+  </div>
+</header>
 
-  <script type="module">
-    import { extractSlug, buildOverlayQuery } from './src/configurator.js';
-    import { mountManualEditor } from './src/manual-editor.js';
-    import { decodeLineup } from './src/lineup-codec.js';
-    import { instantToZonedWallClock, snapDuration, clampCount } from './src/manual-lineup.js';
-    import { parsePresets, serializePresets, upsertPreset, deletePreset, listPresetNames } from './src/presets.js';
-    import { parseStreamers, serializeStreamers, addStreamers, removeStreamer, listStreamers } from './src/streamers.js';
-    import { loadEvent } from './src/raidpal-client.js';
-    import { resolveZone, parseConfig } from './src/config.js';
-    import { resolveLocale, loadMessages, makeT, canonicalLocale, selectorLocale } from './src/i18n/index.js';
-    import { localizeDom } from './src/i18n/dom.js';
+<div class="shell">
+  <nav class="side">
+    <button type="button" class="nav-item" data-nav="trains">My Raid Trains <span class="n-count" id="nc-trains"></span></button>
+    <button type="button" class="nav-item" data-nav="livelink"><span class="n-gold">Live Link</span></button>
+    <button type="button" class="nav-item" data-nav="presets">Preset Library <span class="n-count" id="nc-presets"></span></button>
+    <button type="button" class="nav-item" data-nav="profile">Profile settings</button>
+    <hr>
+    <button type="button" class="nav-item secondary" data-nav="oneoff">One-off link</button>
+    <div class="side-note">Not your RaidPal account? Paste any event link, or build a lineup by hand — same as before.</div>
+  </nav>
+  <main id="main"></main>
+</div>
 
-    // The Configurator localizes its own UI to the chosen overlay language (the
-    // f-lang selector), so a streamer sees the page in the language their overlay
-    // will speak. `t` is rebound whenever that locale changes (applyUiLocale).
-    let t = (key) => key;
+<div id="toast"></div>
+<div id="modal-scrim"><div class="modal" id="modal"></div></div>
 
-    // Sibling Overlay URL, derived from where THIS page lives — works under
-    // `python3 -m http.server` locally and on a GitHub Pages subpath alike.
-    const OVERLAY_BASE = new URL('overlay.html', window.location.href).href;
-    // The built-in demo lineup (event=demo): a fresh Configurator (no shared link)
-    // previews it immediately — rendered with no RaidPal fetch, so it never 404s.
-    // Swap in your own event. Same demo the landing page links to.
-    const DEMO_EVENT = 'demo';
-    const PRESET_KEY = 'raidtrainoverlay.configurator.presets';
+<script type="module">
+  import { extractSlug, buildOverlayQuery } from './src/configurator.js';
+  import { mountManualEditor } from './src/manual-editor.js';
+  import { decodeLineup } from './src/lineup-codec.js';
+  import { instantToZonedWallClock, snapDuration } from './src/manual-lineup.js';
+  import { parseStreamers, serializeStreamers, addStreamers, removeStreamer, listStreamers } from './src/streamers.js';
+  import { loadEvent } from './src/raidpal-client.js';
+  import { parseConfig } from './src/config.js';
+  import { createPreviewFrame } from './src/preview-frame.js';
+  import { resolveLocale, loadMessages, makeT } from './src/i18n/index.js';
+  import {
+    parsePresetLibrary, serializePresetLibrary, createPreset, duplicatePreset, renamePreset,
+    updatePresetSettings, deletePreset, getPreset, listPresets,
+  } from './src/preset-library.js';
+  import {
+    parseProfiles, serializeProfiles, addProfile, removeProfile, setActiveProfile, listProfiles,
+    activeProfile, setDefaultPreset, addSpotlight, removeSpotlight, upsertTrainConfig, getTrainConfig,
+    resolveTrainSettings, countPresetReferences, materializePreset, liveLinkPrefs, setLiveLinkPrefs,
+  } from './src/profiles.js';
+  import { loadMyRaidTrains, loadEventDetails, refreshEventDetail } from './src/my-raid-trains.js';
+  import { buildLiveLinkQuery, baseSettings } from './src/live-link-url.js';
+  import {
+    SETTINGS_DEFAULTS, SETTING_FIELDS, THEME_OPTIONS, applySettings, diffSettings, normalizeSettings,
+  } from './src/settings-schema.js';
+  import { mountSettingsForm } from './src/settings-form.js';
+  import { classifyTrains, trainCardHtml, whenLabel } from './src/train-list.js';
+  import { encodeBackup, decodeBackup } from './src/backup.js';
 
-    // ── Lineup source: 'raidpal' (the #f-event field) or 'manual' (the editor) ──
-    let source = 'raidpal';
-    const detectedZone = (() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'; } catch { return 'UTC'; } })();
-    function freshStartISO() {
-      const d = new Date(); d.setMinutes(0, 0, 0);
-      const p = (n) => String(n).padStart(2, '0');
-      return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+  // Sibling Overlay URL, derived from where THIS page lives — works under
+  // `python3 -m http.server` locally and on a GitHub Pages subpath alike.
+  const OVERLAY_BASE = new URL('overlay.html', window.location.href).href;
+  // The built-in demo lineup: previewed with no RaidPal fetch, so it never 404s.
+  const DEMO_EVENT = 'demo';
+
+  const LIBRARY_KEY = 'raidtrainoverlay.configurator.presets.v2';
+  const PROFILES_KEY = 'raidtrainoverlay.configurator.profiles.v1';
+  const STREAMERS_KEY = 'raidtrainoverlay.configurator.streamers';
+
+  // The idle card's horizons, in the `upcoming=` grammar the Overlay parses.
+  const HORIZONS = { '3': 'Next 3 trains', '5': 'Next 5 trains', '2w': 'Next 2 weeks', '1m': 'Next month', 'all': 'All upcoming' };
+
+  const ICONS = {
+    pencil: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11.3 2.7l2 2L5.4 12.6l-2.9.9.9-2.9z"/><path d="m9.9 4.1 2 2"/></svg>',
+    copy: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5.5" y="5.5" width="8" height="8" rx="1.2"/><path d="M10.5 3.5v-.4a1 1 0 0 0-1-1H3.6a1 1 0 0 0-1 1v5.8a1 1 0 0 0 1 1h.4"/></svg>',
+    trash: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 4.5h11"/><path d="M5.5 4.5V3.2a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v1.3"/><path d="m4.3 4.5.6 8.6a1 1 0 0 0 1 .9h4.2a1 1 0 0 0 1-.9l.6-8.6"/><path d="M6.7 7.3v3.9M9.3 7.3v3.9"/></svg>',
+  };
+
+  // The Build-by-hand editor renders its own localized strings; this page's own
+  // chrome is English until the i18n pass adds its catalog keys.
+  let t = (key) => key;
+
+  const $ = (sel, root) => (root ?? document).querySelector(sel);
+  const $$ = (sel, root) => [...(root ?? document).querySelectorAll(sel)];
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+  // ── Stores (localStorage adapters around the pure modules) ─────────────
+  let library = parsePresetLibrary(localStorage.getItem(LIBRARY_KEY));
+  let profiles = parseProfiles(localStorage.getItem(PROFILES_KEY));
+  let streamers = parseStreamers(localStorage.getItem(STREAMERS_KEY));
+  const saveLibrary = () => localStorage.setItem(LIBRARY_KEY, serializePresetLibrary(library));
+  const saveProfiles = () => localStorage.setItem(PROFILES_KEY, serializeProfiles(profiles));
+  const saveStreamers = () => localStorage.setItem(STREAMERS_KEY, serializeStreamers(streamers));
+
+  const state = {
+    view: 'trains',        // trains | presets | profile | oneoff
+    editing: null,         // Event slug — the Raid Train Config editor is open
+    editingPreset: null,   // Preset id — the Preset editor is open
+    renaming: null,        // Preset id in inline rename (library rows)
+    pastOpen: false,
+    // My Raid Trains data for the ACTIVE Profile.
+    feed: { status: 'idle', events: [], details: {}, error: null, login: null },
+  };
+
+  const me = () => activeProfile(profiles);
+  const myProfile = () => (me() ? profiles.profiles[me()] : null);
+
+  // ── Toast + modal ──────────────────────────────────────────────────────
+  let toastTimer = null;
+  function toast(message) {
+    const el = $('#toast');
+    el.innerHTML = `<span class="ok">✓</span>${esc(message)}`;
+    el.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.remove('show'), 2200);
+  }
+  async function copyText(text, message) {
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      // Non-secure contexts (plain http://) have no clipboard API — fall back
+      // to selecting a scratch input so the copy still works locally.
+      const scratch = document.createElement('input');
+      scratch.value = text;
+      document.body.appendChild(scratch);
+      scratch.select();
+      document.execCommand('copy');
+      scratch.remove();
     }
-    // The manual lineup the editor mutates in place; read by readForm when source==='manual'.
-    const manualState = { title: '', organiser: '', zone: detectedZone, startISO: freshStartISO(), slotMins: 60, djs: [] };
+    toast(message);
+  }
+  const openModal = (html) => { $('#modal').innerHTML = html; $('#modal-scrim').classList.add('open'); };
+  const closeModal = () => $('#modal-scrim').classList.remove('open');
 
-    // Saved-streamers store (local-only, like presets). Harvested from a lineup only on
-    // a committed action (save preset / copy URL); surfaced as click-to-add chips + autocomplete.
-    const STREAMERS_KEY = 'raidtrainoverlay.configurator.streamers';
-    let streamers = parseStreamers(localStorage.getItem(STREAMERS_KEY));
-    function persistStreamers() { localStorage.setItem(STREAMERS_KEY, serializeStreamers(streamers)); }
-    function harvestStreamers() {
-      if (source !== 'manual') return;
-      const handles = manualState.djs.map((d) => (d.handle || '').trim()).filter(Boolean);
-      if (!handles.length) return;
-      streamers = addStreamers(streamers, handles);
-      persistStreamers();
-      if (manualEditor) manualEditor.refresh();
+  // ── Preset helpers ─────────────────────────────────────────────────────
+  /** The Preset a Raid Train Config resolves to: its own, else the Profile default. */
+  function presetFor(config) {
+    return getPreset(library, config?.presetId ?? myProfile()?.defaultPresetId ?? null);
+  }
+  /** A Profile always needs SOMETHING to start from — seed a default Preset on first use. */
+  function ensureStarterPreset(login) {
+    if (myProfile()?.defaultPresetId && getPreset(library, myProfile().defaultPresetId)) return;
+    const existing = listPresets(library);
+    const id = existing.length > 0
+      ? existing[0].id
+      : (() => { const made = createPreset(library, 'House Default', SETTINGS_DEFAULTS); library = made.library; saveLibrary(); return made.id; })();
+    profiles = setDefaultPreset(profiles, login, id);
+    saveProfiles();
+  }
+  /** Settings + Spotlights for a train, defaulting to the Profile's base for an unconfigured one. */
+  function trainSettings(slug) {
+    const login = me();
+    if (!login) return { settings: normalizeSettings({}), spotlight: [] };
+    const config = getTrainConfig(profiles, login, slug);
+    if (config) {
+      const resolved = resolveTrainSettings(library, profiles, login, slug);
+      return { settings: normalizeSettings(resolved.settings), spotlight: resolved.spotlight };
     }
-    function forgetStreamer(handle) { streamers = removeStreamer(streamers, handle); persistStreamers(); }
-    function addStreamerManual(handle) { streamers = addStreamers(streamers, [handle]); persistStreamers(); } // direct add, no preset/copy needed
+    return { settings: baseSettings(library, profiles, login), spotlight: [...(myProfile()?.spotlight ?? [])] };
+  }
+  /** The copyable Overlay URL pinned to ONE train. */
+  function trainOverlayUrl(slug) {
+    const { settings, spotlight } = trainSettings(slug);
+    const query = buildOverlayQuery({ ...settings, event: slug, spotlight: spotlight.join(',') });
+    return `${OVERLAY_BASE}?${query}`;
+  }
+  const liveLinkUrl = () => {
+    const query = buildLiveLinkQuery(library, profiles, me());
+    return query ? `${OVERLAY_BASE}?${query}` : '';
+  };
 
-    const $ = (id) => document.getElementById(id);
-    const els = {
-      srcRaidpal: $('src-raidpal'), srcManual: $('src-manual'),
-      raidpalSource: $('raidpal-source'), manualSource: $('manual-source'),
-      event: $('f-event'), mode: $('f-mode'), interval: $('f-interval'), speed: $('f-speed'),
-      track: $('f-track'), trackRow: $('track-row'), trackNote: $('track-note'),
-      trackfadein: $('f-trackfadein'), trackfadeout: $('f-trackfadeout'), trackfadeRow: $('trackfade-row'),
-      refresh: $('f-refresh'),
-      openslots: $('f-openslots'), spotlight: $('f-spotlight'), tz: $('f-tz'),
-      hidefinished: $('f-hidefinished'), enginedim: $('f-enginedim'),
-      theme: $('f-theme'), scale: $('f-scale'), scaleOut: $('f-scale-out'),
-      lang: $('f-lang'),
-      height: $('f-height'), heightOut: $('f-height-out'),
-      url: $('url'), copy: $('copy'),
-      preview: $('preview'), previewPlaceholder: $('preview-placeholder'), previewCaption: $('preview-caption'),
-      previewRoll: $('preview-roll'), previewStill: $('preview-still'), previewControls: $('preview-controls'),
-      slugStatus: $('slug-status'), tzHint: $('tz-hint'),
-      intervalRow: $('interval-row'), intervalNote: $('interval-note'),
-      presetName: $('preset-name'), presetSave: $('preset-save'), presetSelect: $('preset-select'),
-      presetLoad: $('preset-load'), presetDelete: $('preset-delete'), presetMsg: $('preset-msg'),
-    };
-
-    const debounce = (fn, ms) => {
-      let t;
-      return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
-    };
-
-    // ── Tabs (presentation only; doesn't touch form state) ───────────────
-    const tabs = [...document.querySelectorAll('.tab')];
-    const panels = [...document.querySelectorAll('.panel')];
-    for (const tab of tabs) {
-      tab.addEventListener('click', () => {
-        for (const t of tabs) t.classList.toggle('active', t === tab);
-        for (const p of panels) p.classList.toggle('active', p.id === `panel-${tab.dataset.panel}`);
+  // ── My Raid Trains feed ────────────────────────────────────────────────
+  /**
+   * Load the active Profile's trains: the user record first (cache-first, ~6h),
+   * then each Event's detail SEQUENTIALLY, repainting cards as they settle. A
+   * failed read serves the stale cache and says so — it is never "you left the
+   * train".
+   */
+  async function loadFeed({ force = false } = {}) {
+    const login = me();
+    if (!login) { state.feed = { status: 'idle', events: [], details: {}, error: null, login: null }; return; }
+    state.feed = { status: 'loading', events: [], details: {}, error: null, login };
+    renderMain();
+    try {
+      const result = await loadMyRaidTrains(login, { fetchImpl: fetch.bind(window), storage: localStorage, force });
+      if (me() !== login) return; // the Profile switched while we were away
+      if (result.notFound) { state.feed = { ...state.feed, status: 'notfound' }; renderMain(); return; }
+      state.feed = { ...state.feed, status: 'ready', events: result.user.events, error: result.error ?? null };
+      renderMain();
+      await loadEventDetails(result.user.events, {
+        fetchImpl: fetch.bind(window),
+        storage: localStorage,
+        onDetail: (detail) => {
+          if (me() !== login) return;
+          state.feed.details[detail.slug] = detail;
+          paintCard(detail.slug);
+        },
       });
+    } catch (error) {
+      if (me() !== login) return;
+      state.feed = { ...state.feed, status: 'error', error };
+      renderMain();
     }
+  }
 
-    // ── Form state ↔ inputs ──────────────────────────────────────────────
-    function readForm() {
-      return {
-        source,
-        manual: manualState,
-        event: els.event.value,
-        mode: els.mode.value,
-        interval: els.interval.value,
-        track: els.track.value,
-        trackfadein: els.trackfadein.value,
-        trackfadeout: els.trackfadeout.value,
-        speed: els.speed.value,
-        refresh: els.refresh.value,
-        openslots: els.openslots.checked,
-        hidefinished: els.hidefinished.checked,
-        enginedim: els.enginedim.value,
-        spotlight: els.spotlight.value,
-        tz: els.tz.value,
-        theme: els.theme.value,
-        scale: els.scale.value,
-        height: els.height.value,
-        // Blank means Auto: omit lang so the overlay follows the viewer/browser.
-        // A concrete locale, including English, is explicit and travels in the URL.
-        lang: els.lang.value,
-      };
-    }
-    function writeForm(fs = {}) {
-      els.event.value = fs.event ?? '';
-      els.mode.value = fs.mode === 'marquee' ? 'marquee' : 'pass';
-      els.interval.value = fs.interval ?? '15';
-      els.track.value = ['always', 'periodic'].includes(fs.track) ? fs.track : 'periodic';
-      els.trackfadein.value = fs.trackfadein ?? '15';
-      els.trackfadeout.value = fs.trackfadeout ?? '10';
-      els.speed.value = fs.speed ?? '1';
-      els.refresh.value = fs.refresh ?? '';
-      els.openslots.checked = Boolean(fs.openslots);
-      els.hidefinished.checked = Boolean(fs.hidefinished);
-      els.enginedim.value = ['over', 'finished', 'never'].includes(fs.enginedim) ? fs.enginedim : 'over';
-      els.spotlight.value = fs.spotlight ?? '';
-      els.tz.value = fs.tz ?? '';
-      els.theme.value = ['classic', 'flat', 'synthwave', 'ticket', 'wood', 'comic', 'departures', 'paper', 'tron', 'pixel', 'highvibes', 'jazz', 'bullet', 'lava', 'pride', 'shuffle'].includes(fs.theme) ? fs.theme : 'classic';
-      els.scale.value = fs.scale ?? '1';
-      els.height.value = fs.height ?? '100';
-      els.lang.value = selectorLocale(fs.lang);
-    }
+  /** An Event detail → the `{ slots, filled }` the card's mini-train draws. */
+  function detailCounts(slug) {
+    const entry = state.feed.details[slug];
+    if (!entry?.event) return null;
+    const slots = entry.event.slots.length;
+    return { slots, filled: entry.event.slots.filter((s) => s.occupied).length };
+  }
 
-    // ── Lineup source toggle (RaidPal event ⇄ Build by hand) ──────────────
-    let manualEditor = null;
-    // Replace the manual lineup wholesale (hydrate from a shared ?lineup= link, or a preset).
-    function applyManualState(m) {
-      // Deep-copy the incoming model so the live state never ALIASES a stored preset's
-      // arrays (editing the lineup must not mutate the saved preset). Snap durations to
-      // the grid and default any missing handle so the editor + overlay stay consistent.
-      const src = m ? JSON.parse(JSON.stringify(m)) : {};
-      Object.assign(manualState,
-        { title: '', organiser: '', zone: detectedZone, startISO: freshStartISO(), slotMins: 60, djs: [] },
-        src);
-      manualState.slotMins = snapDuration(manualState.slotMins || 60);
-      manualState.djs = (Array.isArray(manualState.djs) ? manualState.djs : [])
-        .map((d) => ({ handle: d.handle ?? '', slots: clampCount(d.slots) }));
-      if (manualEditor) manualEditor.refresh();
+  function cardView(event, status, now) {
+    const config = me() ? getTrainConfig(profiles, me(), event.slug) : null;
+    const preset = config ? presetFor(config) : null;
+    return {
+      event,
+      status,
+      when: whenLabel(event, now),
+      detail: detailCounts(event.slug),
+      error: state.feed.details[event.slug]?.error ?? null,
+      config: config
+        ? { presetName: preset?.name ?? 'Custom', overrideCount: Object.keys(config.overrides ?? {}).length }
+        : null,
+    };
+  }
+
+  /** Repaint ONE card in place — the progressive detail loads must not rebuild the view. */
+  function paintCard(slug) {
+    const existing = $(`.event-card[data-slug="${CSS.escape(slug)}"]`);
+    const event = state.feed.events.find((e) => e.slug === slug);
+    if (!existing || !event) return;
+    const now = Date.now();
+    const { live, upcoming } = classifyTrains([event], now);
+    const status = live.length ? 'live' : upcoming.length ? 'upcoming' : 'past';
+    existing.outerHTML = trainCardHtml(cardView(event, status, now));
+  }
+
+  // ── Views ──────────────────────────────────────────────────────────────
+  function renderTopbar() {
+    const login = me();
+    $('#pb-avatar').textContent = login ? login[0].toUpperCase() : '+';
+    $('#pb-name').textContent = login ?? 'Add a profile';
+    const rows = listProfiles(profiles).map((name) => {
+      const p = profiles.profiles[name];
+      const trains = Object.keys(p.trains ?? {}).length;
+      return `<button type="button" class="profile-item" data-act="switch-profile" data-name="${esc(name)}">
+        <span class="avatar">${esc(name[0].toUpperCase())}</span>
+        <span><span class="p-name">${esc(name)}</span>
+          <span class="p-sub">${trains} raid train config${trains === 1 ? '' : 's'}</span></span>
+        ${name === login ? '<span class="p-check">✓</span>' : ''}
+      </button>`;
+    }).join('');
+    const manage = login
+      ? `<button type="button" class="profile-item p-manage" data-act="manage-profile">
+          <span class="p-gear" aria-hidden="true">⚙</span>
+          <span><span class="p-name">Manage profile…</span>
+            <span class="p-sub">Standing Spotlights, default Preset and backups</span></span>
+        </button>`
+      : '';
+    $('#profile-list').innerHTML = rows || '<div class="profile-hint">No profiles yet — add your Twitch username below.</div>';
+    $('#profile-list').insertAdjacentHTML('beforeend', manage);
+  }
+
+  function renderSidebar() {
+    $('#nc-trains').textContent = state.feed.status === 'ready' ? String(state.feed.events.length) : '';
+    $('#nc-presets').textContent = String(listPresets(library).length);
+    for (const el of $$('.nav-item')) {
+      const nav = el.dataset.nav;
+      const active = (nav === 'trains' && (state.view === 'trains' || state.editing))
+        || (nav === 'presets' && (state.view === 'presets' || state.editingPreset))
+        || (nav === 'profile' && state.view === 'profile')
+        || (nav === 'oneoff' && state.view === 'oneoff');
+      el.classList.toggle('active', Boolean(active));
     }
-    function setSource(next, { silent = false } = {}) {
-      source = next === 'manual' ? 'manual' : 'raidpal';
-      els.srcRaidpal.classList.toggle('active', source === 'raidpal');
-      els.srcManual.classList.toggle('active', source === 'manual');
-      els.srcRaidpal.setAttribute('aria-pressed', String(source === 'raidpal'));
-      els.srcManual.setAttribute('aria-pressed', String(source === 'manual'));
-      els.raidpalSource.hidden = source !== 'raidpal';
-      els.manualSource.hidden = source !== 'manual';
-      // Mount the editor lazily, the first time manual mode is shown.
-      if (source === 'manual' && !manualEditor) {
-        // Pass a live translator closure so the editor relocalizes when the overlay language changes.
-        manualEditor = mountManualEditor({ root: els.manualSource, state: manualState, onChange: onFormChange, t: (k, p) => t(k, p),
-          getStreamers: () => listStreamers(streamers), onForgetStreamer: forgetStreamer, onAddStreamer: addStreamerManual });
+  }
+
+  // ── View: My Raid Trains ───────────────────────────────────────────────
+  function liveLinkCardHtml() {
+    const prefs = liveLinkPrefs(profiles, me());
+    const on = prefs.upcoming != null;
+    const base = getPreset(library, myProfile()?.defaultPresetId ?? null);
+    const options = Object.entries(HORIZONS)
+      .map(([k, label]) => `<option value="${k}"${(prefs.upcoming ?? '3') === k ? ' selected' : ''}>${esc(label)}</option>`)
+      .join('');
+    return `<section class="card live-link" id="live-link-card">
+      <div class="ll-head"><h2>Live Link</h2><span class="ll-badge">One per profile</span></div>
+      <p class="ll-sub">Paste this <b>one URL</b> into OBS once. It always shows your <b>live</b> raid train — or your next one — using each train's saved settings.</p>
+      <div class="url-row">
+        <input type="text" id="ll-url" readonly value="${esc(liveLinkUrl())}" aria-label="Live Link URL">
+        <button type="button" class="btn gold" data-act="copy-live">Copy Live Link</button>
+      </div>
+      <div class="ll-note"><span class="w" aria-hidden="true">⚠</span><span>Changing settings changes this URL. After a change, copy it again and paste it back into the same OBS browser source.</span></div>
+      <div class="ll-idle">
+        <label class="chk"><input type="checkbox" id="ll-idle-toggle"${on ? ' checked' : ''}>
+          Show an upcoming-trains card while no train is live</label>
+        <select id="ll-horizon"${on ? '' : ' disabled'} aria-label="Upcoming card horizon">${options}</select>
+      </div>
+      <div class="ll-meta">Styled by your default Preset: <b>${esc(base?.name ?? 'none yet')}</b>${base ? ` (${esc(THEME_OPTIONS[normalizeSettings(base.settings).theme])})` : ''} — <a href="#" data-act="goto-presets">manage Presets</a>. Trains with their own Raid Train Config keep their saved settings.</div>
+    </section>`;
+  }
+
+  function trainsViewHtml() {
+    if (!me()) {
+      return `<h2 class="view-title">My Raid Trains</h2>
+        <p class="view-sub">Your RaidPal raid trains — joined and organised — in one place.</p>
+        <section class="card">
+          <h2 class="card-h">Get started</h2>
+          <div class="spot-add">
+            <input type="text" id="onboard-input" placeholder="Your Twitch username" autocomplete="off">
+            <button type="button" class="btn primary" data-act="onboard">Show my trains</button>
+          </div>
+          <div class="hint">No sign-in, no password — RaidPal's public profile is read by username. Everything you build stays in this browser.</div>
+        </section>
+        <section class="card">
+          <h2 class="card-h">No RaidPal profile?</h2>
+          <div class="hint">Build a <a href="#" data-act="goto-oneoff">one-off link</a> from any event link, or type a lineup in by hand.</div>
+        </section>`;
+    }
+    const head = `<h2 class="view-title">My Raid Trains</h2>
+      <p class="view-sub">Your RaidPal raid trains — joined and organised — for <b>${esc(me())}</b>.</p>
+      ${liveLinkCardHtml()}`;
+    if (state.feed.status === 'loading') return `${head}<div class="empty">Loading your raid trains from RaidPal…</div>`;
+    if (state.feed.status === 'notfound') {
+      return `${head}<section class="card"><h2 class="card-h">RaidPal doesn't know that username</h2>
+        <div class="hint">RaidPal has no public profile for <b>${esc(me())}</b>. Check the spelling — it's your Twitch login, not your display name — or
+        <a href="#" data-act="goto-oneoff">build a one-off link</a> instead.</div></section>`;
+    }
+    if (state.feed.status === 'error') {
+      return `${head}<section class="card"><h2 class="card-h">Couldn't reach RaidPal</h2>
+        <div class="hint">${esc(state.feed.error?.message ?? 'The request failed.')} Your saved settings are safe — try
+        <button type="button" class="btn sm" data-act="refresh-all">Retry</button></div></section>`;
+    }
+    const now = Date.now();
+    const { live, upcoming, past } = classifyTrains(state.feed.events, now);
+    const stale = state.feed.error ? '<div class="hint" style="margin:-6px 0 12px">Showing the last good list — RaidPal didn\'t answer just now.</div>' : '';
+    const cards = [...live, ...upcoming].map((e) => trainCardHtml(cardView(e, live.includes(e) ? 'live' : 'upcoming', now))).join('');
+    const emptyNote = (live.length + upcoming.length) === 0
+      ? '<div class="empty">No live or upcoming raid trains. Join one on RaidPal and it appears here.</div>' : '';
+    const departed = past.length > 0
+      ? `<button type="button" class="past-divider${state.pastOpen ? ' open' : ''}" data-act="toggle-past">
+           ${past.length} departed train${past.length === 1 ? '' : 's'} <span class="pd-chev" aria-hidden="true">▾</span>
+         </button>
+         <div class="past-list"${state.pastOpen ? '' : ' hidden'}>${past.map((e) => trainCardHtml(cardView(e, 'past', now))).join('')}</div>`
+      : '';
+    return `${head}${stale}${cards}${emptyNote}${departed}`;
+  }
+
+  // ── View: Raid Train Config editor ─────────────────────────────────────
+  function configEditorHtml() {
+    const slug = state.editing;
+    const event = state.feed.events.find((e) => e.slug === slug);
+    const config = getTrainConfig(profiles, me(), slug);
+    const overrideCount = Object.keys(config?.overrides ?? {}).length;
+    const presetId = config?.presetId ?? myProfile()?.defaultPresetId ?? null;
+    const options = listPresets(library)
+      .map((p) => `<option value="${esc(p.id)}"${p.id === presetId ? ' selected' : ''}>${esc(p.name)}${p.id === myProfile()?.defaultPresetId ? ' (default)' : ''}</option>`)
+      .join('');
+    const now = Date.now();
+    const isLive = event ? classifyTrains([event], now).live.length > 0 : false;
+    return `<button type="button" class="back-link" data-act="back-trains">← My Raid Trains</button>
+      <div class="editor-head-row">
+        <h2>${esc(event?.title ?? slug)}</h2>
+        ${isLive ? '<span class="chip-live"><span class="dot"></span>LIVE NOW</span>' : ''}
+        ${event?.organiser ? '<span class="chip-org">Organiser</span>' : ''}
+      </div>
+      <p class="view-sub">${event ? esc(whenLabel(event, now)) : esc(slug)}</p>
+
+      <section class="card">
+        <div class="preview-frame">
+          <iframe id="preview" title="Overlay preview"></iframe>
+          <div class="preview-controls">
+            <button type="button" id="preview-roll" class="preview-btn">▶&nbsp;Roll it</button>
+            <button type="button" id="preview-still" class="preview-btn" hidden>◼&nbsp;Recenter</button>
+          </div>
+        </div>
+        <div class="preview-caption" id="preview-caption"></div>
+      </section>
+
+      <section class="card">
+        <h2 class="card-h">Raid Train Config</h2>
+        <div class="preset-ref">
+          <span class="lbl">Preset</span>
+          <select id="cfg-preset">${options || '<option value="">No Presets yet</option>'}</select>
+        </div>
+        <div class="hint">Settings start from this Preset. Change any field below to override it — for this train only.</div>
+      </section>
+
+      <section class="card">
+        <div class="cfg-toolbar">
+          <h2 class="card-h" style="margin:0">Settings for this train</h2>
+          <button type="button" class="reset-all" data-act="reset-overrides"${overrideCount ? '' : ' hidden'}>Reset ${overrideCount} override${overrideCount === 1 ? '' : 's'}</button>
+        </div>
+        <div id="settings-root"></div>
+      </section>
+
+      <section class="card">
+        <h2 class="card-h">Spotlights for this train</h2>
+        <div class="spot-chips">
+          ${(myProfile()?.spotlight ?? []).length
+            ? (myProfile().spotlight).map((s) => `<span class="spot-chip">Always on: <b>${esc(s)}</b></span>`).join('')
+            : '<span class="spot-chip">No standing Spotlights yet</span>'}
+          <button type="button" class="btn sm" data-act="goto-profile">Edit in Profile settings →</button>
+        </div>
+        <input type="text" id="cfg-spotlight" value="${esc((config?.spotlight ?? []).join(', '))}" placeholder="DJ Alpha, DJ Charlie" autocomplete="off">
+        <div class="hint">Comma-separated names to glow — this train only, on top of your standing Spotlights above.</div>
+      </section>
+
+      <section class="card">
+        <h2 class="card-h">Overlay link for this train</h2>
+        <div class="url-row">
+          <input type="text" id="cfg-url" readonly value="${esc(trainOverlayUrl(slug))}" aria-label="Overlay link for this train">
+          <button type="button" class="btn primary" data-act="copy-cfg-url">Copy</button>
+        </div>
+        <div class="hint">A direct link for this one train. Your Live Link picks these settings up automatically — you only need this for a source pinned to this specific train.</div>
+      </section>`;
+  }
+
+  // ── View: Preset Library + Preset editor ───────────────────────────────
+  function presetSummaryHtml(settings) {
+    const s = normalizeSettings(settings);
+    const bits = [THEME_OPTIONS[s.theme] ?? s.theme, s.mode === 'pass' ? 'Pass' : 'Marquee', `size ${s.scale}`];
+    if (s.height !== '100') bits.push(`Y ${s.height}`);
+    const extra = SETTING_FIELDS.filter((def) => !['theme', 'mode', 'scale', 'height'].includes(def.key)
+      && String(s[def.key]) !== String(SETTINGS_DEFAULTS[def.key])).length;
+    if (extra) bits.push(`+${extra} more`);
+    return bits.map((b) => `<span class="sum-chip">${esc(b)}</span>`).join('');
+  }
+
+  function presetsViewHtml() {
+    const defaultId = myProfile()?.defaultPresetId ?? null;
+    const rows = listPresets(library).map((preset) => {
+      const { configs } = countPresetReferences(profiles, preset.id);
+      const isDefault = preset.id === defaultId;
+      const nameCell = state.renaming === preset.id
+        ? `<input type="text" id="rename-input" value="${esc(preset.name)}" data-id="${esc(preset.id)}" autocomplete="off">`
+        : `<span class="preset-name">${esc(preset.name)}</span>`;
+      return `<div class="card preset-row">
+        <div class="preset-info" data-act="edit-preset" data-id="${esc(preset.id)}" title="Open this Preset">
+          <div class="preset-name-row">${nameCell}${isDefault ? '<span class="chip-default">Default</span>' : ''}</div>
+          <div class="preset-sum">${presetSummaryHtml(preset.settings)}</div>
+          <div class="preset-used">${configs ? `Used by <b>${configs}</b> Raid Train Config${configs === 1 ? '' : 's'}` : 'Not used by any Raid Train Config yet'}</div>
+        </div>
+        <div class="preset-actions">
+          <button type="button" class="icon-btn star-btn${isDefault ? ' on' : ''}" data-act="make-default" data-id="${esc(preset.id)}"
+            title="${isDefault ? 'This is the default Preset' : 'Make this the default Preset'}"
+            aria-label="${isDefault ? 'This is the default Preset' : `Make ${esc(preset.name)} the default Preset`}">${isDefault ? '★' : '☆'}</button>
+          <button type="button" class="icon-btn" data-act="edit-preset" data-id="${esc(preset.id)}" title="Edit — settings and rename" aria-label="Edit preset ${esc(preset.name)}">${ICONS.pencil}</button>
+          <button type="button" class="icon-btn accent" data-act="dup-preset" data-id="${esc(preset.id)}" title="Duplicate, then rename the copy" aria-label="Duplicate preset ${esc(preset.name)}">${ICONS.copy}</button>
+          <button type="button" class="icon-btn destructive" data-act="del-preset" data-id="${esc(preset.id)}" title="Delete this Preset" aria-label="Delete preset ${esc(preset.name)}">${ICONS.trash}</button>
+        </div>
+      </div>`;
+    }).join('');
+    return `<div class="editor-head-row"><h2 class="view-title">Preset Library</h2>
+        <button type="button" class="btn sm" data-act="new-preset">+ New Preset</button></div>
+      <p class="view-sub">Presets are saved settings — no event attached. Raid Train Configs point at a Preset and override only what differs. Click a Preset to edit it, or duplicate one to branch a new look in seconds.</p>
+      ${rows || '<div class="empty">No Presets yet — make one to get started.</div>'}`;
+  }
+
+  function presetEditorHtml() {
+    const preset = getPreset(library, state.editingPreset);
+    if (!preset) return '';
+    const { configs } = countPresetReferences(profiles, state.editingPreset);
+    const isDefault = state.editingPreset === myProfile()?.defaultPresetId;
+    return `<button type="button" class="back-link" data-act="back-presets">← Preset Library</button>
+      <div class="editor-head-row">
+        <input type="text" class="preset-title-input" id="preset-title-input" value="${esc(preset.name)}"
+          data-id="${esc(state.editingPreset)}" autocomplete="off" title="Rename this Preset" aria-label="Preset name">
+        ${isDefault
+          ? '<span class="chip-default" title="New Raid Train Configs and your Live Link start from this Preset">✓ Default</span>'
+          : `<button type="button" class="btn sm" data-act="make-default-editor" data-id="${esc(state.editingPreset)}"${me() ? '' : ' disabled'}>Make default</button>`}
+      </div>
+      <p class="view-sub">${configs
+        ? `Used by <b>${configs}</b> Raid Train Config${configs === 1 ? '' : 's'} — changes here flow to ${configs === 1 ? 'it' : 'them'}, except fields a train has overridden.`
+        : 'Not used by any Raid Train Config yet.'}</p>
+
+      <section class="card">
+        <div class="preview-frame">
+          <iframe id="preview" title="Overlay preview"></iframe>
+          <div class="preview-controls">
+            <button type="button" id="preview-roll" class="preview-btn">▶&nbsp;Roll it</button>
+            <button type="button" id="preview-still" class="preview-btn" hidden>◼&nbsp;Recenter</button>
+          </div>
+        </div>
+        <div class="preview-caption" id="preview-caption"></div>
+      </section>
+
+      <section class="card">
+        <h2 class="card-h">Preset settings</h2>
+        <div id="settings-root"></div>
+        <div class="hint" style="margin-top:12px">Spotlights are not part of a Preset — standing Spotlights live in
+          <a href="#" data-act="goto-profile">Profile settings</a>, extras on each train's Raid Train Config.</div>
+      </section>`;
+  }
+
+  // ── View: Profile settings ─────────────────────────────────────────────
+  function profileViewHtml() {
+    if (!me()) return '<div class="empty">Add a Profile first — use the button in the top right.</div>';
+    const spots = myProfile().spotlight ?? [];
+    const defaultId = myProfile().defaultPresetId ?? null;
+    return `<h2 class="view-title">Profile settings</h2>
+      <p class="view-sub">For <b>${esc(me())}</b> — these apply across every raid train this Profile runs.</p>
+
+      <section class="card">
+        <h2 class="card-h">Standing Spotlights</h2>
+        <div class="spot-edit-list">
+          ${spots.length
+            ? spots.map((s) => `<span class="spot-edit-chip"><b>${esc(s)}</b><button type="button" class="chip-x" data-act="rm-spot" data-name="${esc(s)}" title="Remove ${esc(s)}" aria-label="Remove ${esc(s)}">✕</button></span>`).join('')
+            : '<span class="hint" style="margin:0">No standing Spotlights yet.</span>'}
+        </div>
+        <div class="spot-add">
+          <input type="text" id="spot-input" placeholder="Twitch username" autocomplete="off">
+          <button type="button" class="btn" data-act="add-spot">Add Spotlight</button>
+        </div>
+        <div class="hint">These names glow on every raid train you run — always, on top of any per-train extras.</div>
+      </section>
+
+      <section class="card">
+        <h2 class="card-h">Default Preset</h2>
+        <select id="default-preset-select" style="max-width:320px">
+          ${listPresets(library).map((p) => `<option value="${esc(p.id)}"${p.id === defaultId ? ' selected' : ''}>${esc(p.name)}</option>`).join('')
+            || '<option value="">No Presets yet</option>'}
+        </select>
+        <div class="hint">New Raid Train Configs and your Live Link start from this Preset. Same setting as the star in the
+          <a href="#" data-act="goto-presets">Preset Library</a>.</div>
+      </section>
+
+      <section class="card">
+        <h2 class="card-h">Backup</h2>
+        <div class="backup-row">
+          <button type="button" class="btn" data-act="export-backup">Copy backup code</button>
+          <button type="button" class="btn" data-act="import-backup">Restore from code</button>
+        </div>
+        <textarea id="backup-blob" placeholder="Paste a backup code here to restore it" spellcheck="false" aria-label="Backup code"></textarea>
+        <div class="hint">One code carries every Profile, Preset and Raid Train Config in this browser — the only way to move a
+          setup to another machine. Restoring <b>replaces</b> everything here.</div>
+      </section>
+
+      <section class="card">
+        <h2 class="card-h">This profile</h2>
+        <button type="button" class="btn" data-act="remove-profile">Remove ${esc(me())}</button>
+        <div class="hint">Removes this Profile and its Raid Train Configs from this browser. Presets are shared and stay.</div>
+      </section>`;
+  }
+
+  // ── View: One-off link (any RaidPal event, or a hand-built lineup) ──────
+  const detectedZone = (() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'; } catch { return 'UTC'; } })();
+  function freshStartISO() {
+    const d = new Date(); d.setMinutes(0, 0, 0);
+    const p = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+  }
+  const oneOff = {
+    source: 'raidpal',
+    event: '',
+    settings: normalizeSettings({}),
+    manual: { title: '', organiser: '', zone: detectedZone, startISO: freshStartISO(), slotMins: 60, djs: [] },
+  };
+  let manualEditor = null;
+
+  function oneOffViewHtml() {
+    return `<h2 class="view-title">One-off link</h2>
+      <p class="view-sub">Build a single overlay link for any RaidPal event — or type a lineup in by hand. Nothing here touches your Profile, Presets or Live Link.</p>
+      <section class="card">
+        <div class="source-toggle" role="group" aria-label="Lineup source">
+          <button type="button" id="src-raidpal" class="src-btn${oneOff.source === 'raidpal' ? ' active' : ''}" aria-pressed="${oneOff.source === 'raidpal'}">RaidPal event</button>
+          <button type="button" id="src-manual" class="src-btn${oneOff.source === 'manual' ? ' active' : ''}" aria-pressed="${oneOff.source === 'manual'}">Build by hand</button>
+        </div>
+        <div class="field" id="raidpal-source"${oneOff.source === 'raidpal' ? '' : ' hidden'}>
+          <div class="field-head"><label for="f-event">RaidPal event</label></div>
+          <input type="text" id="f-event" value="${esc(oneOff.event)}" placeholder="Paste your RaidPal event link" autocomplete="off">
+          <div class="hint">Paste the event's RaidPal link — the whole web address works.</div>
+          <div class="status-dot" id="slug-status"></div>
+        </div>
+        <div class="field" id="manual-source"${oneOff.source === 'manual' ? '' : ' hidden'}></div>
+
+        <div class="preview-frame" style="margin-top:14px">
+          <iframe id="preview" title="Overlay preview"></iframe>
+          <div class="preview-controls">
+            <button type="button" id="preview-roll" class="preview-btn">▶&nbsp;Roll it</button>
+            <button type="button" id="preview-still" class="preview-btn" hidden>◼&nbsp;Recenter</button>
+          </div>
+        </div>
+        <div class="preview-caption" id="preview-caption"></div>
+
+        <div class="url-row" style="margin-top:14px">
+          <input type="text" id="oneoff-url" readonly placeholder="Enter an event above to generate your URL" aria-label="Overlay URL">
+          <button type="button" class="btn primary" data-act="copy-oneoff" disabled>Copy</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2 class="card-h">Settings</h2>
+        <div id="settings-root"></div>
+      </section>
+
+      <div class="card">
+        <h2 class="card-h">Add this to OBS</h2>
+        <ol class="obs">
+          <li><strong>Copy your overlay URL</strong> with the Copy button above.</li>
+          <li>In OBS, under <strong>Sources</strong> click <strong>+</strong> and choose <strong>Browser</strong>.</li>
+          <li><strong>Paste your URL</strong> into the URL field.</li>
+          <li>Set <strong>Width 1920</strong> and <strong>Height 1080</strong>.</li>
+          <li>Leave the background transparent — the overlay is already see-through.</li>
+          <li><strong>Leave the source at full size, positioned at 0, 0</strong> — set <strong>Train size</strong> and
+            <strong>Vertical position</strong> with the sliders here instead, so they travel with the URL.</li>
+        </ol>
+        <p class="hint">Changed something? Copy the new URL and paste it back into the same Browser source's URL field.</p>
+      </div>`;
+  }
+
+  // ── Master render ──────────────────────────────────────────────────────
+  let preview = null;
+  let settingsForm = null;
+  let pendingImport = null;
+
+  function renderMain() {
+    // Every view is rebuilt wholesale, so the controllers bound to the old DOM
+    // go with it — drop the references or they'd write into a detached tree.
+    preview = null;
+    settingsForm = null;
+    manualEditor = null;
+    const main = $('#main');
+    if (state.editing) main.innerHTML = configEditorHtml();
+    else if (state.editingPreset) main.innerHTML = presetEditorHtml();
+    else if (state.view === 'presets') main.innerHTML = presetsViewHtml();
+    else if (state.view === 'profile') main.innerHTML = profileViewHtml();
+    else if (state.view === 'oneoff') main.innerHTML = oneOffViewHtml();
+    else main.innerHTML = trainsViewHtml();
+    renderSidebar();
+    wireView();
+  }
+
+  function render(opts = {}) {
+    renderTopbar();
+    renderMain();
+    if (opts.flashLiveLink) {
+      const card = $('#live-link-card');
+      if (card) {
+        card.classList.add('flash');
+        card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        setTimeout(() => card.classList.remove('flash'), 1200);
       }
-      if (!silent) onFormChange();
     }
-    els.srcRaidpal.addEventListener('click', () => setSource('raidpal'));
-    els.srcManual.addEventListener('click', () => setSource('manual'));
+  }
 
-    // Switch the Configurator UI + the overlay language together: load the
-    // catalog, rebind `t`, re-localize the static DOM, and refresh the dynamic
-    // strings (interval note, caption, status) that `t` feeds.
-    async function applyUiLocale(locale) {
-      const messages = await loadMessages(locale);
-      t = makeT(messages);
-      localizeDom(document, messages);
-      document.documentElement.lang = locale;
-      if (manualEditor) manualEditor.refresh(); // relocalize the build-by-hand editor too
-      onFormChange();
+  /** Wire the pieces that only exist inside the view just rendered. */
+  function wireView() {
+    const rename = $('#rename-input');
+    if (rename) { rename.focus(); rename.select(); }
+    if (state.editing) wireConfigEditor();
+    else if (state.editingPreset) wirePresetEditor();
+    else if (state.view === 'oneoff') wireOneOff();
+  }
+
+  function mountPreview() {
+    const iframe = $('#preview');
+    if (!iframe) return null;
+    return createPreviewFrame({ iframe, rollBtn: $('#preview-roll'), stillBtn: $('#preview-still'), overlayBase: OVERLAY_BASE });
+  }
+  function previewCaption(settings) {
+    const caption = $('#preview-caption');
+    if (!caption) return;
+    const s = normalizeSettings(settings);
+    caption.textContent = s.mode === 'pass'
+      ? `Preview — on stream the train rolls across every ${parseConfig(`interval=${encodeURIComponent(s.interval)}`).interval} minutes.`
+      : 'Preview — on stream the train scrolls continuously.';
+  }
+
+  // ── Wiring: Raid Train Config editor ───────────────────────────────────
+  function wireConfigEditor() {
+    const slug = state.editing;
+    const login = me();
+    preview = mountPreview();
+
+    const basisFor = (config) => normalizeSettings(getPreset(library, config.presetId ?? myProfile()?.defaultPresetId ?? null)?.settings ?? {});
+    /**
+     * The stored Config, with its overrides re-diffed against the CURRENT base.
+     * A Config can arrive carrying fields that no longer differ — materializing
+     * a deleted Preset bakes in all fifteen — and a field that matches the base
+     * is not an override. Normalizing on read keeps the badges, the group tags
+     * and the "Reset N overrides" count telling the same story.
+     */
+    const readConfig = () => {
+      const stored = getTrainConfig(profiles, login, slug)
+        ?? { presetId: myProfile()?.defaultPresetId ?? null, overrides: {}, spotlight: [] };
+      const base = basisFor(stored);
+      return { ...stored, overrides: diffSettings(base, applySettings(base, stored.overrides)) };
+    };
+
+    function persist(config) {
+      profiles = upsertTrainConfig(profiles, login, slug, config);
+      saveProfiles();
+      refreshEditorChrome();
     }
-
-    // ── Live URL (synchronous, every input) ──────────────────────────────
-    function updateUrl(fs) {
-      const query = buildOverlayQuery(fs);
-      // The copyable overlay URL must always carry an event — without one the overlay
-      // renders nothing. So even if other knobs produce a query, the box stays empty
-      // (and Copy disabled) until a real event is entered. The demo previews live but
-      // is never written into the field, so it never leaks into the copied URL.
-      // Derive this from the built query (single source of truth) so the Copy-gate
-      // can't drift from what the URL actually contains. Either source counts: a
-      // RaidPal event OR a hand-built lineup makes the URL copyable.
-      const sp = new URLSearchParams(query);
-      const hasSource = sp.has('event') || sp.has('lineup');
-      if (!query || !hasSource) {
-        els.url.value = '';
-        els.copy.disabled = true;
-      } else {
-        els.url.value = `${OVERLAY_BASE}?${query}`;
-        els.copy.disabled = false;
+    function refreshEditorChrome() {
+      const config = readConfig();
+      const count = Object.keys(config.overrides ?? {}).length;
+      const reset = $('.reset-all');
+      if (reset) {
+        reset.hidden = count === 0;
+        reset.textContent = `Reset ${count} override${count === 1 ? '' : 's'}`;
       }
-      // Mirror the config into THIS page's address bar so the Configurator link is
-      // itself shareable (and reloadable) — same params as the overlay URL.
-      history.replaceState(null, '', query ? `?${query}` : window.location.pathname);
+      const url = $('#cfg-url');
+      if (url) url.value = trainOverlayUrl(slug);
+      const { settings, spotlight } = trainSettings(slug);
+      previewCaption(settings);
+      preview?.render(buildOverlayQuery({ ...settings, event: slug, spotlight: spotlight.join(',') }), slug);
     }
 
-    // ── interval gating + height readout + tz echo ───────────────────────
-    function updateMisc(fs) {
-      const isPass = fs.mode === 'pass';
-      const isShuffle = fs.theme === 'shuffle';
-      const showInterval = isPass || isShuffle; // shuffle reuses it as the per-theme cadence
-      els.interval.disabled = !showInterval;
-      els.intervalRow.classList.toggle('dimmed', !showInterval);
-      els.intervalNote.textContent =
-        isPass && isShuffle ? t('configurator.intervalNotePassShuffle')
-          : isPass ? t('configurator.intervalNotePass')
-            : isShuffle ? t('configurator.intervalNoteShuffle')
-              : t('configurator.intervalNoteOff');
-      // Periodic Track visibility is a Pass-only behaviour (no off-screen gap in
-      // marquee), so disable + dim + explain it whenever Mode isn't Pass.
-      els.track.disabled = !isPass;
-      els.trackRow.classList.toggle('dimmed', !isPass);
-      els.trackNote.textContent = isPass ? t('configurator.trackHint') : t('configurator.intervalNoteOff');
-      // Fade durations only bite when the track actually fades (Pass + periodic).
-      const fadeActive = isPass && fs.track === 'periodic';
-      els.trackfadein.disabled = !fadeActive;
-      els.trackfadeout.disabled = !fadeActive;
-      els.trackfadeRow.classList.toggle('dimmed', !fadeActive);
-      els.heightOut.textContent = fs.height;
-      els.scaleOut.textContent = fs.scale;
-
-      const tokens = fs.tz.split(',').map((tok) => tok.trim()).filter(Boolean);
-      if (tokens.length === 0) { els.tzHint.textContent = ''; els.tzHint.className = 'status-dot'; return; }
-      const ok = [], bad = [];
-      for (const tok of tokens) (resolveZone(tok) ? ok : bad).push(tok);
-      const kept = ok.slice(0, 3), dropped = [...ok.slice(3), ...bad];
-      els.tzHint.textContent =
-        (kept.length ? t('configurator.tzShowing', { zones: kept.join(', ') }) : '') +
-        (dropped.length ? `   ·   ${t('configurator.tzIgnored', { zones: dropped.join(', ') })}` : '');
-      els.tzHint.className = 'status-dot' + (dropped.length ? ' bad' : ' ok');
-    }
-
-    // ── Slug validity + live preview (debounced together) ────────────────
-    let validateToken = 0;
-    let previewSlug = null;     // event currently LOADED in the preview iframe (null = placeholder)
-    let baseQuery = '';         // overlay query baked into the iframe's current src
-    let lastQuery = '';         // latest overlay query the form represents
-    let rollState = 'still'; // 'still' (centred showcase) | 'rolling' (sweeping) | 'frozen' (sweep paused in place)
-
-    function showPreviewPlaceholder(text) {
-      els.previewPlaceholder.textContent = text;
-      els.previewPlaceholder.style.display = 'flex';
-      els.previewControls.hidden = true; rollState = 'still';
-      if (els.preview.getAttribute('src')) els.preview.removeAttribute('src');
-      previewSlug = null; baseQuery = ''; lastQuery = '';
-    }
-    function loadPreview(fs) {
-      // A STILL, centred showcase (preview=1): the whole Train stays on-screen and
-      // never scrolls off, so you can study the art (its ambient motion still plays).
-      // The Roll-it toggle (below) sweeps it across instead. preview=1 is appended
-      // only here — the copied overlay URL is unaffected.
-      const query = buildOverlayQuery(fs);
-      // The source key keys reload-vs-postMessage: the event slug for RaidPal, or the
-      // encoded lineup blob for manual. A source change OR a lineup edit changes it
-      // (→ iframe reload); a knob-only change keeps it (→ in-place postMessage).
-      const sp = new URLSearchParams(query);
-      const slug = sp.get('lineup') || sp.get('event') || null;
-      els.previewPlaceholder.style.display = 'none';
-      els.previewControls.hidden = false;
-      if (slug !== previewSlug || !els.preview.getAttribute('src')) {
-        // Source changed (or first load): (re)load the iframe — the ONLY path that
-        // fetches RaidPal (manual lineups never fetch).
-        els.preview.src = `${OVERLAY_BASE}?${query}&preview=1`;
-        previewSlug = slug; baseQuery = query;
-      } else if (query !== lastQuery) {
-        // Same event, a knob moved (theme/scale/mode/…): re-render in the SAME
-        // document via postMessage — no iframe reload, no refetch, no flicker, and
-        // nothing that nudges a browser's auto-hidden chrome (e.g. Zen's sidebar).
-        // A re-render restarts the sweep, so a frozen preview returns to rolling.
-        if (rollState === 'frozen') { rollState = 'rolling'; updateRollButtons(); }
-        els.preview.contentWindow?.postMessage({ type: 'rto-preview', query, roll: rollState !== 'still' }, window.location.origin);
-      }
-      lastQuery = query;
-      if (fs.mode === 'pass') {
-        const mins = parseConfig(`interval=${encodeURIComponent(fs.interval)}`).interval;
-        els.previewCaption.textContent = t('configurator.captionPass', { mins });
-      } else {
-        els.previewCaption.textContent = t('configurator.captionMarquee');
-      }
-    }
-
-    // When the iframe finishes (re)loading its Event, re-apply the roll state and
-    // any config that moved on while it was loading — the iframe always (re)loads
-    // as a still showcase, so a rolling preview must be re-asserted here, and this
-    // also covers a postMessage that arrived before the overlay was listening.
-    els.preview.addEventListener('load', () => {
-      // A fresh iframe always loads as a still showcase and can't preserve a paused
-      // sweep, so a frozen preview resumes rolling on (re)load.
-      if (rollState === 'frozen') { rollState = 'rolling'; updateRollButtons(); }
-      if (rollState === 'rolling' || (lastQuery && lastQuery !== baseQuery)) {
-        els.preview.contentWindow?.postMessage({ type: 'rto-preview', query: lastQuery, roll: rollState === 'rolling' }, window.location.origin);
-        baseQuery = lastQuery;
-      }
+    settingsForm = mountSettingsForm({
+      root: $('#settings-root'),
+      prefix: 'cfg',
+      getState: () => {
+        const config = readConfig();
+        const base = basisFor(config);
+        return { values: applySettings(base, config.overrides), base };
+      },
+      onChange: (key, value) => {
+        const config = readConfig();
+        const base = basisFor(config);
+        const next = applySettings(base, { ...config.overrides, [key]: value });
+        persist({ ...config, overrides: diffSettings(base, next) });
+      },
+      onRevert: (key) => {
+        const config = readConfig();
+        const overrides = { ...config.overrides };
+        delete overrides[key];
+        persist({ ...config, overrides });
+      },
     });
 
-    // Roll it → Freeze → Resume, plus Recenter. Roll sweeps the whole train across;
-    // Freeze pauses that sweep IN PLACE (wheels + undulation keep going — running on
-    // the spot) so you can study it up close; Resume continues from there; Recenter
-    // drops back to the still, centred showcase. All in-place via postMessage.
-    function updateRollButtons() {
-      els.previewRoll.innerHTML = rollState === 'rolling' ? `⏸&nbsp;${t('configurator.freeze')}`
-        : rollState === 'frozen' ? `▶&nbsp;${t('configurator.resume')}` : `▶&nbsp;${t('configurator.rollIt')}`;
-      els.previewRoll.classList.toggle('is-rolling', rollState !== 'still');
-      els.previewStill.hidden = rollState === 'still';
-    }
-    els.previewRoll.addEventListener('click', () => {
-      if (!previewSlug) return;
-      const win = els.preview.contentWindow;
-      if (rollState === 'still') {
-        rollState = 'rolling';
-        win?.postMessage({ type: 'rto-preview', query: lastQuery, roll: true }, window.location.origin);
-      } else if (rollState === 'rolling') {
-        rollState = 'frozen'; // pause the sweep in place — no re-render
-        win?.postMessage({ type: 'rto-preview-pause', paused: true }, window.location.origin);
-      } else {
-        rollState = 'rolling'; // resume from where it froze
-        win?.postMessage({ type: 'rto-preview-pause', paused: false }, window.location.origin);
-      }
-      updateRollButtons();
+    $('#cfg-preset')?.addEventListener('change', (e) => {
+      // Switching Preset must not change what's on stream: re-diff the SAME
+      // effective settings against the new base, so a train pinned to tron
+      // stays on tron — and an override the new Preset already satisfies
+      // quietly stops being an override.
+      const config = readConfig();
+      const effective = applySettings(basisFor(config), config.overrides);
+      const next = { ...config, presetId: e.target.value || null };
+      persist({ ...next, overrides: diffSettings(basisFor(next), effective) });
+      settingsForm.sync();
     });
-    els.previewStill.addEventListener('click', () => {
-      if (!previewSlug) return;
-      rollState = 'still';
-      els.preview.contentWindow?.postMessage({ type: 'rto-preview', query: lastQuery, roll: false }, window.location.origin);
-      updateRollButtons();
+    $('#cfg-spotlight')?.addEventListener('input', (e) => {
+      const names = e.target.value.split(',').map((n) => n.trim()).filter(Boolean);
+      persist({ ...readConfig(), spotlight: names });
     });
 
-    // Re-validate the slug against RaidPal ONLY when it changes; for every other
-    // tweak (theme, mode, scale, …) just refresh the still preview — no refetch. This
-    // makes the preview reload instantly on a theme change and stops a network
-    // request firing on every keystroke (which also tripped some browsers' UI).
-    let validatedSlug = null;
-    const refreshPreview = debounce(async () => {
-      const fs = readForm();
-      if (fs.source === 'manual') {
-        // Manual lineup: nothing to validate against RaidPal. Preview straight from the
-        // hand-built lineup once there's at least one named DJ; otherwise show a hint.
-        els.slugStatus.textContent = '';
-        els.slugStatus.className = 'status-dot';
-        if (manualState.djs.some((d) => (d.handle || '').trim())) loadPreview(fs);
-        else showPreviewPlaceholder(t('configurator.manualPlaceholder'));
+    refreshEditorChrome();
+  }
+
+  // ── Wiring: Preset editor ──────────────────────────────────────────────
+  function wirePresetEditor() {
+    const id = state.editingPreset;
+    preview = mountPreview();
+    const settingsOf = () => normalizeSettings(getPreset(library, id)?.settings ?? {});
+    function refreshChrome() {
+      const settings = settingsOf();
+      previewCaption(settings);
+      preview?.render(buildOverlayQuery({ ...settings, event: DEMO_EVENT }), DEMO_EVENT);
+    }
+    settingsForm = mountSettingsForm({
+      root: $('#settings-root'),
+      prefix: 'pst',
+      getState: () => ({ values: settingsOf(), base: null }),
+      onChange: (key, value) => {
+        library = updatePresetSettings(library, id, { ...settingsOf(), [key]: value });
+        saveLibrary();
+        refreshChrome();
+      },
+    });
+    refreshChrome();
+  }
+
+  // ── Wiring: One-off link ───────────────────────────────────────────────
+  function harvestStreamers() {
+    if (oneOff.source !== 'manual') return;
+    const handles = oneOff.manual.djs.map((d) => (d.handle || '').trim()).filter(Boolean);
+    if (handles.length === 0) return;
+    streamers = addStreamers(streamers, handles);
+    saveStreamers();
+    manualEditor?.refresh();
+  }
+
+  function wireOneOff() {
+    preview = mountPreview();
+    settingsForm = mountSettingsForm({
+      root: $('#settings-root'),
+      prefix: 'one',
+      getState: () => ({ values: oneOff.settings, base: null }),
+      onChange: (key, value) => { oneOff.settings = normalizeSettings({ ...oneOff.settings, [key]: value }); refreshOneOff(); },
+    });
+
+    const setSource = (next) => {
+      oneOff.source = next;
+      $('#src-raidpal').classList.toggle('active', next === 'raidpal');
+      $('#src-manual').classList.toggle('active', next === 'manual');
+      $('#src-raidpal').setAttribute('aria-pressed', String(next === 'raidpal'));
+      $('#src-manual').setAttribute('aria-pressed', String(next === 'manual'));
+      $('#raidpal-source').hidden = next !== 'raidpal';
+      $('#manual-source').hidden = next !== 'manual';
+      if (next === 'manual' && !manualEditor) {
+        manualEditor = mountManualEditor({
+          root: $('#manual-source'), state: oneOff.manual, onChange: refreshOneOff, t: (k, p) => t(k, p),
+          getStreamers: () => listStreamers(streamers),
+          onForgetStreamer: (h) => { streamers = removeStreamer(streamers, h); saveStreamers(); },
+          onAddStreamer: (h) => { streamers = addStreamers(streamers, [h]); saveStreamers(); },
+        });
+      }
+      refreshOneOff();
+    };
+    $('#src-raidpal').addEventListener('click', () => setSource('raidpal'));
+    $('#src-manual').addEventListener('click', () => setSource('manual'));
+    $('#f-event').addEventListener('input', (e) => { oneOff.event = e.target.value; refreshOneOff(); });
+    $('#f-event').addEventListener('blur', () => {
+      const slug = extractSlug(oneOff.event);
+      if (slug && slug !== oneOff.event.trim()) { oneOff.event = slug; $('#f-event').value = slug; refreshOneOff(); }
+    });
+    if (oneOff.source === 'manual' && !manualEditor) setSource('manual');
+    else refreshOneOff();
+  }
+
+  // Re-validate a slug against RaidPal only when it CHANGES; every other tweak
+  // just re-renders the preview in place — no refetch on a theme change.
+  let validatedSlug = null;
+  let validateToken = 0;
+  let oneOffTimer = null;
+  function refreshOneOff() {
+    const formState = { source: oneOff.source, event: oneOff.event, manual: oneOff.manual, ...oneOff.settings };
+    const query = buildOverlayQuery(formState);
+    const params = new URLSearchParams(query);
+    const urlBox = $('#oneoff-url');
+    const copyBtn = $('[data-act="copy-oneoff"]');
+    const hasSource = params.has('event') || params.has('lineup');
+    if (urlBox) { urlBox.value = hasSource ? `${OVERLAY_BASE}?${query}` : ''; }
+    if (copyBtn) copyBtn.disabled = !hasSource;
+    previewCaption(oneOff.settings);
+
+    clearTimeout(oneOffTimer);
+    oneOffTimer = setTimeout(async () => {
+      const status = $('#slug-status');
+      if (oneOff.source === 'manual') {
+        if (status) { status.textContent = ''; status.className = 'status-dot'; }
+        if (oneOff.manual.djs.some((d) => (d.handle || '').trim())) {
+          preview?.render(query, params.get('lineup'));
+        }
         return;
       }
-      const slug = extractSlug(fs.event);
+      const slug = extractSlug(oneOff.event);
       if (!slug) {
-        // Empty field → preview the built-in demo so a fresh page is never blank,
-        // while the input itself stays empty and shows its placeholder hint. The real
-        // (empty) event still drives the copy URL via updateUrl, so the copied link
-        // never contains event=demo — Copy stays disabled until a real event is entered.
-        // Leave validatedSlug UNTOUCHED: clobbering it here would force a redundant
-        // RaidPal re-fetch when the user clears the field and then re-types the same event.
-        els.slugStatus.textContent = t('configurator.slugDemo');
-        els.slugStatus.className = 'status-dot ok';
-        loadPreview({ ...fs, event: DEMO_EVENT });
+        // Empty field → preview the built-in demo so the page is never blank, while
+        // the copy URL stays empty (the demo must never leak into a copied link).
+        if (status) { status.textContent = 'Previewing the built-in demo lineup.'; status.className = 'status-dot ok'; }
+        preview?.render(buildOverlayQuery({ ...formState, event: DEMO_EVENT }), DEMO_EVENT);
         return;
       }
-      if (slug === DEMO_EVENT) { // the built-in demo — no RaidPal lookup needed
-        validatedSlug = DEMO_EVENT;
-        els.slugStatus.textContent = t('configurator.slugDemo');
-        els.slugStatus.className = 'status-dot ok';
-        loadPreview(fs);
+      if (slug === DEMO_EVENT || slug === validatedSlug) {
+        if (status) { status.textContent = `Found “${slug}”.`; status.className = 'status-dot ok'; }
+        preview?.render(query, slug);
         return;
       }
-      if (slug === validatedSlug) {
-        // Already validated this event — re-preview with no refetch, and restore the
-        // "found" status (the empty-field branch above may have left a "demo" status up).
-        els.slugStatus.textContent = t('configurator.slugFound', { slug });
-        els.slugStatus.className = 'status-dot ok';
-        loadPreview(fs);
-        return;
-      }
-      els.slugStatus.textContent = t('configurator.slugChecking');
-      els.slugStatus.className = 'status-dot checking';
+      if (status) { status.textContent = 'Checking…'; status.className = 'status-dot checking'; }
       const token = ++validateToken;
       try {
         await loadEvent(slug);
-        if (token !== validateToken) return; // a newer check superseded this one
+        if (token !== validateToken) return;
         validatedSlug = slug;
-        els.slugStatus.textContent = t('configurator.slugFound', { slug });
-        els.slugStatus.className = 'status-dot ok';
-        loadPreview(fs);
+        if (status) { status.textContent = `Found “${slug}”.`; status.className = 'status-dot ok'; }
+        preview?.render(query, slug);
       } catch {
         if (token !== validateToken) return;
         validatedSlug = null;
-        els.slugStatus.textContent = t('configurator.slugNotFound', { slug });
-        els.slugStatus.className = 'status-dot bad';
-        showPreviewPlaceholder(t('configurator.previewEnterValid'));
+        if (status) { status.textContent = `No RaidPal event called “${slug}”.`; status.className = 'status-dot bad'; }
+        preview?.reset();
       }
     }, 350);
+  }
 
-    function onFormChange() {
-      const fs = readForm();
-      updateUrl(fs);
-      updateMisc(fs);
-      refreshPreview();
-    }
+  // ── Navigation ─────────────────────────────────────────────────────────
+  function go(view, opts = {}) {
+    state.view = view;
+    state.editing = null;
+    state.editingPreset = null;
+    state.renaming = opts.renaming ?? null;
+    render(opts);
+  }
 
-    // Collapse a pasted RaidPal URL down to its slug once the user finishes.
-    function collapseEventToSlug() {
-      const slug = extractSlug(els.event.value);
-      if (slug && slug !== els.event.value.trim()) { els.event.value = slug; onFormChange(); }
-    }
-    els.event.addEventListener('blur', collapseEventToSlug);
-    els.event.addEventListener('paste', () => setTimeout(collapseEventToSlug, 0));
-
-    for (const el of [els.event, els.mode, els.interval, els.track, els.trackfadein, els.trackfadeout,
-      els.speed, els.refresh, els.openslots,
-      els.hidefinished, els.enginedim, els.spotlight, els.tz, els.theme, els.scale, els.height]) {
-      el.addEventListener('input', onFormChange);
-    }
-    // The overlay-language selector either bakes an explicit lang= into the URL
-    // or, on Auto, omits lang so the overlay follows browser detection. It also
-    // re-localizes THIS page (applyUiLocale runs onFormChange itself).
-    els.lang.addEventListener('change', () => applyUiLocale(els.lang.value || resolveLocale(undefined, navigator.languages)));
-
-    // ── Copy ─────────────────────────────────────────────────────────────
-    els.copy.addEventListener('click', async () => {
-      const text = els.url.value;
-      if (!text) return;
-      try {
-        await navigator.clipboard.writeText(text);
-      } catch {
-        els.url.select();
-        document.execCommand('copy'); // fallback for non-secure contexts
-      }
-      const original = els.copy.textContent;
-      els.copy.textContent = t('configurator.copied');
-      setTimeout(() => { els.copy.textContent = original; }, 1500);
-      harvestStreamers(); // remember this lineup's DJs for future lineups
+  for (const el of $$('.nav-item')) {
+    el.addEventListener('click', () => {
+      const nav = el.dataset.nav;
+      if (nav === 'livelink') { go('trains', { flashLiveLink: true }); return; }
+      go(nav);
     });
+  }
 
-    // ── Presets (localStorage adapter around the pure src/presets.js) ─────
-    let store = parsePresets(localStorage.getItem(PRESET_KEY));
-    function persist() { localStorage.setItem(PRESET_KEY, serializePresets(store)); }
-    function refreshPresetList() {
-      const names = listPresetNames(store);
-      els.presetSelect.innerHTML = '';
-      if (names.length === 0) {
-        const opt = document.createElement('option');
-        opt.value = ''; opt.textContent = t('configurator.noPresets');
-        els.presetSelect.appendChild(opt);
-        els.presetLoad.disabled = true; els.presetDelete.disabled = true;
-        return;
-      }
-      els.presetLoad.disabled = false; els.presetDelete.disabled = false;
-      for (const name of names) {
-        const opt = document.createElement('option');
-        opt.value = name; opt.textContent = name;
-        els.presetSelect.appendChild(opt);
-      }
+  // ── Profile menu ───────────────────────────────────────────────────────
+  const profileBtn = $('#profile-btn');
+  const profileMenu = $('#profile-menu');
+  profileBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const open = profileMenu.classList.toggle('open');
+    profileBtn.setAttribute('aria-expanded', String(open));
+  });
+  document.addEventListener('click', (e) => {
+    if (!profileMenu.contains(e.target)) { profileMenu.classList.remove('open'); profileBtn.setAttribute('aria-expanded', 'false'); }
+  });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { profileMenu.classList.remove('open'); closeModal(); } });
+
+  /** Add (or switch to) a Profile, seed it a Preset, and load its trains. */
+  function useProfile(rawLogin) {
+    const login = (rawLogin ?? '').trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
+    if (login === '') return;
+    profiles = addProfile(profiles, login);
+    profiles = setActiveProfile(profiles, login);
+    saveProfiles();
+    ensureStarterPreset(login);
+    state.pastOpen = false;
+    go('trains');
+    loadFeed();
+  }
+  $('#profile-add-btn').addEventListener('click', () => {
+    useProfile($('#profile-add-input').value);
+    $('#profile-add-input').value = '';
+    profileMenu.classList.remove('open');
+  });
+  $('#profile-add-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#profile-add-btn').click(); });
+  profileMenu.addEventListener('click', (e) => {
+    const item = e.target.closest('[data-act]');
+    if (!item) { e.stopPropagation(); return; }
+    profileMenu.classList.remove('open');
+    if (item.dataset.act === 'switch-profile') { useProfile(item.dataset.name); toast(`Now acting as ${item.dataset.name}`); }
+    if (item.dataset.act === 'manage-profile') go('profile');
+  });
+
+  // ── Main-content actions (delegated: the views are re-rendered wholesale) ──
+  $('#main').addEventListener('click', async (e) => {
+    const el = e.target.closest('[data-act]');
+    if (!el) return;
+    const act = el.dataset.act;
+
+    if (act === 'onboard') { useProfile($('#onboard-input').value); return; }
+    if (act === 'goto-oneoff') { e.preventDefault(); go('oneoff'); return; }
+    if (act === 'goto-presets') { e.preventDefault(); go('presets'); return; }
+    if (act === 'goto-profile') { e.preventDefault(); go('profile'); return; }
+    if (act === 'back-trains') { go('trains'); return; }
+    if (act === 'back-presets') { go('presets'); return; }
+    if (act === 'refresh-all') { loadFeed({ force: true }); return; }
+
+    if (act === 'toggle-past') {
+      state.pastOpen = !state.pastOpen;
+      el.classList.toggle('open', state.pastOpen);
+      const list = $('.past-list');
+      if (list) list.hidden = !state.pastOpen;
+      return;
     }
-    function flashPresetMsg(text) {
-      els.presetMsg.textContent = text;
-      setTimeout(() => { if (els.presetMsg.textContent === text) els.presetMsg.textContent = ''; }, 2500);
+    if (act === 'refresh-train') {
+      el.classList.add('spin');
+      const detail = await refreshEventDetail(el.dataset.slug, { fetchImpl: fetch.bind(window), storage: localStorage });
+      state.feed.details[detail.slug] = detail;
+      paintCard(detail.slug);
+      toast(detail.error ? 'RaidPal didn’t answer — showing the last good lineup' : 'Lineup refreshed from RaidPal');
+      return;
+    }
+    if (act === 'copy-train-link') { copyText(trainOverlayUrl(el.dataset.slug), 'Overlay link copied'); return; }
+    if (act === 'open-config') {
+      state.editing = el.dataset.slug;
+      state.editingPreset = null;
+      render();
+      return;
+    }
+    if (act === 'copy-live') {
+      const url = liveLinkUrl();
+      if (!url) { toast('Add a Profile first'); return; }
+      copyText(url, 'Live Link copied — paste it into OBS');
+      return;
+    }
+    if (act === 'copy-cfg-url') { copyText($('#cfg-url').value, 'Overlay link copied'); return; }
+    if (act === 'copy-oneoff') {
+      const url = $('#oneoff-url').value;
+      if (!url) return;
+      copyText(url, 'Overlay link copied');
+      harvestStreamers();
+      return;
+    }
+    if (act === 'reset-overrides') {
+      const config = getTrainConfig(profiles, me(), state.editing);
+      profiles = upsertTrainConfig(profiles, me(), state.editing, { ...config, overrides: {} });
+      saveProfiles();
+      render();
+      toast('All overrides reset to the Preset');
+      return;
     }
 
-    els.presetSave.addEventListener('click', () => {
-      const name = els.presetName.value.trim();
-      if (!name) { flashPresetMsg(t('configurator.presetNameFirst')); return; }
-      if (Object.prototype.hasOwnProperty.call(store, name)
-        && !confirm(t('configurator.presetReplace', { name }))) return;
-      // Snapshot the form (incl. the full manual lineup) so later edits don't mutate the saved preset.
-      store = upsertPreset(store, name, JSON.parse(JSON.stringify(readForm())));
-      persist();
-      harvestStreamers(); // remember this lineup's DJs for future lineups
-      refreshPresetList();
-      els.presetSelect.value = name;
-      els.presetName.value = '';
-      flashPresetMsg(t('configurator.presetSaved', { name }));
-    });
-    els.presetLoad.addEventListener('click', () => {
-      const name = els.presetSelect.value;
-      if (!name || !store[name]) return;
-      const preset = store[name];
-      writeForm(preset);
-      // Presets carry the lineup source (and the full manual lineup) too.
-      if (preset.source === 'manual') { applyManualState(preset.manual); setSource('manual', { silent: true }); }
-      else setSource('raidpal', { silent: true });
-      els.presetName.value = name; // populate the name so re-saving over it is one click
-      onFormChange();
-      flashPresetMsg(t('configurator.presetLoaded', { name }));
-    });
-    els.presetDelete.addEventListener('click', () => {
-      const name = els.presetSelect.value;
-      if (!name || !store[name]) return;
-      if (!confirm(t('configurator.presetDeleteConfirm', { name }))) return;
-      store = deletePreset(store, name);
-      persist();
-      refreshPresetList();
-      flashPresetMsg(t('configurator.presetDeleted', { name }));
-    });
+    // ── Preset library ──
+    if (act === 'new-preset') {
+      const made = createPreset(library, 'New Preset', SETTINGS_DEFAULTS);
+      library = made.library;
+      saveLibrary();
+      go('presets', { renaming: made.id });
+      return;
+    }
+    if (act === 'dup-preset') {
+      const made = duplicatePreset(library, el.dataset.id);
+      library = made.library;
+      saveLibrary();
+      go('presets', { renaming: made.id }); // dupe → rename → editor is ONE flow
+      return;
+    }
+    if (act === 'edit-preset') {
+      if (e.target.id === 'rename-input') return; // an inline rename is in progress
+      state.renaming = null;
+      state.editingPreset = el.dataset.id;
+      state.editing = null;
+      render();
+      return;
+    }
+    if (act === 'make-default' || act === 'make-default-editor') {
+      if (!me()) { toast('Add a Profile first'); return; }
+      if (!getPreset(library, el.dataset.id)) { render(); return; } // a stale click must never dangle the default
+      profiles = setDefaultPreset(profiles, me(), el.dataset.id);
+      saveProfiles();
+      render();
+      toast(`“${getPreset(library, el.dataset.id).name}” is now the default Preset`);
+      return;
+    }
+    if (act === 'del-preset') {
+      const preset = getPreset(library, el.dataset.id);
+      if (!preset) return;
+      const { configs, defaults } = countPresetReferences(profiles, el.dataset.id);
+      openModal(`<h3>Delete “${esc(preset.name)}”?</h3>
+        ${configs
+          ? `<p><b>${configs} Raid Train Config${configs === 1 ? '' : 's'}</b> reference${configs === 1 ? 's' : ''} it. ${configs === 1 ? 'Its' : 'Their'} settings are kept — they're copied into ${configs === 1 ? 'that Config' : 'those Configs'}, so nothing changes on stream.</p>`
+          : '<p>No Raid Train Configs reference this Preset.</p>'}
+        ${defaults ? `<p><b>It is the default Preset</b> for ${defaults} profile${defaults === 1 ? '' : 's'}, which will be left without one.</p>` : ''}
+        <div class="m-actions">
+          <button type="button" class="btn" data-mact="cancel">Cancel</button>
+          <button type="button" class="btn danger-solid" data-mact="confirm-del" data-id="${esc(el.dataset.id)}">Delete Preset</button>
+        </div>`);
+      return;
+    }
 
-    // ── Init ──────────────────────────────────────────────────────────────
-    // Hydrate the form from THIS page's own query so a Configurator link is itself
-    // shareable + reloadable (?event=…&theme=…&… — same params as the overlay URL)
-    // and previews on load. With no query, leave the event field empty (so its
-    // placeholder hint shows); the preview falls back to the built-in demo
-    // (refreshPreview), so a fresh page still previews immediately and themes can be browsed.
-    (function hydrateFromUrl() {
-      const qs = window.location.search.replace(/^\?/, '');
-      if (!qs) return;
-      const c = parseConfig(qs);
-      const p = new URLSearchParams(qs);
-      writeForm({
-        event: c.event ?? '',
-        mode: c.mode,
-        interval: String(c.interval),
-        track: c.track,
-        trackfadein: String(c.trackfadein),
-        trackfadeout: String(c.trackfadeout),
-        speed: String(c.speed),
-        refresh: c.refresh ? String(c.refresh) : '',
-        openslots: c.openslots,
-        hidefinished: c.hidefinished,
-        enginedim: c.enginedim,
-        spotlight: p.get('spotlight') ?? '',   // raw, so the form keeps the typed casing
-        tz: p.get('tz') ?? '',
-        theme: c.theme,
-        scale: String(c.scale),
-        height: String(c.height),
-        lang: c.lang ?? '',
+    // ── Profile settings ──
+    if (act === 'add-spot') {
+      const input = $('#spot-input');
+      const name = input.value.trim().replace(/,/g, '');
+      if (!name) return;
+      profiles = addSpotlight(profiles, me(), name);
+      saveProfiles();
+      render();
+      $('#spot-input')?.focus();
+      toast(`“${name}” will glow on every train`);
+      return;
+    }
+    if (act === 'rm-spot') {
+      profiles = removeSpotlight(profiles, me(), el.dataset.name);
+      saveProfiles();
+      render();
+      return;
+    }
+    if (act === 'export-backup') {
+      const blob = await encodeBackup({ presets: library, profiles, streamers });
+      $('#backup-blob').value = blob;
+      copyText(blob, 'Backup code copied');
+      return;
+    }
+    if (act === 'import-backup') {
+      const decoded = await decodeBackup($('#backup-blob').value.trim());
+      if (!decoded) { toast('That doesn’t look like a backup code'); return; }
+      openModal(`<h3>Restore this backup?</h3>
+        <p>It carries <b>${Object.keys(decoded.presets).length} Preset(s)</b> and
+           <b>${listProfiles(decoded.profiles).length} Profile(s)</b>.</p>
+        <p>Everything currently in this browser is <b>replaced</b>.</p>
+        <div class="m-actions">
+          <button type="button" class="btn" data-mact="cancel">Cancel</button>
+          <button type="button" class="btn danger-solid" data-mact="confirm-import">Replace everything</button>
+        </div>`);
+      pendingImport = decoded;
+      return;
+    }
+    if (act === 'remove-profile') {
+      openModal(`<h3>Remove “${esc(me())}”?</h3>
+        <p>Its Raid Train Configs and standing Spotlights go with it. Presets are shared and stay.</p>
+        <div class="m-actions">
+          <button type="button" class="btn" data-mact="cancel">Cancel</button>
+          <button type="button" class="btn danger-solid" data-mact="confirm-remove-profile">Remove profile</button>
+        </div>`);
+      return;
+    }
+  });
+
+  // Live Link idle-card controls (change events, so they live on their own).
+  $('#main').addEventListener('change', (e) => {
+    if (e.target.id === 'll-idle-toggle') {
+      const horizon = $('#ll-horizon');
+      profiles = setLiveLinkPrefs(profiles, me(), { upcoming: e.target.checked ? horizon.value : null });
+      saveProfiles();
+      horizon.disabled = !e.target.checked;
+      $('#ll-url').value = liveLinkUrl();
+      toast(e.target.checked ? 'Idle card on — re-copy your Live Link' : 'Idle card off — re-copy your Live Link');
+      return;
+    }
+    if (e.target.id === 'll-horizon') {
+      profiles = setLiveLinkPrefs(profiles, me(), { upcoming: e.target.value });
+      saveProfiles();
+      $('#ll-url').value = liveLinkUrl();
+      toast('Horizon updated — re-copy your Live Link');
+      return;
+    }
+    if (e.target.id === 'default-preset-select') {
+      profiles = setDefaultPreset(profiles, me(), e.target.value || null);
+      saveProfiles();
+      toast('Default Preset updated');
+    }
+  });
+
+  // ── Preset renaming (inline in the library, and the editor's title) ─────
+  function commitRename(input) {
+    const id = input.dataset.id;
+    const name = input.value.trim();
+    state.renaming = null;
+    if (name && name !== getPreset(library, id)?.name) {
+      library = renamePreset(library, id, name);
+      saveLibrary();
+    }
+    // Post-duplicate intent is always "now customize it": any commit drops
+    // straight into the new Preset's editor. Escape stays in the library.
+    state.editingPreset = id;
+    render();
+  }
+  $('#main').addEventListener('keydown', (e) => {
+    if (e.target.id === 'rename-input') {
+      if (e.key === 'Enter') commitRename(e.target);
+      if (e.key === 'Escape') { state.renaming = null; render(); }
+      return;
+    }
+    if (e.target.id === 'preset-title-input') {
+      if (e.key === 'Enter') e.target.blur();
+      if (e.key === 'Escape') { e.target.value = getPreset(library, e.target.dataset.id)?.name ?? ''; e.target.blur(); }
+      return;
+    }
+    if (e.target.id === 'spot-input' && e.key === 'Enter') $('[data-act="add-spot"]')?.click();
+    if (e.target.id === 'onboard-input' && e.key === 'Enter') $('[data-act="onboard"]')?.click();
+  });
+  $('#main').addEventListener('focusout', (e) => {
+    if (e.target.id === 'rename-input' && state.renaming) commitRename(e.target);
+    if (e.target.id === 'preset-title-input') {
+      const id = e.target.dataset.id;
+      const name = e.target.value.trim();
+      const current = getPreset(library, id);
+      if (!current || !name || name === current.name) { e.target.value = current?.name ?? ''; return; }
+      library = renamePreset(library, id, name);
+      saveLibrary();
+      toast(`Renamed to “${name}”`);
+      // Patch the label in place rather than re-rendering: an in-flight click on
+      // "Make default" must still land on a Preset that exists.
+      e.target.value = getPreset(library, id).name;
+    }
+  });
+
+  // ── Modal actions ──────────────────────────────────────────────────────
+  $('#modal-scrim').addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) { closeModal(); return; }
+    const el = e.target.closest('[data-mact]');
+    if (!el) return;
+    const act = el.dataset.mact;
+    if (act === 'cancel') { closeModal(); pendingImport = null; return; }
+    if (act === 'confirm-del') {
+      const id = el.dataset.id;
+      const name = getPreset(library, id)?.name ?? '';
+      // Bake the Preset into every referencing Config FIRST, so nothing dangles
+      // and nothing changes on stream — then drop it from the library.
+      profiles = materializePreset(profiles, library, id);
+      library = deletePreset(library, id);
+      saveProfiles();
+      saveLibrary();
+      closeModal();
+      go('presets');
+      toast(`Deleted “${name}”`);
+      return;
+    }
+    if (act === 'confirm-import') {
+      if (!pendingImport) { closeModal(); return; }
+      library = pendingImport.presets;
+      profiles = pendingImport.profiles;
+      streamers = pendingImport.streamers;
+      pendingImport = null;
+      saveLibrary(); saveProfiles(); saveStreamers();
+      closeModal();
+      go('trains');
+      loadFeed();
+      toast('Backup restored');
+      return;
+    }
+    if (act === 'confirm-remove-profile') {
+      profiles = removeProfile(profiles, me());
+      saveProfiles();
+      closeModal();
+      go('trains');
+      if (me()) loadFeed();
+      toast('Profile removed');
+    }
+  });
+
+  // ── Init ───────────────────────────────────────────────────────────────
+  // A landing-page door (`?theme=…`, `#manual`) or an old shared Configurator
+  // link opens the one-off view, hydrated from the query. Otherwise the
+  // Profile's My Raid Trains is home.
+  (async function start() {
+    // Bind the translator before anything mounts — the Build-by-hand editor
+    // renders through it, and an unbound `t` would paint raw message keys.
+    t = makeT(await loadMessages(resolveLocale(undefined, navigator.languages)));
+    const search = window.location.search.replace(/^\?/, '');
+    const wantsOneOff = search !== '' || window.location.hash === '#manual';
+    if (wantsOneOff) {
+      const config = parseConfig(search);
+      const params = new URLSearchParams(search);
+      oneOff.event = config.event ?? '';
+      oneOff.settings = normalizeSettings({
+        theme: config.theme,
+        mode: config.mode,
+        interval: String(config.interval),
+        speed: String(config.speed),
+        track: config.track,
+        trackfadein: String(config.trackfadein),
+        trackfadeout: String(config.trackfadeout),
+        scale: String(config.scale),
+        height: String(config.height),
+        refresh: config.refresh ? String(config.refresh) : '',
+        openslots: config.openslots,
+        hidefinished: config.hidefinished,
+        enginedim: config.enginedim,
+        tz: params.get('tz') ?? '',
+        lang: config.lang ?? '',
       });
-      // A shared / re-opened ?lineup= link rehydrates the Build-by-hand editor and switches to it.
-      if (c.lineup) {
-        const model = decodeLineup(c.lineup);
+      if (config.lineup) {
+        const model = decodeLineup(config.lineup);
         if (model) {
-          // Recover a sensible "default set length" from the encoded per-DJ durations.
-          const durs = (model.d || []).map((x) => snapDuration(x.d));
-          const gg = (a, b) => (b ? gg(b, a % b) : a);
-          const base = durs.length ? durs.reduce((g, n) => gg(g, n), 0) : 60;
-          applyManualState({
-            title: model.t, organiser: model.o?.n ?? '',
+          const durations = (model.d ?? []).map((x) => snapDuration(x.d));
+          const gcd = (a, b) => (b ? gcd(b, a % b) : a);
+          const base = durations.length ? durations.reduce((g, n) => gcd(g, n), 0) : 60;
+          Object.assign(oneOff.manual, {
+            title: model.t,
+            organiser: model.o?.n ?? '',
             zone: model.z || detectedZone,
             startISO: model.s ? instantToZonedWallClock(model.s, model.z || detectedZone) : freshStartISO(),
             slotMins: base,
-            djs: (model.d || []).map((x, i) => ({ handle: x.h, slots: Math.max(1, Math.round(durs[i] / base)) })),
+            djs: (model.d ?? []).map((x, i) => ({ handle: x.h, slots: Math.max(1, Math.round(durations[i] / base)) })),
           });
-          setSource('manual', { silent: true });
+          oneOff.source = 'manual';
         }
       }
-    })();
-    // Landing-page door: configurator.html#manual opens straight into Build-by-hand.
-    if (source !== 'manual' && window.location.hash === '#manual') setSource('manual', { silent: true });
-    // Initial locale: an explicit ?lang= selects that language; otherwise the
-    // selector stays on Auto and the UI/overlay preview resolve from the browser.
-    // applyUiLocale localizes the static DOM, binds `t`, and runs onFormChange
-    // (which builds the URL + preview from the now-localized state). The preset
-    // list is rendered after `t` is bound so its strings localize too.
-    (async function initLocale() {
-      const urlConfig = parseConfig(window.location.search.replace(/^\?/, ''));
-      const explicitLocale = canonicalLocale(urlConfig.lang);
-      const initialLocale = explicitLocale || resolveLocale(undefined, navigator.languages);
-      els.lang.value = selectorLocale(urlConfig.lang);
-      await applyUiLocale(initialLocale);
-      refreshPresetList();
-    })();
-  </script>
+      if (window.location.hash === '#manual') oneOff.source = 'manual';
+      state.view = 'oneoff';
+    }
+    render();
+    if (!wantsOneOff && me()) loadFeed();
+  })();
+</script>
 </body>
 </html>

@@ -37,6 +37,10 @@ export function extractSlug(input) {
  * schema drift, and the output is the tested-idempotent serialize∘parse, which
  * is what makes a copied URL reproduce the form state. `event` is run through
  * extractSlug so a pasted RaidPal URL still produces a clean slug.
+ *
+ * Three Event sources, most specific first: a Live Link `user` (with its
+ * optional `trains` blob and `upcoming` horizon), a hand-built `manual`
+ * lineup, or a RaidPal `event`. Exactly one is emitted.
  */
 /**
  * Manual-editor state → the lineup wire model the codec encodes, or null if there are
@@ -65,7 +69,13 @@ export function buildOverlayQuery(formState = {}) {
   const params = new URLSearchParams();
   // The lineup SOURCE: a hand-built manual lineup (?lineup=) or a RaidPal event
   // (?event=). Only one is ever emitted; everything else (the knobs below) is shared.
-  if (formState.source === 'manual') {
+  if (formState.user) {
+    // Live Link: a Profile login, not an Event — the Overlay resolves the live/next
+    // train itself. Its per-train mapping blob and idle-card horizon ride along.
+    params.set('user', String(formState.user));
+    if (formState.trains) params.set('trains', String(formState.trains));
+    if (formState.upcoming) params.set('upcoming', String(formState.upcoming));
+  } else if (formState.source === 'manual') {
     const model = buildLineupModel(formState.manual || {});
     if (model) params.set('lineup', encodeLineup(model));
   } else {

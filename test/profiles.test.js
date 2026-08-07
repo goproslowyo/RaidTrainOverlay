@@ -6,6 +6,7 @@ import {
   setDefaultPreset, addSpotlight, removeSpotlight,
   upsertTrainConfig, deleteTrainConfig, getTrainConfig,
   resolveTrainSettings, countPresetReferences, materializePreset,
+  liveLinkPrefs, setLiveLinkPrefs,
 } from '../src/profiles.js';
 import { createPreset } from '../src/preset-library.js';
 
@@ -59,6 +60,20 @@ test('setDefaultPreset stores the Profile default Preset reference (null clears 
   assert.equal(store.profiles.alpha.defaultPresetId, 'id-1');
   store = setDefaultPreset(store, 'alpha', null);
   assert.equal(store.profiles.alpha.defaultPresetId, null);
+});
+
+test('liveLinkPrefs round-trips the idle-card horizon, and defaults to no card', () => {
+  let store = addProfile(EMPTY, 'alpha');
+  assert.deepEqual(liveLinkPrefs(store, 'alpha'), { upcoming: null });
+  store = setLiveLinkPrefs(store, 'alpha', { upcoming: '2w' });
+  assert.deepEqual(liveLinkPrefs(store, 'ALPHA'), { upcoming: '2w' });
+  store = setLiveLinkPrefs(store, 'alpha', { upcoming: null });
+  assert.equal(liveLinkPrefs(store, 'alpha').upcoming, null);
+  // A Profile written before the field existed reads as "no card", never a throw.
+  const legacy = { active: 'beta', profiles: { beta: { spotlight: [], defaultPresetId: null, trains: {} } } };
+  assert.deepEqual(liveLinkPrefs(legacy, 'beta'), { upcoming: null });
+  assert.deepEqual(liveLinkPrefs(legacy, 'nobody'), { upcoming: null });
+  assert.equal(setLiveLinkPrefs(legacy, 'beta', { upcoming: 'all' }).profiles.beta.liveLink.upcoming, 'all');
 });
 
 test('addSpotlight builds the standing promote list, deduped case-insensitively; removeSpotlight drops', () => {

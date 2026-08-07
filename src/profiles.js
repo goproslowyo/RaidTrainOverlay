@@ -4,7 +4,8 @@
  * A Profile is a bare Twitch login (lowercased key; RaidPal lookup is
  * case-insensitive) owning: a standing Spotlight list (names always
  * highlighted — self, friends, team members), a default Preset reference
- * (the base look, and the Live Link fallback for unmapped trains), and its
+ * (the base look, and the Live Link fallback for unmapped trains), its Live
+ * Link preferences (the idle card's horizon), and its
  * Raid Train Configs keyed by Event slug — `{ presetId, overrides, spotlight }`
  * where overrides is a per-field sparse diff against the referenced Preset
  * and spotlight is per-train ADDITIONS (union with the standing list, never
@@ -60,7 +61,10 @@ export function addProfile(store, login) {
   if (key === '' || store.profiles[key]) return { ...store };
   return {
     active: store.active ?? key,
-    profiles: { ...store.profiles, [key]: { spotlight: [], defaultPresetId: null, trains: {} } },
+    profiles: {
+      ...store.profiles,
+      [key]: { spotlight: [], defaultPresetId: null, trains: {}, liveLink: { upcoming: null } },
+    },
   };
 }
 
@@ -88,6 +92,22 @@ export function listProfiles(store) {
 /** The acting Profile's login, or null when none exist. */
 export function activeProfile(store) {
   return store.active ?? null;
+}
+
+/**
+ * The Profile's Live Link preferences — currently just the idle card's
+ * `upcoming` horizon (`'3'`, `'2w'`, `'1m'`, `'all'`, or null for "no card").
+ * It lives on the Profile, not in the URL alone, so the Live Link panel
+ * regenerates the SAME URL on every visit; a Profile written before this field
+ * existed reads as "no card".
+ */
+export function liveLinkPrefs(store, login) {
+  return { upcoming: null, ...(store.profiles[normalizeLogin(login)]?.liveLink ?? {}) };
+}
+
+/** Set the Profile's Live Link preferences (merged over what's there). */
+export function setLiveLinkPrefs(store, login, prefs) {
+  return withProfile(store, login, (p) => ({ ...p, liveLink: { ...(p.liveLink ?? {}), ...prefs } }));
 }
 
 /** Set (or clear, with null) a Profile's default Preset reference. */

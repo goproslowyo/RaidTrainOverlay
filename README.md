@@ -16,16 +16,25 @@ stamp. Fifteen themes, from Classic Americana to 16-bit pixel art to a rainbow P
 
 ## Quick start (OBS)
 
-1. **Get your event slug** — the last part of your RaidPal event link:
-   `raidpal.com/event/`**`your-event`** → `your-event`.
-2. **Build your URL** in the [Configurator](https://goproslowyo.github.io/RaidTrainOverlay/configurator.html):
-   pick a theme, motion, size and position, and copy the generated link. The minimal form is:
+1. **Open the [Configurator](https://goproslowyo.github.io/RaidTrainOverlay/configurator.html)
+   and type your Twitch username.** No sign-in — RaidPal's public profile is read by name.
+   Every raid train you've joined or organised appears under **My Raid Trains**.
+2. **Copy your Live Link** — one URL, keyed to your username, that always shows whichever
+   train is live (or your next one). Set it in OBS once and never edit it per train.
+   Prefer a link pinned to a single train? Hit **Configure** on that train and copy its link:
    ```
    https://goproslowyo.github.io/RaidTrainOverlay/overlay.html?event=your-event
    ```
 3. **Add it to OBS** — *Sources → + → Browser*, paste the URL, set the width/height to your
    canvas (e.g. 1920×1080). The overlay background is transparent, so it composites over
    your scene.
+
+Not your RaidPal account, or no RaidPal event at all? **One-off link** takes any event link,
+or lets you type a lineup in by hand.
+
+Settings live in **Presets** — saved bundles of look and motion with no event attached. Each
+train's **Raid Train Config** points at a Preset and overrides only what differs, so one tweak
+to a Preset flows to every train that hasn't overridden that field.
 
 ## Options
 
