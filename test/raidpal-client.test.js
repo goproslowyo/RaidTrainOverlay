@@ -63,3 +63,116 @@ test('normalizeEvent throws when the payload has no event', () => {
   assert.throws(() => normalizeEvent({}), /event/);
   assert.throws(() => normalizeEvent(null), /event/);
 });
+
+// ---- user endpoint (My Raid Trains) ----
+
+import { fetchUserPayload, normalizeUser, loadUser } from '../src/raidpal-client.js';
+import { makeUserPayload } from './fixtures/user-payload.js';
+
+test('fetchUserPayload fetches the raw wire payload from the user URL', async () => {
+  const payload = makeUserPayload();
+  let calledUrl;
+  const fakeFetch = async (url) => {
+    calledUrl = url;
+    return { ok: true, status: 200, text: async () => JSON.stringify(payload) };
+  };
+  const raw = await fetchUserPayload('goproflowyo', fakeFetch);
+  assert.equal(calledUrl, 'https://api.raidpal.com/rest/user/goproflowyo');
+  // Raw means raw: wire shape preserved (events_joined, not normalized).
+  assert.ok(Array.isArray(raw.user.events_joined));
+});
+
+test('fetchUserPayload returns null on 204 — unknown user, not an error', async () => {
+  // The live API answers unknown/invalid logins with 204 No Content and an
+  // EMPTY body (not JSON) — response.json() would throw here.
+  const fakeFetch = async () => ({ ok: true, status: 204, text: async () => '' });
+  assert.equal(await fetchUserPayload('thisuserdoesnotexist12345', fakeFetch), null);
+});
+
+test('fetchUserPayload returns null on a 200 whose body is empty or not a user payload', async () => {
+  const empty = async () => ({ ok: true, status: 200, text: async () => '' });
+  assert.equal(await fetchUserPayload('someone', empty), null);
+  const garbage = async () => ({ ok: true, status: 200, text: async () => 'not json' });
+  assert.equal(await fetchUserPayload('someone', garbage), null);
+  const noUser = async () => ({ ok: true, status: 200, text: async () => '{"ok":true}' });
+  assert.equal(await fetchUserPayload('someone', noUser), null);
+});
+
+test('fetchUserPayload throws on a non-ok response, carrying the status', async () => {
+  const fakeFetch = async () => ({ ok: false, status: 503, text: async () => '' });
+  await assert.rejects(fetchUserPayload('goproflowyo', fakeFetch), /503/);
+});
+
+test('fetchUserPayload URL-encodes the login', async () => {
+  let calledUrl;
+  const fakeFetch = async (url) => {
+    calledUrl = url;
+    return { ok: true, status: 204, text: async () => '' };
+  };
+  await fetchUserPayload('bad name!!', fakeFetch);
+  assert.equal(calledUrl, 'https://api.raidpal.com/rest/user/bad%20name!!');
+});
+
+test('normalizeUser maps the profile fields', () => {
+  const user = normalizeUser(makeUserPayload());
+  assert.equal(user.displayName, 'GoProFlowYo');
+  assert.equal(user.profileImage, 'https://example.test/avatars/goproflowyo.png');
+  assert.equal(user.twitchUri, 'https://twitch.tv/goproflowyo');
+  assert.equal(user.timezone, 'America/Los_Angeles');
+});
+
+test('normalizeUser merges organised + joined Events, deduped by raidpal_link, sorted by starttime', () => {
+  const user = normalizeUser(makeUserPayload());
+  // 1 organised (duplicated in joined) + 3 joined = 3 unique, ascending by start.
+  assert.deepEqual(
+    user.events.map((e) => e.slug),
+    ['luna-hao8', 'trainwreck-lucky-13', 'my-own-train'],
+  );
+});
+
+test('normalizeUser marks the Events the user organises', () => {
+  const user = normalizeUser(makeUserPayload());
+  const bySlug = Object.fromEntries(user.events.map((e) => [e.slug, e]));
+  assert.equal(bySlug['my-own-train'].organiser, true);
+  assert.equal(bySlug['luna-hao8'].organiser, false);
+});
+
+test('normalizeUser tolerates the events key being absent (non-organisers)', () => {
+  const payload = makeUserPayload();
+  delete payload.user.events;
+  const user = normalizeUser(payload);
+  assert.equal(user.events.length, 3);
+  assert.ok(user.events.every((e) => e.organiser === false));
+});
+
+test('normalizeUser maps Event summary fields, with Date times and a slug from api_link', () => {
+  const user = normalizeUser(makeUserPayload());
+  const luna = user.events[0];
+  assert.equal(luna.title, 'LUNA');
+  assert.ok(luna.starttime instanceof Date);
+  assert.equal(luna.starttime.getTime(), Date.parse('2026-08-03T22:00:00Z'));
+  assert.ok(luna.endtime instanceof Date);
+  assert.equal(luna.raidpalLink, 'https://raidpal.com/en/event/luna-hao8');
+  assert.equal(luna.apiLink, 'https://api.raidpal.com/rest/event/luna-hao8');
+  assert.equal(luna.slug, 'luna-hao8');
+});
+
+test('normalizeUser decodes HTML entities in Event titles (defensive)', () => {
+  const user = normalizeUser(makeUserPayload());
+  const wreck = user.events.find((e) => e.slug === 'trainwreck-lucky-13');
+  assert.equal(wreck.title, 'Trainwreck & Friends');
+});
+
+test('normalizeUser throws when the payload has no user', () => {
+  assert.throws(() => normalizeUser({}), /user/);
+  assert.throws(() => normalizeUser(null), /user/);
+});
+
+test('loadUser returns the normalized user, or null for an unknown login', async () => {
+  const okFetch = async () => ({ ok: true, status: 200, text: async () => JSON.stringify(makeUserPayload()) });
+  const user = await loadUser('goproflowyo', { fetchImpl: okFetch });
+  assert.equal(user.displayName, 'GoProFlowYo');
+
+  const goneFetch = async () => ({ ok: true, status: 204, text: async () => '' });
+  assert.equal(await loadUser('nobody', { fetchImpl: goneFetch }), null);
+});
