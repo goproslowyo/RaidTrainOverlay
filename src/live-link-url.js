@@ -82,21 +82,35 @@ function endTimes(profile, events) {
  *      train is still listed, from `endsAt` recorded earlier or from the read
  *      itself.
  *
- * The failure mode is the part to keep right: `events` MUST be null unless the
- * read was good. `fetchUserPayload` returns null for any unexpected 200 body,
- * and a read that failed or was served stale is not evidence of anything —
- * pruning on one would blank an entire Live Link on a bad RaidPal day. With
- * `events: null` nothing is dropped on absence, and with no `now` nothing is
- * dropped on time either.
+ * The failure mode is the part to keep right, and the two grounds do not need
+ * the same evidence:
+ *
+ * - `events` MUST be null unless the read was good. `fetchUserPayload` returns
+ *   null for any unexpected 200 body, and a read that failed or was served
+ *   stale is not evidence of anything — pruning on one would blank an entire
+ *   Live Link on a bad RaidPal day.
+ * - `verified` MUST be true only when that read actually reached RaidPal.
+ *   Ground 1 is an INFERENCE from absence and it decays: `loadMyRaidTrains`
+ *   serves a cache hit inside its 6h window as `{ fromCache: true, fresh: true }`
+ *   with no error and no stale flag, so a healthy-looking feed can be six hours
+ *   old and never re-checked — and one degraded-but-well-formed response poisons
+ *   it for that whole window. Ground 2 is a recorded FACT and does not decay, so
+ *   it still applies to a cached read.
+ *
+ * `verified` defaults to false so a caller that has not thought about
+ * provenance prunes nothing on absence. With `events: null` nothing is dropped
+ * on absence either, and with no `now` nothing is dropped on time.
  */
-export function buildTrainMap(library, store, login, { now = null, events = null } = {}) {
+export function buildTrainMap(library, store, login, { now = null, events = null, verified = false } = {}) {
   const profile = store.profiles?.[(login ?? '').toLowerCase()];
   if (!profile) return {};
   const at = now instanceof Date ? now.getTime() : now;
   const haveClock = Number.isFinite(at);
+  // End times come from the read whatever its age — when a train finishes is a
+  // fact RaidPal reported, not something inferred from what is missing.
   const ends = haveClock ? endTimes(profile, events) : new Map();
-  // Only a good read (an actual array) can speak to absence.
-  const listed = Array.isArray(events) ? new Set(events.map((e) => e?.slug)) : null;
+  // Absence, by contrast, only speaks when the read was actually verified.
+  const listed = verified && Array.isArray(events) ? new Set(events.map((e) => e?.slug)) : null;
   const base = baseSettings(library, store, login);
   const map = {};
   for (const slug of Object.keys(profile.trains ?? {})) {
@@ -136,9 +150,10 @@ export function buildTrainMap(library, store, login, { now = null, events = null
  * own Config, or less overridden on each. (A blob that is oversize today also
  * starts working unchanged if the cap is ever raised.)
  *
- * `when` is passed straight to buildTrainMap — `{ now, events }`, where
- * `events` is the feed only when the read was good. `trainCount` is what
- * survives that filter, which is what the panel's coverage line reports.
+ * `when` is passed straight to buildTrainMap — `{ now, events, verified }`,
+ * where `events` is the feed only when the read was good and `verified` says
+ * that read actually reached RaidPal rather than the cache. `trainCount` is
+ * what survives that filter, which is what the panel's coverage line reports.
  *
  * Returns `{ query: '' }` with a zero count for an unknown or blank login —
  * there is no Live Link without an identity to resolve.

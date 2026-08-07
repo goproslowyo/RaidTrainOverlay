@@ -684,6 +684,15 @@
     const f = state.feed;
     return f.status === 'ready' && !f.stale && !f.error ? f.events : null;
   }
+  /**
+   * …and whether that read actually reached RaidPal (#39). `goodFeedEvents`
+   * cannot tell: `loadMyRaidTrains` serves a cache hit inside its 6h window
+   * with no error and no stale flag, so a feed can look perfectly healthy and
+   * still be a six-hour-old snapshot nobody re-checked. That is fine for an end
+   * time — a recorded fact — but absence from it is an inference, and pruning a
+   * train's overrides on a stale inference is silent data loss.
+   */
+  const feedVerified = () => goodFeedEvents() != null && state.feed.fromCache === false;
   /** When the feed says this train ends, as epoch ms — only from a good read. */
   function feedEndsAt(slug) {
     const event = (goodFeedEvents() ?? []).find((e) => e.slug === slug);
@@ -691,7 +700,9 @@
   }
   /** The Live Link plus its size verdict (#33) and its train coverage (#31). */
   const liveLink = () => {
-    const link = buildLiveLink(library, profiles, me(), { now: Date.now(), events: goodFeedEvents() });
+    const link = buildLiveLink(library, profiles, me(), {
+      now: Date.now(), events: goodFeedEvents(), verified: feedVerified(),
+    });
     return { ...link, url: link.query ? `${OVERLAY_BASE}?${link.query}` : '' };
   };
   const liveLinkUrl = () => liveLink().url;
@@ -736,7 +747,16 @@
         renderMain();
         return;
       }
-      state.feed = { ...state.feed, status: 'ready', events: result.user.events, error: result.error ?? null };
+      // `fromCache` rides along so the Live Link can tell a verified read from a
+      // cache hit (#39). This is the ONLY assignment that sets it: loadFeed
+      // rebuilds state.feed from scratch on entry, so a later `...state.feed`
+      // spread can only ever carry THIS call's value — and the notFound/error
+      // paths that do spread it are already excluded by goodFeedEvents()
+      // returning null, which feedVerified() requires first.
+      state.feed = {
+        ...state.feed, status: 'ready', events: result.user.events,
+        error: result.error ?? null, fromCache: result.fromCache === true,
+      };
       renderMain();
       await loadEventDetails(result.user.events, {
         fetchImpl: fetch.bind(window),
