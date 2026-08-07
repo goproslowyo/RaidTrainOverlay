@@ -13,13 +13,15 @@
 // below ~6 KB.
 export const MAX_BLOB_CHARS = 8192;
 
-function bytesToB64url(bytes) {
+/** Raw bytes → URL-safe base64url (no padding). Exported for byte-level payloads (backup.js). */
+export function bytesToB64url(bytes) {
   let bin = '';
   for (let i = 0; i < bytes.length; i += 1) bin += String.fromCharCode(bytes[i]);
   return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
-function b64urlToBytes(str) {
+/** base64url → raw bytes. Throws on invalid base64 — callers catch (decodeJsonBlob discipline). */
+export function b64urlToBytes(str) {
   const b64 = str.replace(/-/g, '+').replace(/_/g, '/');
   const padded = b64 + '='.repeat((4 - (b64.length % 4)) % 4);
   const bin = atob(padded); // throws on invalid base64 — caught by decodeJsonBlob
