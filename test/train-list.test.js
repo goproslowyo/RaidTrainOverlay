@@ -60,11 +60,13 @@ test('the card shows live / organiser / config chips and escapes user text', () 
   assert.ok(!html.includes('<script>'), 'the RaidPal title is escaped');
 });
 
-test('a departed card is stamped and drops its mini-train; a failed detail still renders', () => {
+test('an ended card is stamped and drops its mini-train; a failed detail still renders', () => {
   const event = at('2026-07-26T20:00:00Z', 4);
-  const departed = trainCardHtml({ event, status: 'past', when: 'Sun, Jul 26', detail: { slots: 8, filled: 8 } }, t);
-  assert.match(departed, /Departed/);
-  assert.ok(!departed.includes('mini-train'));
+  const ended = trainCardHtml({ event, status: 'past', when: 'Sun, Jul 26', detail: { slots: 8, filled: 8 } }, t);
+  // "Ended", never "Departed" — a train departs when it STARTS (CONTEXT.md).
+  assert.match(ended, /Ended/);
+  assert.doesNotMatch(ended, /Departed/);
+  assert.ok(!ended.includes('mini-train'));
 
   const failed = trainCardHtml({ event, status: 'upcoming', when: 'Sun, Jul 26', error: new Error('nope') }, t);
   assert.match(failed, /couldn’t refresh/);

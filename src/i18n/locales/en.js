@@ -231,8 +231,8 @@ export default {
   'configurator.staleNotFound': 'RaidPal didn\'t return a profile for {login} just now — showing your last good list.',
   'configurator.staleError': 'Showing the last good list — RaidPal didn\'t answer just now.',
   'configurator.noTrains': 'No live or upcoming raid trains. Join one on RaidPal and it appears here.',
-  'configurator.departedOne': '{n} departed train',
-  'configurator.departedMany': '{n} departed trains',
+  'configurator.endedOne': '{n} ended train',
+  'configurator.endedMany': '{n} ended trains',
   'configurator.customPreset': 'Custom',
 
   // ── Configurator: one raid-train card in the list ────────────────────────
@@ -242,7 +242,7 @@ export default {
   'configurator.chipConfigTitle': 'This train has a saved Raid Train Config',
   'configurator.slotsFilled': '<b>{filled}/{slots}</b> slots filled',
   'configurator.cardRefreshFailed': 'couldn’t refresh',
-  'configurator.stampDeparted': 'Departed',
+  'configurator.stampEnded': 'Ended',
   'configurator.cardRefreshTitle': 'Refresh this train from RaidPal',
   'configurator.cardRefreshAria': 'Refresh {title} from RaidPal',
   'configurator.cardCopyTitle': 'Copy the overlay link for this train',

@@ -31,6 +31,19 @@ _Avoid_: empty slot, vacancy
 **Train**:
 The full visual assembly: Engine + one Car per displayed Slot + Caboose. Shows the full Event lineup.
 
+**Upcoming / Departed / Ended** _(a Train's three lifecycle states)_:
+The metaphor runs in one direction and the vocabulary must follow it. A Train sits at the station until its start time (**Upcoming**); it **departs** the station when the Event *starts*, and travels from streamer to streamer; it **ends** when it reaches the Caboose, the last streamer.
+
+| State | In the metaphor | Code |
+|---|---|---|
+| **Upcoming** | waiting at the station | `upcoming` |
+| **Departed** | left the station — running right now | `live` |
+| **Ended** | reached the Caboose | `past` |
+
+_Avoid_: "departed" for a Train that is over — it says the opposite of what it means. The Configurator's past-trains expander made exactly this mistake and now reads **Ended** (`configurator.endedOne` / `endedMany`).
+
+Note this is the **Train** level. At the **Slot** level, `isDeparted` / `.rt-car--departed` / `status.departed` describe one streamer's turn being over, in the departures-board sense of an individual departure having left the board. That usage is deliberate and unchanged — see [docs/authoring-a-theme.md](docs/authoring-a-theme.md), where it is a published Theme contract.
+
 **Engine**:
 The lead locomotive, driven by the **Organiser** — the conductor of the raid train. The Organiser has no Slot of their own, so the Engine carries no live state (no Now Marker, departed, or Spotlight); it simply leads the train and dims only post-event (`enginedim`).
 _Avoid_: locomotive, conductor car
@@ -104,7 +117,7 @@ A per-Event saved settings record, keyed by the Event's slug and scoped to a Pro
 _Avoid_: train setup, booking, override set (for the whole record)
 
 **Orphaned Config**:
-A Raid Train Config whose slug is absent from the Profile's current My Raid Trains feed — the Event departed, was deleted, or was renamed. The store cannot tell these apart, and does not need to: the Overlay resolves against that same feed, so none of the three can ever be selected again. The Live Link therefore drops an Orphaned Config, on the strict condition that the read was *good* — a failed or stale read makes no train an orphan.
+A Raid Train Config whose slug is absent from the Profile's current My Raid Trains feed — the Event ended, was deleted, or was renamed. The store cannot tell these apart, and does not need to: the Overlay resolves against that same feed, so none of the three can ever be selected again. The Live Link therefore drops an Orphaned Config, on the strict condition that the read was *good* — a failed or stale read makes no train an orphan.
 _Avoid_: stale config, dead config, dangling train
 
 **Live Link**:
