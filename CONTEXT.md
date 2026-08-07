@@ -84,8 +84,8 @@ _Avoid_: derail, chaos (those name the deferred opt-in *off-the-rails* axis, not
 The transparent full-canvas page loaded as an OBS browser source. All behavior is driven by its URL's query params.
 
 **Configurator**:
-The form page that builds an Overlay URL (event slug, Mode, toggles, Spotlights, timezones, refresh). Hosted alongside the Overlay.
-_Avoid_: settings page, admin, generator
+The streamer-facing app hosted alongside the Overlay: an app shell over a Profile's raid trains, with My Raid Trains as its home view plus the Raid Train Config editor, the Preset library, and Profile settings. Building a single Overlay URL by hand is one secondary view inside it (the One-off link), not the whole page.
+_Avoid_: settings page, admin, generator, form page
 
 **Preset**:
 A named, saved bundle of Configurator settings — *settings only, no Event*. Stored in the Configurator's localStorage; never read by the Overlay. Referenced by Raid Train Configs.
@@ -103,9 +103,17 @@ _Avoid_: my trains, my events, dashboard
 A per-Event saved settings record, keyed by the Event's slug and scoped to a Profile: a reference to a Preset plus per-Event overrides. Feeds the copied Overlay link for that Event.
 _Avoid_: train setup, booking, override set (for the whole record)
 
+**Orphaned Config**:
+A Raid Train Config whose slug is absent from the Profile's current My Raid Trains feed. Three causes the store cannot tell apart: the Event departed, its slug was renamed, or the read was bad. Because absence is ambiguous it is never on its own grounds to drop a Config — the Live Link filters on *positive* evidence that an Event ended (a recorded or freshly-read `endsAt` in the past).
+_Avoid_: stale config, dead config, dangling train
+
 **Live Link**:
 An Overlay URL keyed to a Profile's username rather than one Event: the Overlay resolves the currently-live (or next) Event from the RaidPal user endpoint at load. Set once in OBS, never edited per train. Carries its settings — including any per-Event mappings — encoded in the URL itself; it never reads the Configurator's localStorage.
 _Avoid_: magic URL (in code; fine in prose)
+
+**One-off link**:
+The Configurator view that builds a single Overlay URL from any Event slug or a hand-typed lineup, with no Profile behind it. The door for someone else's event, or for a train RaidPal has never heard of. Produces a static URL — nothing about it re-resolves later.
+_Avoid_: manual mode, quick link, guest mode
 
 **Theme**:
 The complete, swappable art treatment the Train is rendered in (e.g. Classic Americana, Pixel, Ticket). Selected per Overlay via the `theme` query param; one Theme is active at a time, and every Theme renders the full state vocabulary — Engine, Car, Caboose, Now Marker, Spotlight, departed, Open Slot. Orthogonal to **Mode**: Theme is _how the Train looks_, Mode is _how it moves_.

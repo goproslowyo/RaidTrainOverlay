@@ -6,10 +6,19 @@
  * highlighted — self, friends, team members), a default Preset reference
  * (the base look, and the Live Link fallback for unmapped trains), its Live
  * Link preferences (the idle card's horizon), and its
- * Raid Train Configs keyed by Event slug — `{ presetId, overrides, spotlight }`
- * where overrides is a per-field sparse diff against the referenced Preset
- * and spotlight is per-train ADDITIONS (union with the standing list, never
- * a restatement).
+ * Raid Train Configs keyed by Event slug —
+ * `{ presetId, overrides, spotlight, endsAt }` where overrides is a per-field
+ * sparse diff against the referenced Preset, spotlight is per-train ADDITIONS
+ * (union with the standing list, never a restatement), and endsAt is when the
+ * Event was last known to finish (epoch ms, or null when never observed).
+ *
+ * `endsAt` exists so the Live Link can stop encoding trains that have already
+ * run (#31) on POSITIVE evidence. RaidPal's user endpoint returns only
+ * upcoming events, so a departed train is simply absent — and absence also
+ * means a renamed slug or a bad read. Recording the end time while the train
+ * IS in a good read turns "it ended" into something the store knows outright,
+ * and leaves absence meaning nothing at all. A record written before this
+ * field existed has no endsAt, which reads as "no evidence" and keeps riding.
  *
  * Same discipline as presets.js: pure module, tolerant parse, never mutates;
  * the page owns localStorage. Preset CONTENT lives in preset-library.js —
@@ -140,11 +149,51 @@ export function removeSpotlight(store, login, name) {
  * per-train state the URL grammar doesn't know); spotlight is the per-train
  * ADDITIONS list.
  */
-export function upsertTrainConfig(store, login, slug, { presetId = null, overrides = {}, spotlight = [] } = {}) {
-  return withProfile(store, login, (p) => ({
-    ...p,
-    trains: { ...p.trains, [slug]: { presetId, overrides: pickSettings(overrides), spotlight: [...spotlight] } },
-  }));
+export function upsertTrainConfig(store, login, slug, { presetId = null, overrides = {}, spotlight = [], endsAt = null } = {}) {
+  return withProfile(store, login, (p) => {
+    const config = {
+      presetId,
+      overrides: pickSettings(overrides),
+      spotlight: [...spotlight],
+      endsAt: toEpochMs(endsAt),
+    };
+    // Auto-prune: a Config holding nothing is DELETED, not stored (#31).
+    // Deliberately here rather than at the call sites, so every writer gets
+    // it — `reset-overrides` most of all, which writes `{...config,
+    // overrides: {}}` and is the exact case this exists for. Touching a
+    // setting and putting it back must not leave a permanent record claiming
+    // the train is configured, because that record keeps riding the Live
+    // Link's blob carrying its Preset's whole diff against the base.
+    if (isEmptyTrainConfig(config, p.defaultPresetId ?? null)) {
+      const trains = { ...p.trains };
+      delete trains[slug];
+      return { ...p, trains };
+    }
+    return { ...p, trains: { ...p.trains, [slug]: config } };
+  });
+}
+
+/** Date | epoch ms | ISO string → epoch ms, or null for anything unusable. */
+function toEpochMs(value) {
+  if (value == null) return null;
+  const ms = value instanceof Date ? value.getTime() : Number(new Date(value));
+  return Number.isFinite(ms) ? ms : null;
+}
+
+/**
+ * Does this Config hold nothing the streamer chose? No overrides, no per-train
+ * Spotlight additions, and no Preset of its own beyond the Profile's default.
+ *
+ * Such a record is pure bookkeeping: the editor synthesizes exactly the same
+ * thing when it is absent, so deleting it loses nothing and is not data loss.
+ * `endsAt` is not consulted — it is observed fact about the Event, never a
+ * choice, so a record holding only an end time holds nothing.
+ */
+export function isEmptyTrainConfig(config, defaultPresetId = null) {
+  if (config == null) return true;
+  return Object.keys(config.overrides ?? {}).length === 0
+    && (config.spotlight ?? []).length === 0
+    && (config.presetId ?? null) === (defaultPresetId ?? null);
 }
 
 /** Remove the Config for a slug. Missing slug is a silent no-op. */
