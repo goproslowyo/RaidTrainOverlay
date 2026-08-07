@@ -1,0 +1,585 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PROTOTYPE — landing-page visual direction (#34)</title>
+<!--
+  ══════════════════════════════════════════════════════════════════════════
+  THROWAWAY PROTOTYPE — issue #34, round 4. Not shipped, not tested, not i18n'd.
+  Switch with ?v=A|B|C, the floating bar, or the arrow keys.
+
+  ── Round 4: the page is settled; only the caveat is still in play ──────────
+  The LAYOUT is decided — C's ordering won. The live cycling preview leads, as
+  the catchy "here is what it actually looks like", and the board sits under it.
+  The goofy little CSS train is back too: it was missed, so it now runs as its
+  own strip on the seam between the preview and the board. It competes with
+  nothing, because it carries no message — the preview does that job now.
+
+  Board COPY rewritten. The old NOW row invented a vague noun ("gets the
+  marker", "the overlay reads your RaidPal train and moves the marker") for a
+  thing that already has a name in CONTEXT.md — the **Now Marker** — and a word
+  the viewer actually sees painted on the Car: **NOW** (overlay.now). The copy
+  now uses that, which is also what the owner called it.
+
+  The CAVEAT was right in substance and about four times the length a hero page
+  can carry. Same meaning in ~10 words, and the three variants are now nothing
+  but where it lives:
+
+    A — a board ROW. The board's grammar is already when → what → status, and
+        "when you change something" is another when. Its Manual lamp against two
+        Automatic ones makes the honest point structurally, not in a paragraph.
+    B — one line under the board.
+    C — microcopy under the CTA.
+
+  ── Round 3: the graft ──────────────────────────────────────────────────────
+  Round 2 got the classic prototype answer — "the hero from A with the middle
+  from B" — so the direction is no longer three rival pages. It is ONE page:
+
+      A's hero  +  B's departures board  +  the caveat  +  B's GO row as the CTA
+
+  and A's old below-fold (the How-it-works / Themes card pair) is gone, replaced
+  by the board. The board is also spruced up as asked: staggered split-flap
+  flip-in, a slab with real depth, glowing status lamps, row hover.
+
+  What is STILL open is the one thing the owner was openly unsure about — "I
+  don't know" — so that is what the three variants now test, and nothing else:
+
+      Does the live theme preview belong on the landing page, and where?
+
+    A — Full graft.   Auto-shuffling preview as its own section under the board.
+    B — No preview.   The clutter worry made real: board only, one text door to
+                      preview.html. This is the honest control.
+    C — Preview IS the motif. The real overlay replaces the decorative CSS train
+                      INSIDE the hero, cycling themes. Answers "don't clutter" by
+                      making the preview do the motif's job instead of adding a
+                      section — one fewer thing on the page, not one more.
+
+  The chip GRID is gone from all three: the owner asked for "one that shuffles
+  through all of them as a for instance", not fifteen buttons. Note the knock-on
+  — the grid was the landing page's only door to the individual themes, so each
+  variant keeps a one-line text door to preview.html. Retiring the grid retires
+  all 16 landing.theme.* keys, which pushes #30's catalog delta further negative.
+
+  Cycling uses the Overlay's own `rto-preview` postMessage protocol
+  (src/preview-frame.js), so a theme change re-renders IN PLACE — no iframe
+  reload, no refetch, no flicker every four seconds. The first load is lazy via
+  IntersectionObserver, and prefers-reduced-motion stops the auto-cycle.
+
+  Copy is placeholder English; the caveat's middle sentence is configurator.llWarn
+  verbatim. Tokens are still hand-copied from the Configurator — Q4 (shared
+  assets/app.css vs duplicated :root) remains the one unsettled question.
+  ══════════════════════════════════════════════════════════════════════════
+-->
+<style>
+  /* ── Configurator tokens, copied verbatim from configurator.html ──────── */
+  :root {
+    --bg: #0f1216; --panel: #191e25; --panel-2: #222834; --panel-3: #2a3140;
+    --ink: #e7ecf3; --muted: #96a2b4; --line: #2b313c;
+    --accent: #57b6ff; --accent-dim: #9ad; --gold: #f4c430;
+    --live: #ff5a67; --ok: #5ed18a; --warn: #ffb454; --bad: #ff6b6b;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: radial-gradient(1200px 500px at 70% -200px, #1a2230 0%, transparent 60%), var(--bg);
+    color: var(--ink);
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    min-height: 100vh;
+  }
+  a { color: var(--accent); }
+  button { font: inherit; cursor: pointer; }
+
+  /* ── Shell primitives (the Configurator's, minus the sidebar) ─────────── */
+  .top {
+    display: flex; align-items: center; gap: 16px;
+    padding: 14px 28px; border-bottom: 1px solid var(--line);
+    background: rgba(15, 18, 22, .85); backdrop-filter: blur(6px);
+    position: sticky; top: 0; z-index: 40;
+  }
+  .brand { display: flex; align-items: baseline; gap: 12px; }
+  .brand h1 { font-size: 17px; margin: 0; letter-spacing: -.3px; white-space: nowrap; }
+  .brand h1 .a { color: var(--gold); }
+  .brand-train { display: flex; align-items: flex-end; gap: 3px; padding-bottom: 3px; }
+  .brand-train i { display: block; width: 14px; height: 9px; border-radius: 2px; border: 1px solid #0007; }
+  .brand-train i:nth-child(1) { background: #b45309; border-color: var(--gold); width: 16px; height: 11px; }
+  .brand-train i:nth-child(2) { background: #1e3a5f; }
+  .brand-train i:nth-child(3) { background: #5b2a78; }
+  .top .spacer { margin-left: auto; }
+  .top .toplink { color: var(--muted); text-decoration: none; font-size: 13.5px; font-weight: 600; }
+  .top .toplink:hover { color: var(--ink); }
+
+  .btn {
+    padding: 8px 15px; border-radius: 7px; border: 1px solid var(--line);
+    background: var(--panel-2); color: var(--ink); font-weight: 600; white-space: nowrap;
+    text-decoration: none; display: inline-block;
+  }
+  .btn:hover { border-color: var(--accent); }
+  .btn.gold { background: var(--gold); border-color: var(--gold); color: #1f2937; font-weight: 700; }
+  .btn.lg { padding: 13px 26px; font-size: 16px; border-radius: 9px; }
+
+  /* ── HERO (variant A of round 1 — the part that won) ──────────────────── */
+  .hero {
+    position: relative; overflow: hidden; border-bottom: 1px solid var(--line);
+    padding: 70px 24px 0;
+    background:
+      radial-gradient(760px 300px at 50% 8%, rgba(244, 196, 48, .16), transparent 62%),
+      radial-gradient(900px 400px at 80% 120%, rgba(87, 182, 255, .10), transparent 60%);
+  }
+  .hero-inner { max-width: 780px; margin: 0 auto; text-align: center; position: relative; z-index: 2; }
+  .hero h2 { font-size: 46px; line-height: 1.08; margin: 0 0 14px; letter-spacing: -1.4px; font-weight: 800; }
+  .hero h2 .g { color: var(--gold); }
+  .hero p.lede { color: var(--muted); font-size: 18px; margin: 0 auto 26px; max-width: 560px; }
+  .doors { color: var(--muted); font-size: 13.5px; margin: 18px 0 0; }
+  .doors a { color: var(--accent-dim); }
+
+  /* The decorative rolling train (A and B keep it; C replaces it with the real
+     Overlay, which is the whole point of C). */
+  .rail { position: relative; height: 96px; margin-top: 40px; }
+  .rail::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 22px; height: 3px;
+    background: linear-gradient(90deg, transparent, var(--line) 12%, var(--line) 88%, transparent);
+  }
+  .rolling { position: absolute; bottom: 25px; display: flex; align-items: flex-end; gap: 7px; animation: roll 26s linear infinite; }
+  @keyframes roll { from { left: -340px; } to { left: 100%; } }
+  .rolling .car { width: 58px; height: 40px; border-radius: 6px; border: 2px solid #0006; position: relative; animation: bob 1.1s ease-in-out infinite; }
+  @keyframes bob { 50% { transform: translateY(-1.5px); } }
+  .rolling .car::after {
+    content: ""; position: absolute; left: 8px; right: 8px; bottom: -7px; height: 10px;
+    background: radial-gradient(circle at 9px 3px, #222 3px, transparent 4px),
+                radial-gradient(circle at calc(100% - 9px) 3px, #222 3px, transparent 4px);
+  }
+  .rolling .loco { width: 66px; height: 46px; background: #b45309; border-color: var(--gold); }
+  .rolling .c1 { background: #1e3a5f; animation-delay: .08s; }
+  .rolling .c2 { background: #5b2a78; animation-delay: .16s; }
+  .rolling .c3 { background: #14361f; border-color: #37b24d; animation-delay: .24s; }
+  .rolling .c4 { background: #7c2d12; animation-delay: .32s; }
+
+  /* ── DEPARTURES BOARD (from round 2's B — spruced up) ─────────────────── */
+  .body { max-width: 940px; margin: 0 auto; padding: 40px 24px 0; }
+  .board-kicker {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 11.5px; letter-spacing: .26em;
+    color: var(--gold); text-transform: uppercase; margin: 0 0 12px; text-align: center;
+  }
+  .board {
+    border: 1px solid #3a3222; border-radius: 12px; overflow: hidden;
+    background: linear-gradient(180deg, #0d1015, #090b0f);
+    box-shadow: inset 0 1px 0 #ffffff0d, inset 0 -30px 60px #0006, 0 22px 60px #0008;
+  }
+  .row {
+    display: grid; grid-template-columns: 108px 1fr 152px; align-items: center; gap: 14px;
+    padding: 16px 22px; border-bottom: 1px solid #1a1e26;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    /* Split-flap: each row drops in from the top edge, staggered. */
+    transform-origin: top center; animation: flap .5s cubic-bezier(.2, .8, .3, 1) backwards;
+  }
+  @keyframes flap {
+    from { opacity: 0; transform: perspective(600px) rotateX(-72deg); }
+    to   { opacity: 1; transform: perspective(600px) rotateX(0); }
+  }
+  .row:nth-child(2) { animation-delay: .06s; }
+  .row:nth-child(3) { animation-delay: .16s; }
+  .row:nth-child(4) { animation-delay: .26s; }
+  .row:nth-child(5) { animation-delay: .38s; }
+  .row:last-child { border-bottom: 0; }
+  .row:not(.head):not(.cta):hover { background: #ffffff05; }
+  .row.head {
+    background: #12161d; color: var(--muted); font-size: 10.5px;
+    letter-spacing: .18em; text-transform: uppercase; padding: 10px 22px; animation-delay: 0s;
+  }
+  .when {
+    color: var(--gold); font-size: 13.5px; font-weight: 700; letter-spacing: .06em;
+    text-shadow: 0 0 14px #f4c43055;
+  }
+  .what { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; font-size: 15.5px; }
+  .what b { font-weight: 700; }
+  .what span { display: block; color: var(--muted); font-size: 13px; margin-top: 3px; }
+  .flag { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; text-align: right; color: var(--muted); }
+  .flag.on { color: var(--live); text-shadow: 0 0 12px #ff5a6766; }
+  .flag.on::before { content: "●"; margin-right: 6px; animation: blink 1.6s steps(1, end) infinite; }
+  @keyframes blink { 50% { opacity: .2; } }
+  .flag.auto { color: var(--ok); }
+  /* The CTA is the board's last row — round 2's "more powerful" treatment. */
+  .row.cta {
+    background: linear-gradient(90deg, #f4c4301a, #f4c4300a 60%, transparent);
+    padding: 22px; border-top: 1px solid #3a3222;
+  }
+  .row.cta .what { font-size: 17.5px; font-weight: 700; }
+
+  .caveat {
+    display: flex; gap: 9px; align-items: flex-start; color: var(--muted);
+    font-size: 12.5px; margin: 14px 4px 0; max-width: 70ch;
+  }
+  .caveat .w { color: var(--warn); flex: none; }
+  .caveat b { color: var(--ink); font-weight: 600; }
+
+  /* Caveat treatment A — a board row. The board's grammar is already
+     "when → what you see → status", and "when you change something" is just
+     another when. The Manual lamp against two Automatic ones is the honest
+     point, made structurally instead of in a paragraph. */
+  .row.caveat-row { background: #ffb4540a; }
+  .when.dim { color: var(--warn); text-shadow: 0 0 14px #ffb45444; }
+  .flag.manual { color: var(--warn); }
+  /* Caveat treatment C — microcopy riding under the CTA line. */
+  .cta-note {
+    display: block; color: var(--muted); font-size: 12.5px; font-weight: 400; margin-top: 4px;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+
+  /* The little CSS train's own strip, on the seam under the hero. */
+  .rolling-strip {
+    position: relative; overflow: hidden; height: 74px;
+    border-bottom: 1px solid var(--line);
+    background: linear-gradient(180deg, #ffffff04, transparent);
+  }
+  .rolling-strip .rail { height: 74px; margin: 0; }
+  .rolling-strip .rail::after { bottom: 18px; }
+  .rolling-strip .rolling { bottom: 21px; }
+
+  /* ── LIVE PREVIEW ─────────────────────────────────────────────────────── */
+  /* Round 2's sizing fix, unchanged and load-bearing: the Overlay sizes its
+     Train as --train-height:28vh, a fraction of the IFRAME's viewport, and
+     bottoms it onto the iframe floor (#24's `foot`). So a tall iframe pinned to
+     bottom:0 inside a short overflow-hidden stage gives a BIG Train and no
+     empty air. Shrinking the frame would shrink the Train. */
+  .stage {
+    position: relative; overflow: hidden;
+    border: 1px solid var(--line); border-radius: 14px;
+    background: repeating-conic-gradient(#141922 0% 25%, #11161d 0% 50%) 50% / 22px 22px;
+    height: 200px;
+  }
+  .stage iframe { position: absolute; left: 0; bottom: 0; width: 100%; height: 520px; border: 0; display: block; }
+  .stage.in-hero { height: 220px; border-radius: 16px; box-shadow: 0 24px 70px #0009; }
+  .stage.in-hero iframe { height: 560px; }
+  /* The demo lineup is 9 cars, and at hero size the last one runs past the right
+     edge. Chopped mid-name that reads as a bug; faded, it reads as a train
+     continuing out of frame — which is the motif C is trying to be. Masking the
+     frame beats shrinking the Train with scale=, since size is the whole point. */
+  .stage.in-hero::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(90deg, transparent 82%, #10141a 99%);
+  }
+  .stage-ph {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    color: var(--muted); font-size: 13.5px;
+  }
+  .preview-cap {
+    display: flex; align-items: center; justify-content: center; gap: 9px;
+    color: var(--muted); font-size: 12.5px; margin-top: 10px; min-height: 18px;
+  }
+  .preview-cap .name { color: var(--ink); font-weight: 600; }
+  .preview-cap .dot { color: var(--gold); animation: blink 1.6s steps(1, end) infinite; }
+  .preview-sec { margin-top: 40px; }
+  .preview-sec h3 {
+    font-size: 12.5px; text-transform: uppercase; letter-spacing: .07em;
+    color: var(--accent-dim); margin: 0 0 4px; font-weight: 700; text-align: center;
+  }
+  .preview-sec p.sub { color: var(--muted); font-size: 13.5px; text-align: center; margin: 0 0 16px; }
+  .themes-door { color: var(--muted); font-size: 13.5px; text-align: center; margin: 16px 0 0; }
+  .themes-door a { color: var(--accent-dim); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .rolling, .flag.on::before, .preview-cap .dot { animation: none; }
+    .row { animation: none; }
+  }
+
+  .foot { color: var(--muted); font-size: 13px; text-align: center; padding: 44px 20px 96px; }
+
+  /* ── Prototype switcher — deliberately NOT part of the design ─────────── */
+  .proto-bar {
+    position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 999;
+    display: flex; align-items: center; gap: 4px;
+    background: #05070a; border: 1px solid #46506180; border-radius: 999px;
+    padding: 5px 6px; box-shadow: 0 10px 34px #000b; font-size: 13px;
+  }
+  .proto-bar button {
+    width: 30px; height: 30px; border-radius: 50%; border: 0;
+    background: #1b222c; color: #cfd8e3; font-size: 15px; line-height: 1;
+  }
+  .proto-bar button:hover { background: #2a3340; color: #fff; }
+  .proto-bar .label { padding: 0 12px; color: #cfd8e3; font-weight: 700; white-space: nowrap; }
+  .proto-bar .label em { color: #7d8899; font-style: normal; font-weight: 500; }
+  .proto-bar .tag {
+    font-size: 10px; font-weight: 800; letter-spacing: .1em; color: #05070a;
+    background: var(--warn); border-radius: 999px; padding: 2px 7px; margin-right: 4px;
+  }
+
+  @media (max-width: 820px) {
+    /* 28px of side padding plus the brand and two links overflowed a 375px
+       viewport by 6px — enough to give the whole page a horizontal scrollbar. */
+    .top { padding: 12px 16px; gap: 12px; }
+    .hero { padding-left: 16px; padding-right: 16px; }
+    .hero h2 { font-size: 33px; }
+    .rail { height: 76px; }
+    .row { grid-template-columns: 74px 1fr; padding: 14px 16px; }
+    /* The status column drops on mobile. The header's third cell has no .flag
+       class of its own, so hiding only .flag left "STATUS" wrapping to its own
+       line under a two-column grid. */
+    .flag, .row.head span:last-child { display: none; }
+    .row.cta { grid-template-columns: 74px 1fr; }
+    .row.cta .go-btn { grid-column: 2; margin-top: 10px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="top">
+  <div class="brand">
+    <span class="brand-train" aria-hidden="true"><i></i><i></i><i></i></span>
+    <h1>RaidTrain<span class="a">Overlay</span></h1>
+  </div>
+  <span class="spacer"></span>
+  <a class="toplink" href="#">Themes</a>
+  <a class="toplink" href="#">README</a>
+</div>
+
+<main id="stage-root"></main>
+
+<div class="foot">
+  README &middot; Author a theme &middot; Source &middot; MIT licensed<br>
+  Built with ❤️ by a streamer, for streamers &middot; by goproslowyo
+</div>
+
+<div class="proto-bar">
+  <span class="tag">PROTO</span>
+  <button id="prev" title="Previous variant (←)">‹</button>
+  <span class="label" id="label"></span>
+  <button id="next" title="Next variant (→)">›</button>
+</div>
+
+<script type="module">
+const THEMES = [
+  ['classic', 'Classic Americana'], ['flat', 'Flat'], ['synthwave', 'Synthwave'],
+  ['ticket', 'Vintage Ticket'], ['wood', 'Wooden Toy'], ['comic', 'Comic'],
+  ['departures', 'Departures Board'], ['paper', 'Construction Paper'], ['tron', 'Tron'],
+  ['pixel', '16-bit Pixel'], ['highvibes', 'High Vibes'], ['jazz', 'Jazz Vinyl'],
+  ['bullet', 'Anime Bullet Train'], ['lava', 'Lava Lamp'], ['pride', 'Pride'],
+];
+
+// ── Shared page pieces ──────────────────────────────────────────────────────
+const heroHtml = (motif) => `
+  <section class="hero">
+    <div class="hero-inner">
+      <h2>Your raid train, <span class="g">live on stream</span> — from one link.</h2>
+      <p class="lede">Paste it into OBS once. It finds whichever train you're running today,
+         and every train after that, on its own.</p>
+      <p class="doors">Got a single RaidPal event? <a href="#">Build a one-off link</a>.
+         No RaidPal? <a href="#">Build one by hand</a>.</p>
+    </div>
+    ${motif}
+  </section>`;
+
+const ROLLING = `
+  <div class="rail" aria-hidden="true">
+    <div class="rolling">
+      <span class="car loco"></span><span class="car c1"></span><span class="car c2"></span>
+      <span class="car c3"></span><span class="car c4"></span>
+    </div>
+  </div>`;
+
+const heroPreview = `
+  <div style="max-width:900px;margin:34px auto 0;padding:0 4px 30px">
+    <div class="stage in-hero">
+      <iframe data-preview title="Overlay preview" hidden></iframe>
+      <div class="stage-ph" data-ph>Loading a live example…</div>
+    </div>
+    <p class="preview-cap"><span class="dot">●</span> Live example — <span class="name" data-cap>…</span></p>
+  </div>`;
+
+// The board carries the pitch AND the CTA — round 2's "more powerful" call to
+// action is its final row, so there is one primary button on the page.
+// Copy rewritten in round 4. The old NOW row ("Whoever's live gets the marker" /
+// "the overlay reads your RaidPal train and moves the marker") invented a vague
+// noun for a thing that already has a name AND a rendered word: CONTEXT.md calls
+// it the **Now Marker**, and the badge the viewer actually sees says **NOW**
+// (overlay.now). So the copy says NOW, which is also what the owner called it.
+// CONTEXT.md's _Avoid_ list rules out "now playing" and "live highlight".
+const boardHtml = (caveatRow = '', caveatAfter = '', ctaNote = '') => `
+  <p class="board-kicker">Now boarding</p>
+  <div class="board">
+    <div class="row head"><span>When</span><span>What you see</span><span style="text-align:right">Status</span></div>
+    <div class="row">
+      <span class="when">NOW</span>
+      <span class="what"><b>Whoever's live is marked NOW</b>
+        <span>As your train moves from streamer to streamer, the NOW marker moves with it.</span></span>
+      <span class="flag on">On air</span>
+    </div>
+    <div class="row">
+      <span class="when">NEXT</span>
+      <span class="what"><b>Your next train, already loaded</b>
+        <span>When this one ends, the overlay switches over by itself.</span></span>
+      <span class="flag auto">Automatic</span>
+    </div>
+    <div class="row">
+      <span class="when">EVERY</span>
+      <span class="what"><b>Every train after that too</b>
+        <span>One URL covers your whole schedule.</span></span>
+      <span class="flag auto">Automatic</span>
+    </div>
+    ${caveatRow}
+    <div class="row cta">
+      <span class="when">GO</span>
+      <span class="what">Take your link and paste it into OBS.${ctaNote}</span>
+      <span style="text-align:right"><a class="btn gold lg go-btn" href="#">Get my link</a></span>
+    </div>
+  </div>
+  ${caveatAfter}`;
+
+// ── The caveat, three ways ──────────────────────────────────────────────────
+// Round 3's version said the right thing at four times the length a hero page
+// can carry. Same meaning, ~10 words, three placements to react to.
+const CAVEAT_ROW = `
+    <div class="row caveat-row">
+      <span class="when dim">LATER</span>
+      <span class="what"><b>Changed your settings?</b>
+        <span>Copy the link again — your settings ride inside the URL.</span></span>
+      <span class="flag manual">You do this</span>
+    </div>`;
+const CAVEAT_AFTER = `
+  <p class="caveat"><span class="w" aria-hidden="true">⚠</span>
+    <span>Change your settings later and the URL changes — copy it again.</span></p>`;
+const CTA_NOTE = `<span class="cta-note">Change your settings later? Copy it again.</span>`;
+
+// The goofy little CSS train, back by request, as its own strip on the seam
+// between the real preview and the board. Purely charm — it carries no message,
+// which is why it can sit this close to a live Overlay without competing.
+const ROLLING_STRIP = `
+  <div class="rolling-strip" aria-hidden="true">
+    <div class="rail">
+      <div class="rolling">
+        <span class="car loco"></span><span class="car c1"></span><span class="car c2"></span>
+        <span class="car c3"></span><span class="car c4"></span>
+      </div>
+    </div>
+  </div>`;
+
+const themesDoor = `
+  <p class="themes-door">Fifteen themes to choose from — <a href="#">see them all</a>.</p>`;
+
+// ── Round 4: one page, three caveat treatments ──────────────────────────────
+// C's ORDERING won — the live preview up front, as the catchy "here is what it
+// looks like", with the board below it. And the goofy little CSS train is back:
+// it was missed, so it now runs as its own strip directly under the hero fold,
+// between the real preview and the board. It is no longer competing with the
+// preview for the same job — the preview shows the product, the little train is
+// just charm on the seam.
+//
+// So the page is settled and the only thing left to react to is the caveat,
+// which was right in substance and far too long. Same ~10 words, three homes.
+const page = (opts) => `
+  ${heroHtml(heroPreview)}
+  ${ROLLING_STRIP}
+  <div class="body">${boardHtml(opts.row || '', opts.after || '', opts.note || '')}${themesDoor}</div>`;
+
+const VARIANTS = {
+  A: {
+    name: 'Caveat as a board row — LATER / you do this',
+    html: () => page({ row: CAVEAT_ROW }),
+  },
+  B: {
+    name: 'Caveat as one line under the board',
+    html: () => page({ after: CAVEAT_AFTER }),
+  },
+  C: {
+    name: 'Caveat as microcopy under the CTA',
+    html: () => page({ note: CTA_NOTE }),
+  },
+};
+
+// ── The auto-cycling preview ────────────────────────────────────────────────
+// Uses the Overlay's own `rto-preview` postMessage protocol, exactly as
+// src/preview-frame.js does: the FIRST theme loads the iframe, every theme
+// after that re-renders in the SAME document. No reload, no refetch, no
+// flicker — which is what makes a 4s cycle affordable at all.
+const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
+let timer = null;
+
+function mountPreview(root) {
+  const frame = root.querySelector('[data-preview]');
+  if (!frame) return;
+  const ph = root.querySelector('[data-ph]');
+  const cap = root.querySelector('[data-cap]');
+  let i = Math.floor(performance.now()) % THEMES.length; // vary the entry point
+  let loaded = false;
+
+  const show = () => {
+    const [slug, name] = THEMES[i];
+    // height=93 lifts the Train off the canvas floor by 7%. Default 100 drops
+    // the Baseline onto the bottom edge (#24), which is right for OBS but means
+    // the Themes whose scenery bleeds downward on purpose — jazz's console deck,
+    // lava's floor line, tie strips and receding grids — get shaved by the frame
+    // edge. `height` is WHERE, not how big (config.js:160), so this costs no size.
+    const query = `event=demo&theme=${slug}&height=93`;
+    if (!loaded) {
+      frame.src = `../../overlay.html?${query}&preview=1`;
+      frame.hidden = false;
+      if (ph) ph.style.display = 'none';
+      loaded = true;
+    } else {
+      // Same event slug, so this re-renders in place rather than reloading.
+      frame.contentWindow?.postMessage({ type: 'rto-preview', query, roll: false }, location.origin);
+    }
+    if (cap) cap.textContent = name;
+    i = (i + 1) % THEMES.length;
+  };
+
+  // EAGER in the prototype, on purpose — and this is a decision to revisit
+  // before shipping, not a recommendation.
+  //
+  // Two lazy strategies were tried and both proved untestable in the review
+  // browser: IntersectionObserver never fired (the same hazard PR #29 fixed in
+  // the Overlay — a document that is never painted never runs paint-driven
+  // callbacks), and a geometry-on-scroll fallback could not work either,
+  // because a hidden browser pane reports `innerHeight: 0`, so nothing is ever
+  // "in view". A prototype that silently shows a placeholder cannot be judged.
+  //
+  // For shipping, the page-weight question #34 raises is real and unchanged:
+  // this pulls the whole renderer plus an iframe onto a page many visitors
+  // reach on mobile. Lazy-on-first-scroll is still the right answer there —
+  // it just cannot be demonstrated here. Variant C makes the cost unavoidable
+  // anyway by putting the preview above the fold, which is part of what C is
+  // for: it is the expensive option, and it should be judged as one.
+  show();
+  if (!REDUCED) timer = setInterval(show, 4000);
+}
+
+// ── Switcher ────────────────────────────────────────────────────────────────
+const KEYS = Object.keys(VARIANTS);
+const root = document.getElementById('stage-root');
+const label = document.getElementById('label');
+
+const current = () => {
+  const v = (new URLSearchParams(location.search).get('v') || 'A').toUpperCase();
+  return KEYS.includes(v) ? v : 'A';
+};
+
+function paint() {
+  if (timer) { clearInterval(timer); timer = null; }
+  const key = current();
+  root.innerHTML = VARIANTS[key].html();
+  label.innerHTML = `${key} <em>— ${VARIANTS[key].name.split(' — ')[1] || VARIANTS[key].name}</em>`;
+  document.title = `PROTOTYPE #34 — ${key}: ${VARIANTS[key].name}`;
+  mountPreview(root);
+}
+
+function go(delta) {
+  const next = KEYS[(KEYS.indexOf(current()) + delta + KEYS.length) % KEYS.length];
+  const url = new URL(location.href);
+  url.searchParams.set('v', next);
+  history.replaceState(null, '', url);
+  paint();
+}
+
+document.getElementById('prev').addEventListener('click', () => go(-1));
+document.getElementById('next').addEventListener('click', () => go(1));
+addEventListener('keydown', (e) => {
+  const el = document.activeElement;
+  if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)) return;
+  if (e.key === 'ArrowLeft') go(-1);
+  if (e.key === 'ArrowRight') go(1);
+});
+
+paint();
+</script>
+</body>
+</html>

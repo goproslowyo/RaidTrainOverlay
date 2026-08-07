@@ -1,0 +1,35 @@
+/**
+ * app.css — the design tokens the Configurator and the landing page share.
+ *
+ * #34's Q4. Three pages shipped three different palettes (index.html
+ * `--bg:#0e1116`, configurator.html `--bg:#0f1216`, preview.html a third set)
+ * because every page inlined its own `<style>`. #30 decided the landing page
+ * adopts the Configurator's tokens and primitives — and a copy of them is not
+ * an adoption, it is the same drift with a later start date.
+ *
+ * ONLY the token block lives here, deliberately. Every page keeps its own
+ * inline `<style>` for its own layout: this is a shared vocabulary, not a
+ * framework, and there is no build step to make a bigger one safe.
+ *
+ * preview.html is NOT on these tokens. Its palette diverges on purpose — a
+ * dimmer `--bg` and `--accent: #9ad` against the Configurator's `#57b6ff` —
+ * and pulling it in would restyle a page nobody asked to restyle. It is the
+ * remaining known drift, and it is a smaller one than the two pages that are
+ * supposed to look like a single product.
+ */
+:root {
+  --bg: #0f1216;
+  --panel: #191e25;
+  --panel-2: #222834;
+  --panel-3: #2a3140;
+  --ink: #e7ecf3;
+  --muted: #96a2b4;
+  --line: #2b313c;
+  --accent: #57b6ff;
+  --accent-dim: #9ad;
+  --gold: #f4c430;
+  --live: #ff5a67;
+  --ok: #5ed18a;
+  --warn: #ffb454;
+  --bad: #ff6b6b;
+}

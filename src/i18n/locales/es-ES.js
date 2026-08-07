@@ -19,9 +19,10 @@ export default {
   // "anótate" (LatAm) → "apúntate" (Spain)
   'overlay.signUp': '¡apúntate!',
 
-  // "boleto" (LatAm) → "billete" (Spain) — keep both the configurator + landing chip in sync
+  // "boleto" (LatAm) → "billete" (Spain). One override now covers both surfaces:
+  // since #34 the landing page renders theme names from THEME_OPTION_KEYS, the
+  // same map the Configurator uses, so there is no landing.theme.* to keep in sync.
   'configurator.theme.ticket': 'Billete vintage',
-  'landing.theme.ticket': 'Billete vintage',
 
   // "ingresar" for data entry reads Latin-American; Spain uses "introducir"
   'configurator.urlPlaceholder': 'Introduce un evento arriba para generar tu URL',

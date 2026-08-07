@@ -17,23 +17,11 @@
     settings schema, both editors' form, the train list, the Live Link URL and
     every store are testable modules under src/.
   -->
+  <!-- Tokens only (#34's Q4) — the landing page shares this exact block, so the
+       two pages that are meant to look like one product cannot drift apart
+       again. Layout stays inline, per page. -->
+  <link rel="stylesheet" href="./assets/app.css">
   <style>
-    :root {
-      --bg: #0f1216;
-      --panel: #191e25;
-      --panel-2: #222834;
-      --panel-3: #2a3140;
-      --ink: #e7ecf3;
-      --muted: #96a2b4;
-      --line: #2b313c;
-      --accent: #57b6ff;
-      --accent-dim: #9ad;
-      --gold: #f4c430;
-      --live: #ff5a67;
-      --ok: #5ed18a;
-      --warn: #ffb454;
-      --bad: #ff6b6b;
-    }
     * { box-sizing: border-box; }
     /* Dark native controls, scoped to the CONTROLS — not :root — on purpose: a dark
        :root forces the transparent preview iframe to an opaque white backdrop. */
