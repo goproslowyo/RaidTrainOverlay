@@ -217,6 +217,7 @@ export default {
   'configurator.llUrlAria': 'Live Link-URL',
   'configurator.llCopy': 'Kopiér Live Link',
   'configurator.llWarn': 'Ændrer du indstillinger, ændres denne URL. Kopiér den igen bagefter, og indsæt den i den samme OBS-browserkilde.',
+  'configurator.llTooBig': 'Dette link er for langt til, at overlayet kan læse det ({chars} ud af {max} tegn), så alle {trains} konfigurerede tog ville falde tilbage til dine basisindstillinger. Giv færre tog deres egen Raid Train-konfiguration, eller tilsidesæt færre indstillinger på hvert enkelt.',
   'configurator.llIdleToggle': 'Vis et kort med kommende tog, når ingen er live',
   'configurator.llHorizonAria': 'Tidshorisont for kortet med kommende tog',
   'configurator.llStyledBy': 'Stil hentet fra dit standardpreset: {preset} — <a href="#" data-act="goto-presets">administrer presets</a>. Tog med deres egen Raid Train-konfiguration beholder deres gemte indstillinger.',

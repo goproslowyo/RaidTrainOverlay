@@ -197,6 +197,7 @@ export default {
   'configurator.llUrlAria': 'Live Link URL',
   'configurator.llCopy': 'Copy Live Link',
   'configurator.llWarn': 'Changing settings changes this URL. After a change, copy it again and paste it back into the same OBS browser source.',
+  'configurator.llTooBig': 'This link is too long for the overlay to read ({chars} of {max} characters), so all {trains} of your configured trains would fall back to your base settings. Give fewer trains their own Raid Train Config, or override fewer settings on each.',
   'configurator.llIdleToggle': 'Show an upcoming-trains card while no train is live',
   'configurator.llHorizonAria': 'Upcoming card horizon',
   'configurator.llStyledBy': 'Styled by your default Preset: {preset} — <a href="#" data-act="goto-presets">manage Presets</a>. Trains with their own Raid Train Config keep their saved settings.',

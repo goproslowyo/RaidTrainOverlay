@@ -217,6 +217,7 @@ export default {
   'configurator.llUrlAria': 'URL del Link Live',
   'configurator.llCopy': 'Copia il Link Live',
   'configurator.llWarn': 'Se cambi le impostazioni cambia anche questo URL. Dopo una modifica, copialo di nuovo e incollalo nella stessa sorgente browser di OBS.',
+  'configurator.llTooBig': 'Questo link è troppo lungo perché l\'overlay possa leggerlo ({chars} su {max} caratteri), quindi tutti i {trains} treni configurati tornerebbero alle tue impostazioni di base. Dai una propria Config raid train a meno treni, oppure sovrascrivi meno impostazioni su ciascuno.',
   'configurator.llIdleToggle': 'Mostra una scheda dei prossimi treni quando nessuno è in diretta',
   'configurator.llHorizonAria': 'Orizzonte della scheda dei prossimi treni',
   'configurator.llStyledBy': 'Stile dato dal tuo preset predefinito: {preset} — <a href="#" data-act="goto-presets">gestisci i preset</a>. I treni con una propria Config raid train mantengono le impostazioni salvate.',

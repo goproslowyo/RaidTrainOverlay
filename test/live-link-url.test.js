@@ -1,6 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { baseSettings, buildLiveLinkQuery, buildTrainMap } from '../src/live-link-url.js';
+import { baseSettings, buildLiveLink, buildLiveLinkQuery, buildTrainMap } from '../src/live-link-url.js';
+import { MAX_BLOB_CHARS } from '../src/blob-codec.js';
+import { SETTING_KEYS } from '../src/settings-schema.js';
 import { createPreset } from '../src/preset-library.js';
 import { addProfile, addSpotlight, setDefaultPreset, setLiveLinkPrefs, upsertTrainConfig } from '../src/profiles.js';
 import { decodeTrainMap, effectiveQuery } from '../src/live-link.js';
@@ -94,6 +96,70 @@ test('an unknown or blank login has no Live Link', () => {
   assert.equal(buildLiveLinkQuery(library, store, 'someone-else'), '');
   assert.equal(buildLiveLinkQuery(library, store, ''), '');
   assert.deepEqual(buildTrainMap(library, store, 'someone-else'), {});
+});
+
+// ── The encode-side blob cap (#33) ─────────────────────────────────────────
+// MAX_BLOB_CHARS was enforced on decode only, so an oversized blob rode into
+// OBS looking fine and reverted EVERY per-train override with no signal
+// anywhere. These pin the crossing, not the byte counts: exact sizes move
+// whenever a wire key or a default changes, but "20 materialized trains fit
+// and 25 do not" is the behaviour the panel warning has to track.
+
+/** Every settings field set away from its default — what materialize-then-delete leaves behind. */
+const MATERIALIZED = {
+  theme: 'tron', scale: '1.25', height: '90', enginedim: 'under', mode: 'marquee',
+  interval: '20', speed: '1.5', track: 'always', trackfadein: '20', trackfadeout: '15',
+  refresh: '30', openslots: true, hidefinished: true, tz: 'America/New_York', lang: 'de',
+};
+
+/** ~33 chars, the average the live RaidPal user endpoint returns. */
+const realisticSlug = (i) => `${String(i).padStart(2, '0')}-super-mega-raid-train-marathon`;
+
+/** A Profile on the Overlay defaults with `count` fully-materialized Configs. */
+function materializedProfile(count) {
+  let store = addProfile({ active: null, profiles: {} }, 'gostreamcore');
+  for (let i = 0; i < count; i += 1) {
+    store = upsertTrainConfig(store, 'gostreamcore', realisticSlug(i), {
+      presetId: null, overrides: { ...MATERIALIZED }, spotlight: [],
+    });
+  }
+  return store;
+}
+
+test('MATERIALIZED covers every settings field — the amplification case is the whole 15', () => {
+  assert.equal(realisticSlug(0).length, 33);
+  assert.deepEqual(Object.keys(MATERIALIZED).sort(), [...SETTING_KEYS].sort());
+});
+
+test('a blob that still fits reports no oversize, and the Overlay can read it back', () => {
+  const link = buildLiveLink({}, materializedProfile(20), 'gostreamcore');
+  assert.equal(link.trainCount, 20);
+  assert.equal(link.oversize, false, '20 materialized trains fit under the cap');
+  assert.ok(link.blobChars <= MAX_BLOB_CHARS, `${link.blobChars} <= ${MAX_BLOB_CHARS}`);
+  const trains = new URLSearchParams(link.query).get('trains');
+  assert.equal(Object.keys(decodeTrainMap(trains)).length, 20, 'round-trips');
+});
+
+test('an oversized blob is REPORTED, not silently truncated — the bug #33 fixes', () => {
+  const link = buildLiveLink({}, materializedProfile(25), 'gostreamcore');
+  assert.equal(link.trainCount, 25);
+  assert.equal(link.oversize, true, '25 materialized trains cross the cap');
+  assert.ok(link.blobChars > MAX_BLOB_CHARS, `${link.blobChars} > ${MAX_BLOB_CHARS}`);
+  assert.equal(link.maxBlobChars, MAX_BLOB_CHARS, 'the panel can name the limit it broke');
+
+  // What the flag is FOR: this URL's per-train settings are already dead.
+  const trains = new URLSearchParams(link.query).get('trains');
+  assert.equal(decodeTrainMap(trains), null, 'the Overlay cannot read it — hence the warning');
+  // And it is handed over whole. Trimming to fit would drop some trains and
+  // keep others: the same silent wrong-settings failure, one layer up.
+  assert.equal(trains.length, link.blobChars, 'the blob is not truncated to fit');
+});
+
+test('buildLiveLinkQuery still returns the bare query, and a no-Live-Link Profile is not oversize', () => {
+  const store = materializedProfile(25);
+  assert.equal(buildLiveLinkQuery({}, store, 'gostreamcore'), buildLiveLink({}, store, 'gostreamcore').query);
+  const none = buildLiveLink({}, store, 'someone-else');
+  assert.deepEqual([none.query, none.trainCount, none.blobChars, none.oversize], ['', 0, 0, false]);
 });
 
 test('a Config pointing at a DIFFERENT Preset diffs against the base, not against its own', () => {

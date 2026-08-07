@@ -152,6 +152,7 @@ export const DESCRIPTIONS = {
   'configurator.llUrlAria': 'Screen-reader label for the read-only Live Link URL box.',
   'configurator.llCopy': 'Button copying the Live Link to the clipboard.',
   'configurator.llWarn': 'Warning that a settings change invalidates the copied URL and it must be re-pasted into OBS.',
+  'configurator.llTooBig': 'Hard error shown only when the Live Link URL exceeds the size the overlay can read, which makes every per-train setting revert to the base. {chars} and {max} are character counts, {trains} is how many trains have their own Raid Train Config. Keep all three tokens. Tone: something is wrong now and only the streamer can fix it.',
   'configurator.llIdleToggle': 'Checkbox: show a card listing upcoming raid trains while none is live.',
   'configurator.llHorizonAria': 'Screen-reader label for the how-far-ahead selector next to that checkbox.',
   'configurator.llStyledBy': 'Says which Preset styles the Live Link. {preset} is the Preset name + theme, already formatted. Copy the <a …> tag verbatim, translate only its text.',

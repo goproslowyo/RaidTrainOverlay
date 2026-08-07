@@ -217,6 +217,7 @@ export default {
   'configurator.llUrlAria': 'Live Link-URL',
   'configurator.llCopy': 'Live Link kopiëren',
   'configurator.llWarn': 'Als je instellingen wijzigt, verandert deze URL. Kopieer hem daarna opnieuw en plak hem terug in dezelfde OBS-browserbron.',
+  'configurator.llTooBig': 'Deze link is te lang om door de overlay gelezen te worden ({chars} van {max} tekens), dus al je {trains} ingestelde treinen zouden terugvallen op je basisinstellingen. Geef minder treinen een eigen Raid Train-config, of overschrijf per trein minder instellingen.',
   'configurator.llIdleToggle': 'Toon een kaart met komende treinen zolang er geen live is',
   'configurator.llHorizonAria': 'Periode van de kaart met komende treinen',
   'configurator.llStyledBy': 'Vormgegeven door je standaardpreset: {preset} — <a href="#" data-act="goto-presets">presets beheren</a>. Treinen met een eigen Raid Train-config houden hun opgeslagen instellingen.',

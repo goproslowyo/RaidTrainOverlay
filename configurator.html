@@ -209,6 +209,13 @@
     .url-row .btn { padding-left: 18px; padding-right: 18px; }
     .ll-note { display: flex; gap: 8px; align-items: flex-start; color: var(--muted); font-size: 12.5px; margin-top: 9px; }
     .ll-note .w { color: var(--warn); flex: none; }
+    /* The blob is over the cap — this link's per-train settings are already
+       broken, so it outranks the standard re-paste note beneath it. */
+    .ll-note.bad {
+      color: var(--ink); border: 1px solid #5a2c2c; background: #ff6b6b12;
+      border-radius: 8px; padding: 9px 11px; margin-top: 11px;
+    }
+    .ll-note.bad .w { color: var(--bad); }
     .ll-idle {
       display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
       margin-top: 13px; padding-top: 13px; border-top: 1px dashed var(--line);
@@ -518,7 +525,7 @@
     resolveTrainSettings, countPresetReferences, materializePreset, liveLinkPrefs, setLiveLinkPrefs,
   } from './src/profiles.js';
   import { loadMyRaidTrains, loadEventDetails, refreshEventDetail, userCacheKey } from './src/my-raid-trains.js';
-  import { buildLiveLinkQuery, baseSettings } from './src/live-link-url.js';
+  import { buildLiveLink, baseSettings } from './src/live-link-url.js';
   import {
     SETTINGS_DEFAULTS, SETTING_FIELDS, THEME_OPTION_KEYS, applySettings, diffSettings, normalizeSettings,
   } from './src/settings-schema.js';
@@ -658,10 +665,12 @@
     const query = buildOverlayQuery({ ...settings, event: slug, spotlight: spotlight.join(',') });
     return `${OVERLAY_BASE}?${query}`;
   }
-  const liveLinkUrl = () => {
-    const query = buildLiveLinkQuery(library, profiles, me());
-    return query ? `${OVERLAY_BASE}?${query}` : '';
+  /** The Live Link plus its size verdict — the panel needs both (see #33). */
+  const liveLink = () => {
+    const link = buildLiveLink(library, profiles, me());
+    return { ...link, url: link.query ? `${OVERLAY_BASE}?${link.query}` : '' };
   };
+  const liveLinkUrl = () => liveLink().url;
 
   // ── My Raid Trains feed ────────────────────────────────────────────────
   /**
@@ -826,13 +835,24 @@
     const options = Object.entries(HORIZON_KEYS)
       .map(([k, key]) => `<option value="${k}"${(prefs.upcoming ?? '3') === k ? ' selected' : ''}>${te(key)}</option>`)
       .join('');
+    const link = liveLink();
+    // The blob is over the cap the Overlay decodes against, so this URL's
+    // per-train settings are already unreadable (#33). Say so here — it is the
+    // only place the streamer can act on it, and the alternative is finding
+    // out on stream.
+    const tooBig = link.oversize
+      ? `<div class="ll-note bad"><span class="w" aria-hidden="true">⚠</span><span>${te('configurator.llTooBig', {
+        chars: link.blobChars, max: link.maxBlobChars, trains: link.trainCount,
+      })}</span></div>`
+      : '';
     return `<section class="card live-link" id="live-link-card">
       <div class="ll-head"><h2>${te('configurator.navLiveLink')}</h2><span class="ll-badge">${te('configurator.llBadge')}</span></div>
       <p class="ll-sub">${t('configurator.llSub')}</p>
       <div class="url-row">
-        <input type="text" id="ll-url" readonly value="${esc(liveLinkUrl())}" aria-label="${te('configurator.llUrlAria')}">
+        <input type="text" id="ll-url" readonly value="${esc(link.url)}" aria-label="${te('configurator.llUrlAria')}">
         <button type="button" class="btn gold" data-act="copy-live">${te('configurator.llCopy')}</button>
       </div>
+      ${tooBig}
       <div class="ll-note"><span class="w" aria-hidden="true">⚠</span><span>${te('configurator.llWarn')}</span></div>
       <div class="ll-idle">
         <label class="chk"><input type="checkbox" id="ll-idle-toggle"${on ? ' checked' : ''}>

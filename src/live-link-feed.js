@@ -13,6 +13,7 @@
  * (lineup data), onIdle (nothing to render; #15's card hooks here), onError.
  */
 
+import { MAX_BLOB_CHARS } from './blob-codec.js';
 import { fetchUserPayload, normalizeUser } from './raidpal-client.js';
 import { startEventFeed, nextPollDelayMs } from './event-feed.js';
 import { decodeTrainMap, resolveLiveTrain, effectiveQuery } from './live-link.js';
@@ -67,7 +68,19 @@ export function startLiveLinkFeed(baseQuery, deps) {
 
   const baseConfig = parseConfig(baseQuery);
   const login = baseConfig.user;
-  const map = decodeTrainMap(baseConfig.trains) ?? {};
+  // A `trains=` that will not decode is the loudest thing that can go wrong
+  // here and used to be the quietest: `?? {}` turns it into "no per-train
+  // settings", so every train renders with the base and nothing anywhere says
+  // why (#33). Falling back is still right — a corrupt blob must not stop the
+  // Overlay — but it has to be findable in the console.
+  const decoded = decodeTrainMap(baseConfig.trains);
+  if (decoded == null && baseConfig.trains != null) {
+    console.warn(
+      `RaidTrainOverlay: ?trains= could not be read — every train renders with the base settings. `
+      + `The blob is corrupt or over the ${MAX_BLOB_CHARS}-character limit; re-copy the Live Link from the Configurator.`,
+    );
+  }
+  const map = decoded ?? {};
   const resolveMins = baseConfig.refresh > 0 ? baseConfig.refresh : DEFAULT_RESOLVE_MIN;
 
   let consecutiveFailures = 0;
