@@ -1,0 +1,107 @@
+/**
+ * live-link: the pure half of the Live Link — the `trains=` wire codec, the
+ * live/next resolution rule, and the per-train effective-query merge. No
+ * fetching, no timers (that's live-link-feed); no DOM. The URL is the save
+ * file: everything here derives from the query string and the user's Event
+ * summaries.
+ *
+ * Wire model for `trains=` (versioned, like `lineup=`):
+ *   { v: 1, t: { [slug]: { o?: { param: rawValue }, sp?: [names] } } }
+ * `o` is a per-field sparse diff of RAW query-param values (they re-enter
+ * parseConfig, so validation stays in one place); `sp` is per-train Spotlight
+ * ADDITIONS (union with the base spotlight, per the Preset v2 decision).
+ */
+
+import { encodeJsonBlob, decodeJsonBlob } from './blob-codec.js';
+
+const WIRE_VERSION = 1;
+
+/** The full Train renders this far ahead of departure (fixed, v1). */
+export const LEAD_MS = 60 * 60_000;
+
+/** Mapping `{ [slug]: { overrides, spotlight } }` → URL-safe blob. Empty entries stay compact. */
+export function encodeTrainMap(map) {
+  const t = {};
+  for (const [slug, entry] of Object.entries(map)) {
+    const wire = {};
+    if (entry.overrides && Object.keys(entry.overrides).length > 0) wire.o = entry.overrides;
+    if (entry.spotlight && entry.spotlight.length > 0) wire.sp = entry.spotlight;
+    t[slug] = wire;
+  }
+  return encodeJsonBlob({ v: WIRE_VERSION, t });
+}
+
+/**
+ * URL blob → normalized mapping `{ [slug]: { overrides, spotlight } }`, or
+ * null on any bad, oversized, or unknown-version input. Entry contents are
+ * sanitized field-by-field (string values only) — a tampered blob degrades to
+ * fewer overrides, never to a throw or a smuggled object.
+ */
+export function decodeTrainMap(str) {
+  const wire = decodeJsonBlob(str);
+  if (wire == null || typeof wire !== 'object' || wire.v !== WIRE_VERSION) return null;
+  if (wire.t == null || typeof wire.t !== 'object' || Array.isArray(wire.t)) return null;
+  const map = {};
+  for (const [slug, entry] of Object.entries(wire.t)) {
+    if (entry == null || typeof entry !== 'object') continue;
+    const overrides = {};
+    if (entry.o != null && typeof entry.o === 'object' && !Array.isArray(entry.o)) {
+      for (const [key, value] of Object.entries(entry.o)) {
+        if (typeof value === 'string') overrides[key] = value;
+      }
+    }
+    const spotlight = Array.isArray(entry.sp) ? entry.sp.filter((n) => typeof n === 'string') : [];
+    map[slug] = { overrides, spotlight };
+  }
+  return map;
+}
+
+/**
+ * Which train the Live Link shows now. `events` are normalized Event
+ * summaries (raidpal-client's normalizeUser output — Date times, ascending
+ * or not; sorted here).
+ *
+ *   live — now ∈ [starttime, endtime] (earliest-started wins an overlap)
+ *   lead — the next upcoming train departs within `leadMs` (full render early,
+ *          so viewers see the lineup as departure approaches)
+ *   idle — nothing to render; `upcoming` carries the future trains for the
+ *          opt-in card (#15)
+ *
+ * Returns `{ state, train, upcoming }`.
+ */
+export function resolveLiveTrain(events, now, leadMs = LEAD_MS) {
+  const byStart = [...events].sort((a, b) => a.starttime - b.starttime);
+  const upcoming = byStart.filter((e) => e.starttime > now);
+  const live = byStart.find((e) => e.starttime <= now && now <= e.endtime);
+  if (live) return { state: 'live', train: live, upcoming };
+  const next = upcoming[0] ?? null;
+  if (next && next.starttime - now <= leadMs) return { state: 'lead', train: next, upcoming };
+  return { state: 'idle', train: null, upcoming };
+}
+
+// A mapping entry may only tune settings — never re-point the Overlay at a
+// different Event source or a second mapping.
+const PROTECTED_PARAMS = ['user', 'trains', 'event', 'lineup'];
+
+/**
+ * The resolved train's effective query: base query ⊕ the mapping entry's
+ * overrides, spotlight unioned (base first, additions deduped
+ * case-insensitively). The result re-enters parseConfig, so all value
+ * validation stays there. A null/absent entry returns the base unchanged.
+ */
+export function effectiveQuery(baseSearch, entry) {
+  const params = new URLSearchParams(baseSearch);
+  if (!entry) return params.toString();
+  for (const [key, value] of Object.entries(entry.overrides ?? {})) {
+    if (!PROTECTED_PARAMS.includes(key)) params.set(key, value);
+  }
+  if (entry.spotlight?.length > 0) {
+    const base = (params.get('spotlight') ?? '').split(',').map((n) => n.trim()).filter(Boolean);
+    const additions = entry.spotlight.filter(
+      (n) => !base.some((b) => b.toLowerCase() === n.toLowerCase()),
+    );
+    const union = [...base, ...additions];
+    if (union.length > 0) params.set('spotlight', union.join(','));
+  }
+  return params.toString();
+}
