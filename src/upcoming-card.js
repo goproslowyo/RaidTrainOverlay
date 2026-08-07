@@ -15,6 +15,20 @@ function formatDeparture(date, locale) {
 }
 
 /**
+ * The same departure as a UTC anchor — viewers are worldwide and nobody knows
+ * the streamer's zone. Weekday appears only when UTC lands on a different day
+ * than the viewer's local rendering (a late-night departure crossing midnight).
+ */
+function formatDepartureUtc(date, locale) {
+  const day = (zone) => new Intl.DateTimeFormat('en', { weekday: 'short', ...(zone && { timeZone: zone }) }).format(date);
+  const prefix = day(undefined) === day('UTC')
+    ? ''
+    : `${new Intl.DateTimeFormat(locale, { weekday: 'short', timeZone: 'UTC' }).format(date)} `;
+  const time = new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: 'UTC' }).format(date);
+  return `${prefix}${time} UTC`;
+}
+
+/**
  * Paint the card into `container` (replacing its contents). An empty `trains`
  * list paints nothing — the overlay stays fully transparent. `config`
  * supplies `t` (translator) and `locale`; `--train-pos` keeps governing
@@ -46,10 +60,16 @@ export function renderUpcomingCard(container, trains, config) {
     const name = document.createElement('span');
     name.textContent = train.title;
     name.style.cssText = 'font-size:16px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+    const times = document.createElement('span');
+    times.style.cssText = 'display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0';
     const when = document.createElement('span');
     when.textContent = formatDeparture(train.starttime, config.locale);
     when.style.cssText = 'font-size:14px;opacity:0.85;white-space:nowrap;font-variant-numeric:tabular-nums';
-    row.append(name, when);
+    const utc = document.createElement('span');
+    utc.textContent = formatDepartureUtc(train.starttime, config.locale);
+    utc.style.cssText = 'font-size:12px;opacity:0.55;white-space:nowrap;font-variant-numeric:tabular-nums';
+    times.append(when, utc);
+    row.append(name, times);
     card.appendChild(row);
   }
   container.appendChild(card);
