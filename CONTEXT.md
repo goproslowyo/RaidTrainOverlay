@@ -84,8 +84,24 @@ The form page that builds an Overlay URL (event slug, Mode, toggles, Spotlights,
 _Avoid_: settings page, admin, generator
 
 **Preset**:
-A named, saved Configurator form state, stored in the Configurator's localStorage. Never read by the Overlay.
+A named, saved bundle of Configurator settings — *settings only, no Event*. Stored in the Configurator's localStorage; never read by the Overlay. Referenced by Raid Train Configs.
 _Avoid_: profile, template
+
+**Profile**:
+A Twitch login identity the Configurator acts as — just the username string, no extra naming layer. Owns its My Raid Trains list, Raid Train Configs, and default settings. Stored locally; switchable to manage another streamer's setup.
+_Avoid_: account, user (in code)
+
+**My Raid Trains**:
+The Configurator view that lists the Profile's RaidPal Events (joined and organized), fetched from the RaidPal user endpoint. Upcoming Events sorted by start; past Events greyed out and collapsed.
+_Avoid_: my trains, my events, dashboard
+
+**Raid Train Config**:
+A per-Event saved settings record, keyed by the Event's slug and scoped to a Profile: a reference to a Preset plus per-Event overrides. Feeds the copied Overlay link for that Event.
+_Avoid_: train setup, booking, override set (for the whole record)
+
+**Live Link**:
+An Overlay URL keyed to a Profile's username rather than one Event: the Overlay resolves the currently-live (or next) Event from the RaidPal user endpoint at load. Set once in OBS, never edited per train. Carries its settings — including any per-Event mappings — encoded in the URL itself; it never reads the Configurator's localStorage.
+_Avoid_: magic URL (in code; fine in prose)
 
 **Theme**:
 The complete, swappable art treatment the Train is rendered in (e.g. Classic Americana, Pixel, Ticket). Selected per Overlay via the `theme` query param; one Theme is active at a time, and every Theme renders the full state vocabulary — Engine, Car, Caboose, Now Marker, Spotlight, departed, Open Slot. Orthogonal to **Mode**: Theme is _how the Train looks_, Mode is _how it moves_.
