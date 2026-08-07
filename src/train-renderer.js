@@ -383,6 +383,8 @@ export function renderTrain(train, container, config) {
   stage.style.setProperty('--rt-foot', String(Number.isFinite(declaredFoot) ? declaredFoot : 1));
   // Every built copy (the first, plus any marquee duplicates) is collected so a
   // time tick updates all of them — and afterAttach runs once each are in the DOM.
+  // afterAttach must run SYNCHRONOUSLY (see the call below): it needs the DOM, not
+  // a paint.
   const built = [];
   const buildCopy = () => {
     const copy = theme.build(train, { config, maxTimeLines });
@@ -398,10 +400,19 @@ export function renderTrain(train, container, config) {
   stage.appendChild(track);
   container.appendChild(stage);
   applyMode(track, config, buildCopy);
-  requestAnimationFrame(() => {
-    for (const copy of built) copy.afterAttach?.();
-    pinLeadBadges(track, config);
-  });
+  // The post-attach pass — every Theme's shrink-to-fit (fitAll) and the lead badge.
+  // NEVER defer this to requestAnimationFrame. rAF only runs at a rendering
+  // opportunity, so in a document that is never painted the callback sits queued and
+  // the pass never runs: names render at full size, a name too wide for its Car wraps
+  // to a second line, and the extra line pushes the Train past its baseline so
+  // `height=100` clips it. A permanently hidden document holds that state forever; one
+  // that is later shown gets it until the first frame after it becomes visible.
+  // Nothing here needs a paint — only layout. Every read below (scrollWidth,
+  // getBoundingClientRect, getComputedTextLength) forces the style+layout it needs, so
+  // running synchronously is correct on its own terms, not because applyMode happened
+  // to measure first (applyMode writes styles after its last read — layout is dirty here).
+  for (const copy of built) copy.afterAttach?.();
+  pinLeadBadges(track, config);
 
   return {
     /** In-place time-state update: classes and text only, never structure. */

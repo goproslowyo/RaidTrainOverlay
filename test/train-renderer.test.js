@@ -34,6 +34,41 @@ test('resolveTheme falls back to classic for unknown, unshipped, or missing keys
   assert.equal(resolveTheme(''), classic);
 });
 
+test('no render path defers work to requestAnimationFrame', async () => {
+  // rAF only runs at a rendering opportunity, so in a document that is never painted
+  // — a backgrounded tab, or an OBS browser source in an inactive scene — a queued
+  // callback never fires. The post-attach pass (every Theme's fitAll, plus the lead
+  // badge) once ran inside rAF, so there it never ran at all: names rendered unshrunk,
+  // a too-wide name wrapped, and the extra line pushed the Train past its baseline.
+  //
+  // A hidden document is not observable from node, so the invariant is pinned at the
+  // source. It covers EVERY render module, not just the renderer: each Theme owns its
+  // own afterAttach body and could reintroduce the identical bug there. Comments and
+  // strings are stripped first, so prose about rAF doesn't fail the build.
+  const { readFile, readdir } = await import('node:fs/promises');
+  const srcDir = new URL('../src/', import.meta.url);
+  const files = [];
+  const walk = async (dir) => {
+    for (const entry of await readdir(dir, { withFileTypes: true })) {
+      const child = new URL(`${entry.name}${entry.isDirectory() ? '/' : ''}`, dir);
+      if (entry.isDirectory()) await walk(child);
+      else if (entry.name.endsWith('.js')) files.push(child);
+    }
+  };
+  await walk(srcDir);
+  assert.ok(files.length > 20, 'the walk found the source tree');
+
+  const offenders = [];
+  for (const file of files) {
+    const code = (await readFile(file, 'utf8'))
+      .replace(/\/\*[\s\S]*?\*\//g, '')   // block comments
+      .replace(/^\s*\/\/.*$/gm, '')        // line comments
+      .replace(/`(?:\\[\s\S]|[^`\\])*`/g, '``'); // template literals (theme CSS)
+    if (/\brequestAnimationFrame\s*\(/.test(code)) offenders.push(file.pathname.split('/src/')[1]);
+  }
+  assert.deepEqual(offenders, [], 'render code must not gate work behind rAF');
+});
+
 test('every registered Theme satisfies the renderer contract', () => {
   for (const [key, theme] of Object.entries(THEMES)) {
     assert.equal(theme.key, key, `${key}: key matches its registry slot`);
