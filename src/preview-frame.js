@@ -19,7 +19,7 @@
  * A re-render restarts the sweep, so a frozen preview returns to rolling on any knob
  * change — mirroring the live Overlay.
  */
-export function createPreviewFrame({ iframe, rollBtn, stillBtn, overlayBase, origin = window.location.origin }) {
+export function createPreviewFrame({ iframe, rollBtn, stillBtn, overlayBase, origin = window.location.origin, t = (k) => k }) {
   let rollState = 'still';
   let loadedSlug = null; // event currently (re)loaded in the iframe (null = placeholder)
   let baseQuery = '';    // overlay query baked into the iframe's current src
@@ -27,11 +27,23 @@ export function createPreviewFrame({ iframe, rollBtn, stillBtn, overlayBase, ori
 
   const post = (msg) => iframe.contentWindow?.postMessage(msg, origin);
 
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+  // This button cycles through three labels, so it owns them rather than the
+  // page — hence the injected `t`. The glyph and the &nbsp; are layout, not
+  // language, and stay in code.
   function updateButtons() {
-    rollBtn.innerHTML = rollState === 'rolling' ? '⏸&nbsp;Freeze'
-      : rollState === 'frozen' ? '▶&nbsp;Resume' : '▶&nbsp;Roll it';
+    const label = rollState === 'rolling' ? `⏸&nbsp;${esc(t('configurator.freeze'))}`
+      : rollState === 'frozen' ? `▶&nbsp;${esc(t('configurator.resume'))}`
+        : `▶&nbsp;${esc(t('configurator.rollIt'))}`;
+    rollBtn.innerHTML = label;
+    // One tooltip covers the whole cycle — it describes roll/freeze/resume together.
+    rollBtn.title = t('configurator.rollTitle');
     rollBtn.classList.toggle('is-rolling', rollState !== 'still');
-    if (stillBtn) stillBtn.hidden = rollState === 'still';
+    if (stillBtn) {
+      stillBtn.hidden = rollState === 'still';
+      stillBtn.title = t('configurator.stillTitle');
+    }
   }
 
   function render(query, slug) {

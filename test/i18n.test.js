@@ -130,3 +130,117 @@ for (const [locale, files] of Object.entries(LOCALE_FILES)) {
     }
   });
 }
+
+test('no catalog file carries a key en.js does not have', async () => {
+  // Completeness (above) only asserts locale ⊇ en, so a key RENAMED in en.js
+  // leaves the old one behind in a translation as dead weight — and takes its
+  // divergence with it. That is exactly how `configurator.openslotsHint`
+  // survived in es-MX.js after the rebuild renamed it to `openslotsCheck`:
+  // Mexico's "regístrate" wording silently stopped rendering, and the merge
+  // hid it because a stray key is never read. Checked per FILE, not per merged
+  // locale, so a region variant's own dead overrides surface too.
+  const files = [...new Set(Object.values(LOCALE_FILES).flat())];
+  const strays = [];
+  for (const file of files) {
+    const mod = await import(`../src/i18n/locales/${file}`);
+    for (const key of Object.keys(mod.default)) {
+      if (!(key in enMessages)) strays.push(`${file}: ${key}`);
+    }
+  }
+  assert.deepEqual(strays, [], `keys absent from en.js (renamed or deleted?): ${strays.join(', ')}`);
+});
+
+test('the open-slots checkbox names the badge its own overlay paints', async () => {
+  // configurator.openslotsCheck tells the streamer to look for a car reading
+  // OPEN; overlay.open is the word actually painted on that car. They are 350
+  // lines apart in every catalog, so a translator fixing one never sees the
+  // other — every locale localized the badge and left the English word in the
+  // checkbox, promising a label that would never appear. Cross-key, so no
+  // per-string review catches it; this does.
+  for (const locale of SUPPORTED_LOCALES) {
+    const merged = await loadMessages(locale);
+    assert.ok(merged['configurator.openslotsCheck'].includes(merged['overlay.open']),
+      `${locale}: openslotsCheck "${merged['configurator.openslotsCheck']}" `
+      + `does not name the overlay.open badge "${merged['overlay.open']}"`);
+  }
+});
+
+test('every Configurator render call passes a translator', async () => {
+  // settings-schema.js holds no English — it names its strings by catalog key —
+  // so the modules that render from it (settings-form, train-list, preview-frame)
+  // only produce words if a `t` reaches them. Each keeps a passthrough default so
+  // a missing translator degrades to raw keys instead of throwing mid-render, and
+  // that softness is exactly what hid a real bug: paintCard() repainted a card
+  // without `t`, so a train whose details had loaded showed "configurator.slotsFilled"
+  // and "configurator.cardConfigure" on screen while its neighbours read fine.
+  //
+  // node can't mount the page, so the invariant is pinned at the source: every
+  // call to one of these must pass something named `t` as its translator argument.
+  const { readFile } = await import('node:fs/promises');
+  const page = (await readFile(new URL('../configurator.html', import.meta.url), 'utf8'))
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/^\s*\/\/.*$/gm, '');
+
+  // These calls nest parentheses (`trainCardHtml(cardView(…), t)`) and sit inside
+  // .map(…), so the argument list has to be read by paren balance — a lazy regex
+  // to the next `);` runs straight past the end of the call.
+  const argsOf = (source, name) => {
+    const out = [];
+    for (const m of source.matchAll(new RegExp(`\\b${name}\\(`, 'g'))) {
+      let depth = 1;
+      let i = m.index + m[0].length;
+      for (; i < source.length && depth > 0; i++) {
+        if (source[i] === '(') depth++;
+        else if (source[i] === ')') depth--;
+      }
+      out.push(source.slice(m.index + m[0].length, i - 1));
+    }
+    return out;
+  };
+
+  // Split an argument list on its TOP-LEVEL commas only, so a nested call or
+  // object literal counts as one argument. Arity matters as much as presence:
+  // `whenLabel(event, now, t)` ends in `, t` and would pass a "last arg is t"
+  // check, but drops `t` into the `locale` slot — Intl.DateTimeFormat then
+  // throws and the whole card list fails to render.
+  const topLevelArgs = (args) => {
+    if (args.trim() === '') return [];
+    const out = [];
+    let depth = 0;
+    let start = 0;
+    for (let i = 0; i < args.length; i++) {
+      const c = args[i];
+      if ('([{'.includes(c)) depth++;
+      else if (')]}'.includes(c)) depth--;
+      else if (c === ',' && depth === 0) { out.push(args.slice(start, i)); start = i + 1; }
+    }
+    out.push(args.slice(start));
+    return out.map((a) => a.trim());
+  };
+
+  const offenders = [];
+  // name → how many arguments the call must have for `t` to land in the right slot.
+  for (const [name, arity] of [['trainCardHtml', 2], ['whenLabel', 4]]) {
+    for (const args of argsOf(page, name)) {
+      const parts = topLevelArgs(args);
+      if (parts.length !== arity || parts[arity - 1] !== 't') {
+        offenders.push(`${name}(${args.slice(0, 50)}…) — ${parts.length} args, want ${arity} ending in t`);
+      }
+    }
+    // A bare reference (`.map(trainCardHtml)`) has no argument list to inspect,
+    // so it would slip past argsOf entirely. Outside the import, every mention
+    // must be a call.
+    const body = page.replace(/^\s*import[\s\S]*?;\s*$/gm, '');
+    for (const m of body.matchAll(new RegExp(`\\b${name}\\b(?!\\s*\\()`, 'g'))) {
+      offenders.push(`${name} referenced without calling it (index ${m.index})`);
+    }
+  }
+  assert.ok(argsOf(page, 'trainCardHtml').length >= 3, 'the page renders train cards');
+  // mountSettingsForm / createPreviewFrame take it as an option.
+  for (const name of ['mountSettingsForm', 'createPreviewFrame']) {
+    const calls = [...page.matchAll(new RegExp(`\\b${name}\\(\\{([\\s\\S]*?)\\}\\)`, 'g'))];
+    assert.ok(calls.length > 0, `${name} is called by the page`);
+    for (const m of calls) if (!/\bt:/.test(m[1])) offenders.push(`${name}: missing t`);
+  }
+  assert.deepEqual(offenders, [], 'a render call would paint raw message keys');
+});

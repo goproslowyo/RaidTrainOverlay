@@ -13,33 +13,48 @@
  * checkboxes — exactly what preset-library stores and what buildOverlayQuery
  * consumes. Validation is NOT duplicated here: raw values re-enter
  * parseConfig, which stays the single source of truth for the param schema.
+ *
+ * i18n: this module names its strings by CATALOG KEY (`labelKey`, `hintKey`,
+ * `optionKeys`, …) and never holds English. That keeps it pure — no translator
+ * is threaded through it, so it stays importable from a test or a build script
+ * with no i18n runtime — and puts the English in the one place that already
+ * owns it, `src/i18n/locales/en.js`. The renderer (settings-form.js) is the
+ * only thing that needs a `t`, because rendering is when a locale exists.
  */
 
 import { PRESET_SETTINGS_FIELDS } from './preset-library.js';
 
-/** Theme key → English label. Keys mirror the config schema's Theme enum. */
-export const THEME_OPTIONS = {
-  classic: 'Classic Americana',
-  flat: 'Flat cartoon',
-  synthwave: 'Synthwave',
-  ticket: 'Vintage ticket',
-  wood: 'Wooden toy train',
-  comic: 'Comic / halftone',
-  departures: 'Departures board',
-  paper: 'Paper cutout',
-  tron: 'Tron lightcycle',
-  pixel: '16-bit pixel',
-  highvibes: 'High Vibes',
-  jazz: 'Jazz vinyl',
-  bullet: 'Anime bullet train',
-  lava: 'Lava lamp',
-  pride: 'Pride',
-  shuffle: '🔀 Shuffle — cycle every theme',
+/** Theme key → catalog key for its label. Keys mirror the config schema's Theme enum. */
+export const THEME_OPTION_KEYS = {
+  classic: 'configurator.theme.classic',
+  flat: 'configurator.theme.flat',
+  synthwave: 'configurator.theme.synthwave',
+  ticket: 'configurator.theme.ticket',
+  wood: 'configurator.theme.wood',
+  comic: 'configurator.theme.comic',
+  departures: 'configurator.theme.departures',
+  paper: 'configurator.theme.paper',
+  tron: 'configurator.theme.tron',
+  pixel: 'configurator.theme.pixel',
+  highvibes: 'configurator.theme.highvibes',
+  jazz: 'configurator.theme.jazz',
+  bullet: 'configurator.theme.bullet',
+  lava: 'configurator.theme.lava',
+  pride: 'configurator.theme.pride',
+  shuffle: 'configurator.theme.shuffle',
 };
 
-/** Overlay-language selector values ('' = Auto, follow the browser). */
-export const LANG_OPTIONS = {
-  '': 'Auto (browser)',
+/**
+ * Overlay-language selector values ('' = Auto, follow the browser).
+ *
+ * Deliberately NOT catalog keys: every entry but Auto is an ENDONYM — a
+ * language's name in its own language — which reads the same whatever locale
+ * the page is in. That is the point of a language picker (a German speaker
+ * hunting for Portuguese looks for "Português", not "Portugiesisch"), so these
+ * are literals and only Auto carries a key.
+ */
+export const LANG_AUTO_KEY = 'configurator.languageAuto';
+export const LANG_ENDONYMS = {
   'en': 'English',
   'es-ES': 'Español (España)',
   'es-MX': 'Español (México)',
@@ -54,9 +69,9 @@ export const LANG_OPTIONS = {
 
 /** The collapsible groups the fields render under, in display order. */
 export const SETTING_GROUPS = [
-  { id: 'look', label: 'Look' },
-  { id: 'motion', label: 'Motion' },
-  { id: 'behavior', label: 'Behavior' },
+  { id: 'look', labelKey: 'configurator.tabLook' },
+  { id: 'motion', labelKey: 'configurator.tabMotion' },
+  { id: 'behavior', labelKey: 'configurator.tabBehavior' },
 ];
 
 /**
@@ -66,60 +81,78 @@ export const SETTING_GROUPS = [
  */
 export const SETTING_FIELDS = [
   {
-    key: 'theme', group: 'look', label: 'Theme', type: 'select', options: THEME_OPTIONS, default: 'classic',
-    hint: 'The art style that paints your train. Shuffle rotates the whole roster — a fresh theme each pass.',
+    key: 'theme', group: 'look', labelKey: 'configurator.themeLabel', type: 'select',
+    optionKeys: THEME_OPTION_KEYS, default: 'classic', hintKey: 'configurator.themeHint',
   },
   {
-    key: 'scale', group: 'look', label: 'Train size', type: 'range', min: 0.5, max: 2, step: 0.1, default: '1',
-    hint: 'How big the train is in your broadcast. 1 is the default; the train always stays fully on screen.',
+    key: 'scale', group: 'look', labelKey: 'configurator.scaleLabel', type: 'range',
+    min: 0.5, max: 2, step: 0.1, default: '1', hintKey: 'configurator.scaleHint',
   },
   {
-    key: 'height', group: 'look', label: 'Vertical position', type: 'range', min: 0, max: 100, step: 1, default: '100',
-    hint: '0 = top, 100 = bottom, 50 = centered. The default sits it on the bottom edge.',
+    key: 'height', group: 'look', labelKey: 'configurator.heightLabel', type: 'range',
+    min: 0, max: 100, step: 1, default: '100', hintKey: 'configurator.heightHint',
   },
   {
-    key: 'enginedim', group: 'look', label: 'When the event ends', type: 'select', default: 'over',
-    options: {
-      over: 'Dim the engine',
-      finished: 'Hide it (when hiding finished cars)',
-      never: 'Keep the engine bright',
+    key: 'enginedim', group: 'look', labelKey: 'configurator.enginedimLabel', type: 'select', default: 'over',
+    optionKeys: {
+      over: 'configurator.enginedimOver',
+      finished: 'configurator.enginedimFinished',
+      never: 'configurator.enginedimNever',
     },
+    hintKey: 'configurator.enginedimHint',
   },
   {
-    key: 'mode', group: 'motion', label: 'Display style', type: 'select', default: 'pass',
-    options: {
-      pass: 'Pass — rolls across every few minutes, then leaves',
-      marquee: 'Marquee — scrolls continuously, always on screen',
-    },
-  },
-  { key: 'interval', group: 'motion', label: 'Minutes between passes', type: 'number', min: 1, step: 1, default: '15' },
-  {
-    key: 'speed', group: 'motion', label: 'Animation speed', type: 'number', min: 0.1, step: 0.1, default: '1',
-    hint: 'Higher is faster. 1 is the default pace.',
+    key: 'mode', group: 'motion', labelKey: 'configurator.modeLabel', type: 'select', default: 'pass',
+    optionKeys: { pass: 'configurator.modePass', marquee: 'configurator.modeMarquee' },
   },
   {
-    key: 'track', group: 'motion', label: 'Track between passes', type: 'select', default: 'periodic',
-    options: { periodic: 'Fade it out between passes', always: 'Always show the track' },
-  },
-  { key: 'trackfadein', group: 'motion', label: 'Track fade in (seconds)', type: 'number', min: 0, max: 120, step: 1, default: '15' },
-  { key: 'trackfadeout', group: 'motion', label: 'Track fade out (seconds)', type: 'number', min: 0, max: 120, step: 1, default: '10' },
-  {
-    key: 'refresh', group: 'behavior', label: 'Auto-refresh (minutes)', type: 'number', min: 15, step: 5, default: '', placeholder: 'off',
-    hint: 'How often to re-check RaidPal for lineup changes. Blank = check once on load.',
+    key: 'interval', group: 'motion', labelKey: 'configurator.intervalLabel', type: 'number',
+    min: 1, step: 1, default: '15',
   },
   {
-    key: 'openslots', group: 'behavior', label: 'Open slots', type: 'check', default: false,
-    checkText: 'Show open slots as OPEN cars so viewers can sign up',
+    key: 'speed', group: 'motion', labelKey: 'configurator.speedLabel', type: 'number',
+    min: 0.1, step: 0.1, default: '1', hintKey: 'configurator.speedHint',
   },
   {
-    key: 'hidefinished', group: 'behavior', label: 'Finished cars', type: 'check', default: false,
-    checkText: 'Hide cars that have already played, instead of dimming them',
+    key: 'track', group: 'motion', labelKey: 'configurator.trackLabel', type: 'select', default: 'periodic',
+    optionKeys: { periodic: 'configurator.trackPeriodic', always: 'configurator.trackAlways' },
+    hintKey: 'configurator.trackHint',
+  },
+  // New keys, not the old trackFadeIn/OutLabel: those read "In" / "Out" because
+  // they sub-labelled one paired "Track fade timing" control. As the label of a
+  // standalone field they would say nothing, so their translations can't be reused.
+  {
+    key: 'trackfadein', group: 'motion', labelKey: 'configurator.trackFadeInField', type: 'number',
+    min: 0, max: 120, step: 1, default: '15', hintKey: 'configurator.trackFadeHint',
   },
   {
-    key: 'tz', group: 'behavior', label: 'Clock time zones', type: 'text', default: '', placeholder: 'PT, ET, GMT',
-    hint: 'Up to 3 zones to show absolute times instead of "in 2h". Blank = relative times.',
+    key: 'trackfadeout', group: 'motion', labelKey: 'configurator.trackFadeOutField', type: 'number',
+    min: 0, max: 120, step: 1, default: '10',
   },
-  { key: 'lang', group: 'behavior', label: 'Overlay language', type: 'select', options: LANG_OPTIONS, default: '' },
+  {
+    key: 'refresh', group: 'behavior', labelKey: 'configurator.refreshLabel', type: 'number',
+    min: 15, step: 5, default: '', placeholderKey: 'configurator.refreshPlaceholder',
+    hintKey: 'configurator.refreshHint',
+  },
+  {
+    key: 'openslots', group: 'behavior', labelKey: 'configurator.openslotsField', type: 'check', default: false,
+    checkTextKey: 'configurator.openslotsCheck',
+  },
+  {
+    key: 'hidefinished', group: 'behavior', labelKey: 'configurator.hidefinishedField', type: 'check', default: false,
+    checkTextKey: 'configurator.hidefinishedCheck',
+  },
+  {
+    key: 'tz', group: 'behavior', labelKey: 'configurator.tzLabel', type: 'text', default: '',
+    placeholderKey: 'configurator.tzPlaceholder', hintKey: 'configurator.tzHint',
+  },
+  {
+    key: 'lang', group: 'behavior', labelKey: 'configurator.languageLabel', type: 'select', default: '',
+    // Built at render: Auto needs a translation, the endonyms never do.
+    optionKeys: { '': LANG_AUTO_KEY },
+    literalOptions: LANG_ENDONYMS,
+    hintKey: 'configurator.languageHint',
+  },
 ];
 
 /** Field key → its definition. */
@@ -202,7 +235,8 @@ export function toQueryValues(settings) {
  *   - interval drives Pass cadence, and doubles as Shuffle's theme cadence
  *   - periodic Track visibility is Pass-only (marquee has no off-screen gap)
  *   - the fade durations only bite while the track actually fades
- * Returns `{ [key]: { disabled, note? } }` for the gated keys only.
+ * Returns `{ [key]: { disabled, noteKey? } }` for the gated keys only — a
+ * catalog key, not a sentence, so this stays pure (see the module header).
  */
 export function fieldGating(settings) {
   const values = normalizeSettings(settings);
@@ -213,12 +247,13 @@ export function fieldGating(settings) {
   return {
     interval: {
       disabled: !intervalOn,
-      note: isPass && isShuffle ? 'How often the train rolls across — and how often Shuffle picks a new theme.'
-        : isPass ? 'How often the train rolls across.'
-          : isShuffle ? 'How often Shuffle picks a new theme.'
-            : 'Not used with this display style.',
+      noteKey: isPass && isShuffle ? 'configurator.intervalNotePassShuffle'
+        : isPass ? 'configurator.intervalNotePass'
+          : isShuffle ? 'configurator.intervalNoteShuffle'
+            : 'configurator.intervalNoteOff',
     },
-    track: { disabled: !isPass, note: isPass ? null : 'Not used with this display style.' },
+    // The same "Pass-only" note reads true for the track toggle as for interval.
+    track: { disabled: !isPass, noteKey: isPass ? null : 'configurator.intervalNoteOff' },
     trackfadein: { disabled: !fadeOn },
     trackfadeout: { disabled: !fadeOn },
   };

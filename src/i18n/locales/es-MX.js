@@ -16,6 +16,6 @@ export default {
   // Mexico more commonly invites viewers to "regístrate"; 13 chars, fits the badge budget (14)
   'overlay.signUp': '¡regístrate!',
 
-  // Keep the open-slot help text in sync with the "regístrate" CTA above
-  'configurator.openslotsHint': 'Muestra los espacios sin asignar como vagones <strong>LIBRE</strong> para que los espectadores se registren.',
+  // Keep the open-slot checkbox in sync with the "regístrate" CTA above
+  'configurator.openslotsCheck': 'Mostrar los huecos libres como vagones LIBRE para que los espectadores se registren',
 };

@@ -12,6 +12,9 @@
  *
  * Chrome (badges, group tags, hints, gating) refreshes IN PLACE after an edit —
  * never by re-rendering — so a slider drag survives its own change events.
+ *
+ * i18n: settings-schema.js names its strings by catalog key and holds no
+ * English; this is where they become words, so every caller must supply a `t`.
  */
 
 import {
@@ -26,17 +29,31 @@ import {
 
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-/** A raw value as a human would read it in a hint ("on"/"off", the option label, "blank"). */
-function readableValue(def, value) {
-  if (def.type === 'check') return value ? 'on' : 'off';
-  if (def.type === 'select') return def.options[value] ?? String(value);
-  return String(value) === '' ? 'blank' : String(value);
+/**
+ * A select's `value → label` map, translated. `optionKeys` carry catalog keys;
+ * `literalOptions` (the language endonyms) are already language-independent and
+ * pass through untranslated. Order follows optionKeys then literalOptions, which
+ * is why Auto heads the language list.
+ */
+function optionLabels(def, t) {
+  const out = {};
+  for (const [value, key] of Object.entries(def.optionKeys ?? {})) out[value] = t(key);
+  for (const [value, label] of Object.entries(def.literalOptions ?? {})) out[value] = label;
+  return out;
 }
 
-function controlHtml(def, value, id) {
+/** A raw value as a human would read it in a hint ("on"/"off", the option label, "blank"). */
+function readableValue(def, value, t) {
+  if (def.type === 'check') return value ? t('configurator.valueOn') : t('configurator.valueOff');
+  if (def.type === 'select') return optionLabels(def, t)[value] ?? String(value);
+  return String(value) === '' ? t('configurator.valueBlank') : String(value);
+}
+
+function controlHtml(def, value, id, t) {
   const common = `id="${id}" data-sfield="${def.key}"`;
+  const placeholder = def.placeholderKey ? t(def.placeholderKey) : '';
   if (def.type === 'select') {
-    const options = Object.entries(def.options)
+    const options = Object.entries(optionLabels(def, t))
       .map(([k, label]) => `<option value="${esc(k)}"${String(value) === String(k) ? ' selected' : ''}>${esc(label)}</option>`)
       .join('');
     return `<select ${common}>${options}</select>`;
@@ -52,30 +69,32 @@ function controlHtml(def, value, id) {
       def.min != null ? ` min="${def.min}"` : '',
       def.max != null ? ` max="${def.max}"` : '',
       def.step != null ? ` step="${def.step}"` : '',
-      def.placeholder ? ` placeholder="${esc(def.placeholder)}"` : '',
+      placeholder ? ` placeholder="${esc(placeholder)}"` : '',
     ].join('');
     return `<input type="number" ${common}${bounds} value="${esc(value)}">`;
   }
   if (def.type === 'check') {
     return `<label class="check-row"><input type="checkbox" ${common}${value ? ' checked' : ''}>
-      <span>${esc(def.checkText ?? '')}</span></label>`;
+      <span>${esc(def.checkTextKey ? t(def.checkTextKey) : '')}</span></label>`;
   }
-  return `<input type="text" ${common} value="${esc(value)}"${def.placeholder ? ` placeholder="${esc(def.placeholder)}"` : ''} autocomplete="off">`;
+  return `<input type="text" ${common} value="${esc(value)}"${placeholder ? ` placeholder="${esc(placeholder)}"` : ''} autocomplete="off">`;
 }
 
-function fieldHtml(def, value, prefix, overridden) {
-  const id = `${prefix}-${def.key}`;
-  const badge = overridden
-    ? `<span class="ovr-badge">Overrides preset</span>
+/** The override badge + its revert button — built in two places, so built once. */
+function badgeHtml(def, t) {
+  return `<span class="ovr-badge">${esc(t('configurator.ovrBadge'))}</span>
        <button type="button" class="ovr-revert" data-srevert="${def.key}"
-         title="Revert to the preset value" aria-label="Revert ${esc(def.label)} to the preset value">↺</button>`
-    : '';
+         title="${esc(t('configurator.ovrRevert'))}" aria-label="${esc(t('configurator.ovrRevertField', { field: t(def.labelKey) }))}">↺</button>`;
+}
+
+function fieldHtml(def, value, prefix, overridden, t) {
+  const id = `${prefix}-${def.key}`;
   return `<div class="field" data-sfieldrow="${def.key}">
     <div class="field-head">
-      <label for="${id}">${esc(def.label)}</label>
-      <span class="ovr-slot" data-sovr="${def.key}">${badge}</span>
+      <label for="${id}">${esc(t(def.labelKey))}</label>
+      <span class="ovr-slot" data-sovr="${def.key}">${overridden ? badgeHtml(def, t) : ''}</span>
     </div>
-    ${controlHtml(def, value, id)}
+    ${controlHtml(def, value, id, t)}
     <div class="hint" data-shint="${def.key}"></div>
   </div>`;
 }
@@ -89,21 +108,25 @@ function fieldHtml(def, value, prefix, overridden) {
  *
  * `onChange(key, value)` receives the raw new value (boolean for checkboxes);
  * `onRevert(key)` fires when a revert button is pressed.
+ *
+ * `t` is the bound translator — required, since the schema holds no English.
  */
-export function mountSettingsForm({ root, prefix = 'sf', getState, onChange = () => {}, onRevert = () => {} }) {
+export function mountSettingsForm({ root, prefix = 'sf', getState, onChange = () => {}, onRevert = () => {}, t }) {
+  const groupTag = (count) => (count ? esc(t('configurator.groupOverridden', { n: count })) : '');
+
   function render() {
     const { values, base } = getState();
     const effective = normalizeSettings(values);
     const overrides = base ? diffSettings(base, effective) : {};
     root.innerHTML = SETTING_GROUPS.map((group) => {
       const fields = SETTING_FIELDS.filter((def) => def.group === group.id)
-        .map((def) => fieldHtml(def, effective[def.key], prefix, Object.hasOwn(overrides, def.key)))
+        .map((def) => fieldHtml(def, effective[def.key], prefix, Object.hasOwn(overrides, def.key), t))
         .join('');
       const count = base ? groupOverrideCount(group.id, overrides) : 0;
       return `<details class="fgroup"${group.id === 'look' ? ' open' : ''}>
         <summary>
-          <span class="g-label">${esc(group.label)}</span>
-          <span class="g-ovr" data-sgroup="${group.id}">${count ? `${count} overridden` : ''}</span>
+          <span class="g-label">${esc(t(group.labelKey))}</span>
+          <span class="g-ovr" data-sgroup="${group.id}">${groupTag(count)}</span>
           <span class="g-chev" aria-hidden="true">▾</span>
         </summary>
         <div class="fgroup-body">${fields}</div>
@@ -128,19 +151,21 @@ export function mountSettingsForm({ root, prefix = 'sf', getState, onChange = ()
         // Rebuild only on a transition — an untouched badge keeps its :focus.
         if (slot.dataset.state !== wanted) {
           slot.dataset.state = wanted;
-          slot.innerHTML = overridden
-            ? `<span class="ovr-badge">Overrides preset</span>
-               <button type="button" class="ovr-revert" data-srevert="${def.key}"
-                 title="Revert to the preset value" aria-label="Revert ${esc(def.label)} to the preset value">↺</button>`
-            : '';
+          slot.innerHTML = overridden ? badgeHtml(def, t) : '';
         }
       }
       const hint = root.querySelector(`[data-shint="${def.key}"]`);
       if (hint) {
         const gate = gating[def.key];
-        hint.textContent = overridden && baseValues
-          ? `Preset value: ${readableValue(def, baseValues[def.key])}`
-          : (gate?.disabled && gate.note) || gate?.note || def.hint || '';
+        if (overridden && baseValues) {
+          // Carries a raw setting value — `tz` is whatever the streamer typed —
+          // so this branch stays textContent. The catalog branch below may hold
+          // authored markup (<strong>, <code>, <br>) and is trusted.
+          hint.textContent = t('configurator.presetValue', { value: readableValue(def, baseValues[def.key], t) });
+        } else {
+          const noteKey = gate?.noteKey;
+          hint.innerHTML = noteKey ? t(noteKey) : (def.hintKey ? t(def.hintKey) : '');
+        }
       }
       const out = root.querySelector(`[data-sout="${def.key}"]`);
       if (out) out.textContent = effective[def.key];
@@ -156,7 +181,7 @@ export function mountSettingsForm({ root, prefix = 'sf', getState, onChange = ()
       const tag = root.querySelector(`[data-sgroup="${group.id}"]`);
       if (!tag) continue;
       const count = base ? groupOverrideCount(group.id, overrides) : 0;
-      tag.textContent = count ? `${count} overridden` : '';
+      tag.textContent = count ? t('configurator.groupOverridden', { n: count }) : '';
     }
   }
 

@@ -6,6 +6,11 @@
  * train's status is derived from the clock alone (RaidPal's own `status` field
  * is per-Event detail, not carried on the summaries the user endpoint returns),
  * and getting "departed" wrong would grey out a train that is still running.
+ *
+ * i18n: every user-facing word comes from the injected translator `t`. Values
+ * interpolated into a string (an Event title, a Preset name) are RaidPal or
+ * streamer data, so the translated result is escaped as a whole — never the
+ * fragments before interpolation, which would double-escape.
  */
 
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -41,13 +46,13 @@ export function classifyTrains(events, now) {
  * something today, a dated form otherwise. Rendered in the viewer's own zone
  * (this is the Configurator, not the Overlay — no tz param applies here).
  */
-export function whenLabel(event, now, locale = undefined) {
+export function whenLabel(event, now, locale = undefined, t = (k) => k) {
   const start = event.starttime;
   const end = event.endtime;
   const sameDay = start.toDateString() === new Date(now).toDateString();
   const time = new Intl.DateTimeFormat(locale, { hour: 'numeric', minute: '2-digit' });
   const day = new Intl.DateTimeFormat(locale, { weekday: 'short', month: 'short', day: 'numeric' });
-  const head = sameDay ? 'Today' : day.format(start);
+  const head = sameDay ? t('configurator.whenToday') : day.format(start);
   return `${head} · ${time.format(start)} – ${time.format(end)}`;
 }
 
@@ -72,23 +77,27 @@ function miniTrainHtml(detail) {
  * Train Config, and `error` marks a detail that failed to refresh (the card
  * still renders — a failed read is never "you left the train").
  */
-export function trainCardHtml(view) {
+export function trainCardHtml(view, t = (k) => k) {
   const { event, status, when, detail, config, error } = view;
   const past = status === 'past';
   const chips = [
-    status === 'live' ? '<span class="chip-live"><span class="dot"></span>LIVE NOW</span>' : '',
-    event.organiser ? '<span class="chip-org" title="You organise this raid train">Organiser</span>' : '',
+    status === 'live' ? `<span class="chip-live"><span class="dot"></span>${esc(t('configurator.chipLive'))}</span>` : '',
+    event.organiser
+      ? `<span class="chip-org" title="${esc(t('configurator.chipOrganiserTitle'))}">${esc(t('configurator.chipOrganiser'))}</span>`
+      : '',
     config
-      ? `<span class="chip-cfg" title="This train has a saved Raid Train Config">${esc(config.presetName)}${config.overrideCount ? ` +${config.overrideCount}` : ''}</span>`
+      ? `<span class="chip-cfg" title="${esc(t('configurator.chipConfigTitle'))}">${esc(config.presetName)}${config.overrideCount ? ` +${config.overrideCount}` : ''}</span>`
       : '',
   ].join('');
+  // The filled/total counts are numbers we generate, so the catalog string may
+  // carry the <b> around them; the test asserts translations keep that tag.
   const slots = detail
-    ? ` · <b>${detail.filled}/${detail.slots}</b> slots filled`
-    : (error ? ' · <span class="meta-warn">couldn’t refresh</span>' : ' · …');
+    ? ` · ${t('configurator.slotsFilled', { filled: detail.filled, slots: detail.slots })}`
+    : (error ? ` · <span class="meta-warn">${esc(t('configurator.cardRefreshFailed'))}</span>` : ' · …');
   return `<div class="card event-card${status === 'live' ? ' is-live' : ''}${past ? ' past' : ''}" data-slug="${esc(event.slug)}">
     <div class="event-main">
       <div class="event-title-row">
-        ${past ? '<span class="stamp">Departed</span>' : ''}
+        ${past ? `<span class="stamp">${esc(t('configurator.stampDeparted'))}</span>` : ''}
         <span class="event-title">${esc(event.title)}</span>
         ${chips}
       </div>
@@ -97,10 +106,10 @@ export function trainCardHtml(view) {
     </div>
     <div class="event-actions">
       <button type="button" class="icon-btn" data-act="refresh-train" data-slug="${esc(event.slug)}"
-        title="Refresh this train from RaidPal" aria-label="Refresh ${esc(event.title)} from RaidPal">⟳</button>
+        title="${esc(t('configurator.cardRefreshTitle'))}" aria-label="${esc(t('configurator.cardRefreshAria', { title: event.title }))}">⟳</button>
       <button type="button" class="icon-btn" data-act="copy-train-link" data-slug="${esc(event.slug)}"
-        title="Copy the overlay link for this train" aria-label="Copy the overlay link for ${esc(event.title)}">⧉</button>
-      <button type="button" class="btn sm" data-act="open-config" data-slug="${esc(event.slug)}">Configure</button>
+        title="${esc(t('configurator.cardCopyTitle'))}" aria-label="${esc(t('configurator.cardCopyAria', { title: event.title }))}">⧉</button>
+      <button type="button" class="btn sm" data-act="open-config" data-slug="${esc(event.slug)}">${esc(t('configurator.cardConfigure'))}</button>
     </div>
   </div>`;
 }
