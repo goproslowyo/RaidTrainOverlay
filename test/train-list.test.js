@@ -1,6 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { classifyTrains, trainCardHtml, whenLabel } from '../src/train-list.js';
+import { makeT } from '../src/i18n/index.js';
+import enMessages from '../src/i18n/locales/en.js';
+
+// The real English catalog, so these assertions exercise the shipped strings
+// rather than a stub — a key deleted from en.js fails here, not just in CI.
+const t = makeT(enMessages);
 
 const NOW = new Date('2026-08-07T18:00:00Z');
 const at = (iso, hours) => ({
@@ -36,9 +42,9 @@ test('departed trains list most-recent first', () => {
 
 test('whenLabel says Today for a train departing today', () => {
   const today = at('2026-08-07T22:00:00Z', 3);
-  assert.match(whenLabel(today, NOW, 'en-US'), /^Today · /);
+  assert.match(whenLabel(today, NOW, 'en-US', t), /^Today · /);
   const other = at('2026-08-20T22:00:00Z', 3);
-  assert.ok(!whenLabel(other, NOW, 'en-US').startsWith('Today'));
+  assert.ok(!whenLabel(other, NOW, 'en-US', t).startsWith('Today'));
 });
 
 test('the card shows live / organiser / config chips and escapes user text', () => {
@@ -46,7 +52,7 @@ test('the card shows live / organiser / config chips and escapes user text', () 
   const html = trainCardHtml({
     event, status: 'live', when: 'Today · 4 PM – 10 PM',
     detail: { slots: 12, filled: 11 }, config: { presetName: 'House', overrideCount: 2 },
-  });
+  }, t);
   assert.match(html, /LIVE NOW/);
   assert.match(html, /Organiser/);
   assert.match(html, /House \+2/);
@@ -56,11 +62,11 @@ test('the card shows live / organiser / config chips and escapes user text', () 
 
 test('a departed card is stamped and drops its mini-train; a failed detail still renders', () => {
   const event = at('2026-07-26T20:00:00Z', 4);
-  const departed = trainCardHtml({ event, status: 'past', when: 'Sun, Jul 26', detail: { slots: 8, filled: 8 } });
+  const departed = trainCardHtml({ event, status: 'past', when: 'Sun, Jul 26', detail: { slots: 8, filled: 8 } }, t);
   assert.match(departed, /Departed/);
   assert.ok(!departed.includes('mini-train'));
 
-  const failed = trainCardHtml({ event, status: 'upcoming', when: 'Sun, Jul 26', error: new Error('nope') });
+  const failed = trainCardHtml({ event, status: 'upcoming', when: 'Sun, Jul 26', error: new Error('nope') }, t);
   assert.match(failed, /couldn’t refresh/);
   assert.match(failed, /data-act="open-config"/, 'the card stays usable when RaidPal fails');
 });

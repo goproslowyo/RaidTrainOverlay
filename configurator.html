@@ -460,7 +460,7 @@
     <span class="brand-train" aria-hidden="true"><i></i><i></i><i></i></span>
     <h1>RaidTrain<span class="a">Overlay</span></h1>
     <span class="sep">/</span>
-    <span class="app">Configurator</span>
+    <span class="app" data-i18n="configurator.appName">Configurator</span>
   </div>
   <div class="profile-wrap">
     <button type="button" class="profile-btn" id="profile-btn" aria-haspopup="true" aria-expanded="false">
@@ -469,26 +469,27 @@
       <span class="chev" aria-hidden="true">▾</span>
     </button>
     <div class="profile-menu" id="profile-menu">
-      <div class="menu-label">Profiles</div>
+      <div class="menu-label" data-i18n="configurator.menuProfiles">Profiles</div>
       <div id="profile-list"></div>
       <div class="profile-add">
-        <input type="text" id="profile-add-input" placeholder="Twitch username" autocomplete="off">
-        <button type="button" id="profile-add-btn">Add</button>
+        <input type="text" id="profile-add-input" placeholder="Twitch username" autocomplete="off"
+          data-i18n-attr="placeholder:configurator.twitchUsername">
+        <button type="button" id="profile-add-btn" data-i18n="configurator.add">Add</button>
       </div>
-      <div class="profile-hint">A Profile is just a Twitch login name. Each Profile keeps its own raid trains, Raid Train Configs and Live Link.</div>
+      <div class="profile-hint" data-i18n="configurator.profileMenuHint">A Profile is just a Twitch login name. Each Profile keeps its own raid trains, Raid Train Configs and Live Link.</div>
     </div>
   </div>
 </header>
 
 <div class="shell">
   <nav class="side">
-    <button type="button" class="nav-item" data-nav="trains">My Raid Trains <span class="n-count" id="nc-trains"></span></button>
-    <button type="button" class="nav-item" data-nav="livelink"><span class="n-gold">Live Link</span></button>
-    <button type="button" class="nav-item" data-nav="presets">Preset Library <span class="n-count" id="nc-presets"></span></button>
-    <button type="button" class="nav-item" data-nav="profile">Profile settings</button>
+    <button type="button" class="nav-item" data-nav="trains"><span data-i18n="configurator.navTrains">My Raid Trains</span> <span class="n-count" id="nc-trains"></span></button>
+    <button type="button" class="nav-item" data-nav="livelink"><span class="n-gold" data-i18n="configurator.navLiveLink">Live Link</span></button>
+    <button type="button" class="nav-item" data-nav="presets"><span data-i18n="configurator.navPresets">Preset Library</span> <span class="n-count" id="nc-presets"></span></button>
+    <button type="button" class="nav-item" data-nav="profile" data-i18n="configurator.navProfile">Profile settings</button>
     <hr>
-    <button type="button" class="nav-item secondary" data-nav="oneoff">One-off link</button>
-    <div class="side-note">Not your RaidPal account? Paste any event link, or build a lineup by hand — same as before.</div>
+    <button type="button" class="nav-item secondary" data-nav="oneoff" data-i18n="configurator.navOneOff">One-off link</button>
+    <div class="side-note" data-i18n="configurator.sideNote">Not your RaidPal account? Paste any event link, or build a lineup by hand — same as before.</div>
   </nav>
   <main id="main"></main>
 </div>
@@ -506,6 +507,7 @@
   import { parseConfig } from './src/config.js';
   import { createPreviewFrame } from './src/preview-frame.js';
   import { resolveLocale, loadMessages, makeT } from './src/i18n/index.js';
+  import { localizeDom } from './src/i18n/dom.js';
   import {
     parsePresetLibrary, serializePresetLibrary, createPreset, duplicatePreset, renamePreset,
     updatePresetSettings, deletePreset, getPreset, listPresets,
@@ -518,7 +520,7 @@
   import { loadMyRaidTrains, loadEventDetails, refreshEventDetail, userCacheKey } from './src/my-raid-trains.js';
   import { buildLiveLinkQuery, baseSettings } from './src/live-link-url.js';
   import {
-    SETTINGS_DEFAULTS, SETTING_FIELDS, THEME_OPTIONS, applySettings, diffSettings, normalizeSettings,
+    SETTINGS_DEFAULTS, SETTING_FIELDS, THEME_OPTION_KEYS, applySettings, diffSettings, normalizeSettings,
   } from './src/settings-schema.js';
   import { mountSettingsForm } from './src/settings-form.js';
   import { classifyTrains, trainCardHtml, whenLabel } from './src/train-list.js';
@@ -534,8 +536,12 @@
   const PROFILES_KEY = 'raidtrainoverlay.configurator.profiles.v1';
   const STREAMERS_KEY = 'raidtrainoverlay.configurator.streamers';
 
-  // The idle card's horizons, in the `upcoming=` grammar the Overlay parses.
-  const HORIZONS = { '3': 'Next 3 trains', '5': 'Next 5 trains', '2w': 'Next 2 weeks', '1m': 'Next month', 'all': 'All upcoming' };
+  // The idle card's horizons, in the `upcoming=` grammar the Overlay parses,
+  // each pointing at its catalog key rather than an English label.
+  const HORIZON_KEYS = {
+    '3': 'configurator.horizon3', '5': 'configurator.horizon5', '2w': 'configurator.horizon2w',
+    '1m': 'configurator.horizon1m', 'all': 'configurator.horizonAll',
+  };
 
   const ICONS = {
     pencil: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11.3 2.7l2 2L5.4 12.6l-2.9.9.9-2.9z"/><path d="m9.9 4.1 2 2"/></svg>',
@@ -543,13 +549,34 @@
     trash: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 4.5h11"/><path d="M5.5 4.5V3.2a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v1.3"/><path d="m4.3 4.5.6 8.6a1 1 0 0 0 1 .9h4.2a1 1 0 0 0 1-.9l.6-8.6"/><path d="M6.7 7.3v3.9M9.3 7.3v3.9"/></svg>',
   };
 
-  // The Build-by-hand editor renders its own localized strings; this page's own
-  // chrome is English until the i18n pass adds its catalog keys.
+  // The bound translator. start() replaces this before the first render, so the
+  // stub only ever covers the module's own evaluation; every string on the page
+  // — this file's views, the settings form, the train cards, the Build-by-hand
+  // editor — resolves through it.
   let t = (key) => key;
+  // The resolved locale, handed to Intl so dates and clock times in the train
+  // list read the same way as the words around them. undefined = the browser's.
+  let pageLocale;
 
   const $ = (sel, root) => (root ?? document).querySelector(sel);
   const $$ = (sel, root) => [...(root ?? document).querySelectorAll(sel)];
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  /** t() for a string that lands in HTML as text or in an attribute. */
+  const te = (key, params) => esc(t(key, params));
+  /**
+   * A Theme's display name in the current locale. An unregistered theme (a
+   * hand-edited backup blob, a Theme retired since the Preset was saved) has no
+   * key, so it renders as its stored value — NOT through t(), which would treat
+   * the value as a message key and could resolve it to an unrelated string.
+   */
+  const themeLabel = (theme) => (THEME_OPTION_KEYS[theme] ? t(THEME_OPTION_KEYS[theme]) : String(theme));
+  /**
+   * Two-form plural: a locale gets its own singular and plural strings rather
+   * than English's "s" glued on in code, which is wrong in most of the eleven
+   * languages here. Not full CLDR plural categories — a machine-translated
+   * draft can't be trusted with six Lithuanian forms — but honest for one/many.
+   */
+  const plural = (n, oneKey, otherKey, params) => t(n === 1 ? oneKey : otherKey, { n, ...params });
 
   // ── Stores (localStorage adapters around the pure modules) ─────────────
   let library = parsePresetLibrary(localStorage.getItem(LIBRARY_KEY));
@@ -610,7 +637,7 @@
     const existing = listPresets(library);
     const id = existing.length > 0
       ? existing[0].id
-      : (() => { const made = createPreset(library, 'House Default', SETTINGS_DEFAULTS); library = made.library; saveLibrary(); return made.id; })();
+      : (() => { const made = createPreset(library, t('configurator.starterPresetName'), SETTINGS_DEFAULTS); library = made.library; saveLibrary(); return made.id; })();
     profiles = setDefaultPreset(profiles, login, id);
     saveProfiles();
   }
@@ -714,11 +741,11 @@
     return {
       event,
       status,
-      when: whenLabel(event, now),
+      when: whenLabel(event, now, pageLocale, t),
       detail: detailCounts(event.slug),
       error: state.feed.details[event.slug]?.error ?? null,
       config: config
-        ? { presetName: preset?.name ?? 'Custom', overrideCount: Object.keys(liveOverrides).length }
+        ? { presetName: preset?.name ?? t('configurator.customPreset'), overrideCount: Object.keys(liveOverrides).length }
         : null,
     };
   }
@@ -731,32 +758,32 @@
     const now = Date.now();
     const { live, upcoming } = classifyTrains([event], now);
     const status = live.length ? 'live' : upcoming.length ? 'upcoming' : 'past';
-    existing.outerHTML = trainCardHtml(cardView(event, status, now));
+    existing.outerHTML = trainCardHtml(cardView(event, status, now), t);
   }
 
   // ── Views ──────────────────────────────────────────────────────────────
   function renderTopbar() {
     const login = me();
     $('#pb-avatar').textContent = login ? login[0].toUpperCase() : '+';
-    $('#pb-name').textContent = login ?? 'Add a profile';
+    $('#pb-name').textContent = login ?? t('configurator.addProfile');
     const rows = listProfiles(profiles).map((name) => {
       const p = profiles.profiles[name];
       const trains = Object.keys(p.trains ?? {}).length;
       return `<button type="button" class="profile-item" data-act="switch-profile" data-name="${esc(name)}">
         <span class="avatar">${esc(name[0].toUpperCase())}</span>
         <span><span class="p-name">${esc(name)}</span>
-          <span class="p-sub">${trains} raid train config${trains === 1 ? '' : 's'}</span></span>
+          <span class="p-sub">${esc(plural(trains, 'configurator.profileConfigsOne', 'configurator.profileConfigsMany'))}</span></span>
         ${name === login ? '<span class="p-check">✓</span>' : ''}
       </button>`;
     }).join('');
     const manage = login
       ? `<button type="button" class="profile-item p-manage" data-act="manage-profile">
           <span class="p-gear" aria-hidden="true">⚙</span>
-          <span><span class="p-name">Manage profile…</span>
-            <span class="p-sub">Standing Spotlights, default Preset and backups</span></span>
+          <span><span class="p-name">${te('configurator.manageProfile')}</span>
+            <span class="p-sub">${te('configurator.manageProfileSub')}</span></span>
         </button>`
       : '';
-    $('#profile-list').innerHTML = rows || '<div class="profile-hint">No profiles yet — add your Twitch username below.</div>';
+    $('#profile-list').innerHTML = rows || `<div class="profile-hint">${te('configurator.noProfiles')}</div>`;
     $('#profile-list').insertAdjacentHTML('beforeend', manage);
   }
 
@@ -773,80 +800,99 @@
     }
   }
 
+  /**
+   * The preview iframe + its roll/recenter controls — identical in all three
+   * editors, so it lives once. (It was triplicated inline; every string in it
+   * would otherwise need localizing three times and could drift.)
+   */
+  function previewFrameHtml() {
+    return `<div class="preview-frame">
+          <iframe id="preview" title="${te('configurator.previewTitle')}"></iframe>
+          <div class="preview-controls">
+            <button type="button" id="preview-roll" class="preview-btn">▶&nbsp;${te('configurator.rollIt')}</button>
+            <button type="button" id="preview-still" class="preview-btn" hidden>◼&nbsp;${te('configurator.recenter')}</button>
+          </div>
+        </div>
+        <div class="preview-caption" id="preview-caption"></div>`;
+  }
+
+  const resetOverridesLabel = (n) => plural(n, 'configurator.resetOverridesOne', 'configurator.resetOverridesMany');
+
   // ── View: My Raid Trains ───────────────────────────────────────────────
   function liveLinkCardHtml() {
     const prefs = liveLinkPrefs(profiles, me());
     const on = prefs.upcoming != null;
     const base = getPreset(library, myProfile()?.defaultPresetId ?? null);
-    const options = Object.entries(HORIZONS)
-      .map(([k, label]) => `<option value="${k}"${(prefs.upcoming ?? '3') === k ? ' selected' : ''}>${esc(label)}</option>`)
+    const options = Object.entries(HORIZON_KEYS)
+      .map(([k, key]) => `<option value="${k}"${(prefs.upcoming ?? '3') === k ? ' selected' : ''}>${te(key)}</option>`)
       .join('');
     return `<section class="card live-link" id="live-link-card">
-      <div class="ll-head"><h2>Live Link</h2><span class="ll-badge">One per profile</span></div>
-      <p class="ll-sub">Paste this <b>one URL</b> into OBS once. It always shows your <b>live</b> raid train — or your next one — using each train's saved settings.</p>
+      <div class="ll-head"><h2>${te('configurator.navLiveLink')}</h2><span class="ll-badge">${te('configurator.llBadge')}</span></div>
+      <p class="ll-sub">${t('configurator.llSub')}</p>
       <div class="url-row">
-        <input type="text" id="ll-url" readonly value="${esc(liveLinkUrl())}" aria-label="Live Link URL">
-        <button type="button" class="btn gold" data-act="copy-live">Copy Live Link</button>
+        <input type="text" id="ll-url" readonly value="${esc(liveLinkUrl())}" aria-label="${te('configurator.llUrlAria')}">
+        <button type="button" class="btn gold" data-act="copy-live">${te('configurator.llCopy')}</button>
       </div>
-      <div class="ll-note"><span class="w" aria-hidden="true">⚠</span><span>Changing settings changes this URL. After a change, copy it again and paste it back into the same OBS browser source.</span></div>
+      <div class="ll-note"><span class="w" aria-hidden="true">⚠</span><span>${te('configurator.llWarn')}</span></div>
       <div class="ll-idle">
         <label class="chk"><input type="checkbox" id="ll-idle-toggle"${on ? ' checked' : ''}>
-          Show an upcoming-trains card while no train is live</label>
-        <select id="ll-horizon"${on ? '' : ' disabled'} aria-label="Upcoming card horizon">${options}</select>
+          ${te('configurator.llIdleToggle')}</label>
+        <select id="ll-horizon"${on ? '' : ' disabled'} aria-label="${te('configurator.llHorizonAria')}">${options}</select>
       </div>
-      <div class="ll-meta">Styled by your default Preset: <b>${esc(base?.name ?? 'none yet')}</b>${base ? ` (${esc(THEME_OPTIONS[normalizeSettings(base.settings).theme])})` : ''} — <a href="#" data-act="goto-presets">manage Presets</a>. Trains with their own Raid Train Config keep their saved settings.</div>
+      <div class="ll-meta">${t('configurator.llStyledBy', {
+        preset: `<b>${esc(base?.name ?? t('configurator.noneYet'))}</b>${base ? ` (${esc(themeLabel(normalizeSettings(base.settings).theme))})` : ''}`,
+      })}</div>
     </section>`;
   }
 
   function trainsViewHtml() {
     if (!me()) {
-      return `<h2 class="view-title">My Raid Trains</h2>
-        <p class="view-sub">Your RaidPal raid trains — joined and organised — in one place.</p>
+      return `<h2 class="view-title">${te('configurator.navTrains')}</h2>
+        <p class="view-sub">${te('configurator.trainsSubAnon')}</p>
         <section class="card">
-          <h2 class="card-h">Get started</h2>
+          <h2 class="card-h">${te('configurator.getStarted')}</h2>
           <div class="spot-add">
-            <input type="text" id="onboard-input" placeholder="Your Twitch username" autocomplete="off">
-            <button type="button" class="btn primary" data-act="onboard">Show my trains</button>
+            <input type="text" id="onboard-input" placeholder="${te('configurator.yourTwitchUsername')}" autocomplete="off">
+            <button type="button" class="btn primary" data-act="onboard">${te('configurator.showMyTrains')}</button>
           </div>
-          <div class="hint">No sign-in, no password — RaidPal's public profile is read by username. Everything you build stays in this browser.</div>
+          <div class="hint">${te('configurator.onboardHint')}</div>
         </section>
         <section class="card">
-          <h2 class="card-h">No RaidPal profile?</h2>
-          <div class="hint">Build a <a href="#" data-act="goto-oneoff">one-off link</a> from any event link, or type a lineup in by hand.</div>
+          <h2 class="card-h">${te('configurator.noRaidpalProfile')}</h2>
+          <div class="hint">${t('configurator.noRaidpalProfileHint')}</div>
         </section>`;
     }
-    const head = `<h2 class="view-title">My Raid Trains</h2>
-      <p class="view-sub">Your RaidPal raid trains — joined and organised — for <b>${esc(me())}</b>.</p>
+    const head = `<h2 class="view-title">${te('configurator.navTrains')}</h2>
+      <p class="view-sub">${t('configurator.trainsSubFor', { login: `<b>${esc(me())}</b>` })}</p>
       ${liveLinkCardHtml()}`;
-    if (state.feed.status === 'loading') return `${head}<div class="empty">Loading your raid trains from RaidPal…</div>`;
+    if (state.feed.status === 'loading') return `${head}<div class="empty">${te('configurator.trainsLoading')}</div>`;
     if (state.feed.status === 'notfound') {
-      return `${head}<section class="card"><h2 class="card-h">RaidPal doesn't know that username</h2>
-        <div class="hint">RaidPal has no public profile for <b>${esc(me())}</b>. Check the spelling — it's your Twitch login, not your display name — or
-        <a href="#" data-act="goto-oneoff">build a one-off link</a> instead.
-        <button type="button" class="btn sm" data-act="refresh-all" style="margin-left:8px">Try again</button></div></section>`;
+      return `${head}<section class="card"><h2 class="card-h">${te('configurator.unknownUser')}</h2>
+        <div class="hint">${t('configurator.unknownUserHint', { login: `<b>${esc(me())}</b>` })}
+        <button type="button" class="btn sm" data-act="refresh-all" style="margin-left:8px">${te('configurator.tryAgain')}</button></div></section>`;
     }
     if (state.feed.status === 'error') {
-      return `${head}<section class="card"><h2 class="card-h">Couldn't reach RaidPal</h2>
-        <div class="hint">${esc(state.feed.error?.message ?? 'The request failed.')} Your saved settings are safe — try
-        <button type="button" class="btn sm" data-act="refresh-all">Retry</button></div></section>`;
+      return `${head}<section class="card"><h2 class="card-h">${te('configurator.raidpalUnreachable')}</h2>
+        <div class="hint">${esc(state.feed.error?.message ?? t('configurator.requestFailed'))} ${te('configurator.settingsSafe')}
+        <button type="button" class="btn sm" data-act="refresh-all">${te('configurator.retry')}</button></div></section>`;
     }
     const now = Date.now();
     const { live, upcoming, past } = classifyTrains(state.feed.events, now);
     const staleNote = state.feed.stale === 'notfound'
-      ? `RaidPal didn't return a profile for <b>${esc(me())}</b> just now — showing your last good list.`
-      : state.feed.error ? 'Showing the last good list — RaidPal didn\'t answer just now.' : '';
+      ? t('configurator.staleNotFound', { login: `<b>${esc(me())}</b>` })
+      : state.feed.error ? t('configurator.staleError') : '';
     const stale = staleNote
       ? `<div class="hint" style="margin:-6px 0 12px">${staleNote}
-           <button type="button" class="btn sm" data-act="refresh-all" style="margin-left:6px">Try again</button></div>`
+           <button type="button" class="btn sm" data-act="refresh-all" style="margin-left:6px">${te('configurator.tryAgain')}</button></div>`
       : '';
-    const cards = [...live, ...upcoming].map((e) => trainCardHtml(cardView(e, live.includes(e) ? 'live' : 'upcoming', now))).join('');
+    const cards = [...live, ...upcoming].map((e) => trainCardHtml(cardView(e, live.includes(e) ? 'live' : 'upcoming', now), t)).join('');
     const emptyNote = (live.length + upcoming.length) === 0
-      ? '<div class="empty">No live or upcoming raid trains. Join one on RaidPal and it appears here.</div>' : '';
+      ? `<div class="empty">${te('configurator.noTrains')}</div>` : '';
     const departed = past.length > 0
       ? `<button type="button" class="past-divider${state.pastOpen ? ' open' : ''}" data-act="toggle-past">
-           ${past.length} departed train${past.length === 1 ? '' : 's'} <span class="pd-chev" aria-hidden="true">▾</span>
+           ${esc(plural(past.length, 'configurator.departedOne', 'configurator.departedMany'))} <span class="pd-chev" aria-hidden="true">▾</span>
          </button>
-         <div class="past-list"${state.pastOpen ? '' : ' hidden'}>${past.map((e) => trainCardHtml(cardView(e, 'past', now))).join('')}</div>`
+         <div class="past-list"${state.pastOpen ? '' : ' hidden'}>${past.map((e) => trainCardHtml(cardView(e, 'past', now), t)).join('')}</div>`
       : '';
     return `${head}${stale}${cards}${emptyNote}${departed}`;
   }
@@ -863,72 +909,69 @@
       .join('');
     const now = Date.now();
     const isLive = event ? classifyTrains([event], now).live.length > 0 : false;
-    return `<button type="button" class="back-link" data-act="back-trains">← My Raid Trains</button>
+    return `<button type="button" class="back-link" data-act="back-trains">← ${te('configurator.navTrains')}</button>
       <div class="editor-head-row">
         <h2>${esc(event?.title ?? slug)}</h2>
-        ${isLive ? '<span class="chip-live"><span class="dot"></span>LIVE NOW</span>' : ''}
-        ${event?.organiser ? '<span class="chip-org">Organiser</span>' : ''}
+        ${isLive ? `<span class="chip-live"><span class="dot"></span>${te('configurator.chipLive')}</span>` : ''}
+        ${event?.organiser ? `<span class="chip-org">${te('configurator.chipOrganiser')}</span>` : ''}
       </div>
-      <p class="view-sub">${event ? esc(whenLabel(event, now)) : esc(slug)}</p>
+      <p class="view-sub">${event ? esc(whenLabel(event, now, pageLocale, t)) : esc(slug)}</p>
 
       <section class="card">
-        <div class="preview-frame">
-          <iframe id="preview" title="Overlay preview"></iframe>
-          <div class="preview-controls">
-            <button type="button" id="preview-roll" class="preview-btn">▶&nbsp;Roll it</button>
-            <button type="button" id="preview-still" class="preview-btn" hidden>◼&nbsp;Recenter</button>
-          </div>
-        </div>
-        <div class="preview-caption" id="preview-caption"></div>
+        ${previewFrameHtml()}
       </section>
 
       <section class="card">
-        <h2 class="card-h">Raid Train Config</h2>
+        <h2 class="card-h">${te('configurator.cfgTitle')}</h2>
         <div class="preset-ref">
-          <span class="lbl">Preset</span>
-          <select id="cfg-preset">${options || '<option value="">No Presets yet</option>'}</select>
+          <span class="lbl">${te('configurator.presetLabel')}</span>
+          <select id="cfg-preset">${options || `<option value="">${te('configurator.noPresets')}</option>`}</select>
         </div>
-        <div class="hint">Settings start from this Preset. Change any field below to override it — for this train only.</div>
+        <div class="hint">${te('configurator.cfgPresetHint')}</div>
       </section>
 
       <section class="card">
         <div class="cfg-toolbar">
-          <h2 class="card-h" style="margin:0">Settings for this train</h2>
-          <button type="button" class="reset-all" data-act="reset-overrides"${overrideCount ? '' : ' hidden'}>Reset ${overrideCount} override${overrideCount === 1 ? '' : 's'}</button>
+          <h2 class="card-h" style="margin:0">${te('configurator.cfgSettingsTitle')}</h2>
+          <button type="button" class="reset-all" data-act="reset-overrides"${overrideCount ? '' : ' hidden'}>${esc(resetOverridesLabel(overrideCount))}</button>
         </div>
         <div id="settings-root"></div>
       </section>
 
       <section class="card">
-        <h2 class="card-h">Spotlights for this train</h2>
+        <h2 class="card-h">${te('configurator.cfgSpotlightTitle')}</h2>
         <div class="spot-chips">
           ${(myProfile()?.spotlight ?? []).length
-            ? (myProfile().spotlight).map((s) => `<span class="spot-chip">Always on: <b>${esc(s)}</b></span>`).join('')
-            : '<span class="spot-chip">No standing Spotlights yet</span>'}
-          <button type="button" class="btn sm" data-act="goto-profile">Edit in Profile settings →</button>
+            ? (myProfile().spotlight).map((s) => `<span class="spot-chip">${t('configurator.alwaysOn', { name: `<b>${esc(s)}</b>` })}</span>`).join('')
+            : `<span class="spot-chip">${te('configurator.noStandingSpotlights')}</span>`}
+          <button type="button" class="btn sm" data-act="goto-profile">${te('configurator.editInProfile')}</button>
         </div>
-        <input type="text" id="cfg-spotlight" value="${esc((config?.spotlight ?? []).join(', '))}" placeholder="DJ Alpha, DJ Charlie" autocomplete="off">
-        <div class="hint">Comma-separated names to glow — this train only, on top of your standing Spotlights above.</div>
+        <input type="text" id="cfg-spotlight" value="${esc((config?.spotlight ?? []).join(', '))}" placeholder="${te('configurator.spotlightPlaceholder')}" autocomplete="off">
+        <div class="hint">${te('configurator.cfgSpotlightHint')}</div>
       </section>
 
       <section class="card">
-        <h2 class="card-h">Overlay link for this train</h2>
+        <h2 class="card-h">${te('configurator.cfgLinkTitle')}</h2>
         <div class="url-row">
-          <input type="text" id="cfg-url" readonly value="${esc(trainOverlayUrl(slug))}" aria-label="Overlay link for this train">
-          <button type="button" class="btn primary" data-act="copy-cfg-url">Copy</button>
+          <input type="text" id="cfg-url" readonly value="${esc(trainOverlayUrl(slug))}" aria-label="${te('configurator.cfgLinkAria')}">
+          <button type="button" class="btn primary" data-act="copy-cfg-url">${te('configurator.copy')}</button>
         </div>
-        <div class="hint">A direct link for this one train. Your Live Link picks these settings up automatically — you only need this for a source pinned to this specific train.</div>
+        <div class="hint">${te('configurator.cfgLinkHint')}</div>
       </section>`;
   }
 
   // ── View: Preset Library + Preset editor ───────────────────────────────
   function presetSummaryHtml(settings) {
     const s = normalizeSettings(settings);
-    const bits = [THEME_OPTIONS[s.theme] ?? s.theme, s.mode === 'pass' ? 'Pass' : 'Marquee', `size ${s.scale}`];
-    if (s.height !== '100') bits.push(`Y ${s.height}`);
+    const bits = [
+      themeLabel(s.theme),
+      t(s.mode === 'pass' ? 'configurator.sumPass' : 'configurator.sumMarquee'),
+      t('configurator.sumSize', { v: s.scale }),
+    ];
+    if (s.height !== '100') bits.push(t('configurator.sumHeight', { v: s.height }));
     const extra = SETTING_FIELDS.filter((def) => !['theme', 'mode', 'scale', 'height'].includes(def.key)
       && String(s[def.key]) !== String(SETTINGS_DEFAULTS[def.key])).length;
-    if (extra) bits.push(`+${extra} more`);
+    if (extra) bits.push(t('configurator.sumMore', { n: extra }));
     return bits.map((b) => `<span class="sum-chip">${esc(b)}</span>`).join('');
   }
 
@@ -941,25 +984,27 @@
         ? `<input type="text" id="rename-input" value="${esc(preset.name)}" data-id="${esc(preset.id)}" autocomplete="off">`
         : `<span class="preset-name">${esc(preset.name)}</span>`;
       return `<div class="card preset-row">
-        <div class="preset-info" data-act="edit-preset" data-id="${esc(preset.id)}" title="Open this Preset">
-          <div class="preset-name-row">${nameCell}${isDefault ? '<span class="chip-default">Default</span>' : ''}</div>
+        <div class="preset-info" data-act="edit-preset" data-id="${esc(preset.id)}" title="${te('configurator.openPreset')}">
+          <div class="preset-name-row">${nameCell}${isDefault ? `<span class="chip-default">${te('configurator.chipDefault')}</span>` : ''}</div>
           <div class="preset-sum">${presetSummaryHtml(preset.settings)}</div>
-          <div class="preset-used">${configs ? `Used by <b>${configs}</b> Raid Train Config${configs === 1 ? '' : 's'}` : 'Not used by any Raid Train Config yet'}</div>
+          <div class="preset-used">${configs
+            ? plural(configs, 'configurator.usedByOne', 'configurator.usedByMany', { n: `<b>${configs}</b>` })
+            : te('configurator.usedByNone')}</div>
         </div>
         <div class="preset-actions">
           <button type="button" class="icon-btn star-btn${isDefault ? ' on' : ''}" data-act="make-default" data-id="${esc(preset.id)}"
-            title="${isDefault ? 'This is the default Preset' : 'Make this the default Preset'}"
-            aria-label="${isDefault ? 'This is the default Preset' : `Make ${esc(preset.name)} the default Preset`}">${isDefault ? '★' : '☆'}</button>
-          <button type="button" class="icon-btn" data-act="edit-preset" data-id="${esc(preset.id)}" title="Edit — settings and rename" aria-label="Edit preset ${esc(preset.name)}">${ICONS.pencil}</button>
-          <button type="button" class="icon-btn accent" data-act="dup-preset" data-id="${esc(preset.id)}" title="Duplicate, then rename the copy" aria-label="Duplicate preset ${esc(preset.name)}">${ICONS.copy}</button>
-          <button type="button" class="icon-btn destructive" data-act="del-preset" data-id="${esc(preset.id)}" title="Delete this Preset" aria-label="Delete preset ${esc(preset.name)}">${ICONS.trash}</button>
+            title="${isDefault ? te('configurator.isDefaultPreset') : te('configurator.makeDefaultPreset')}"
+            aria-label="${isDefault ? te('configurator.isDefaultPreset') : te('configurator.makeDefaultAria', { name: preset.name })}">${isDefault ? '★' : '☆'}</button>
+          <button type="button" class="icon-btn" data-act="edit-preset" data-id="${esc(preset.id)}" title="${te('configurator.editPresetTitle')}" aria-label="${te('configurator.editPresetAria', { name: preset.name })}">${ICONS.pencil}</button>
+          <button type="button" class="icon-btn accent" data-act="dup-preset" data-id="${esc(preset.id)}" title="${te('configurator.dupPresetTitle')}" aria-label="${te('configurator.dupPresetAria', { name: preset.name })}">${ICONS.copy}</button>
+          <button type="button" class="icon-btn destructive" data-act="del-preset" data-id="${esc(preset.id)}" title="${te('configurator.delPresetTitle')}" aria-label="${te('configurator.delPresetAria', { name: preset.name })}">${ICONS.trash}</button>
         </div>
       </div>`;
     }).join('');
-    return `<div class="editor-head-row"><h2 class="view-title">Preset Library</h2>
-        <button type="button" class="btn sm" data-act="new-preset">+ New Preset</button></div>
-      <p class="view-sub">Presets are saved settings — no event attached. Raid Train Configs point at a Preset and override only what differs. Click a Preset to edit it, or duplicate one to branch a new look in seconds.</p>
-      ${rows || '<div class="empty">No Presets yet — make one to get started.</div>'}`;
+    return `<div class="editor-head-row"><h2 class="view-title">${te('configurator.navPresets')}</h2>
+        <button type="button" class="btn sm" data-act="new-preset">${te('configurator.newPreset')}</button></div>
+      <p class="view-sub">${te('configurator.presetsSub')}</p>
+      ${rows || `<div class="empty">${te('configurator.noPresetsEmpty')}</div>`}`;
   }
 
   function presetEditorHtml() {
@@ -967,84 +1012,74 @@
     if (!preset) return '';
     const { configs } = countPresetReferences(profiles, state.editingPreset);
     const isDefault = state.editingPreset === myProfile()?.defaultPresetId;
-    return `<button type="button" class="back-link" data-act="back-presets">← Preset Library</button>
+    return `<button type="button" class="back-link" data-act="back-presets">← ${te('configurator.navPresets')}</button>
       <div class="editor-head-row">
         <input type="text" class="preset-title-input" id="preset-title-input" value="${esc(preset.name)}"
-          data-id="${esc(state.editingPreset)}" autocomplete="off" title="Rename this Preset" aria-label="Preset name">
+          data-id="${esc(state.editingPreset)}" autocomplete="off" title="${te('configurator.renamePreset')}" aria-label="${te('configurator.presetNameAria')}">
         ${isDefault
-          ? '<span class="chip-default" title="New Raid Train Configs and your Live Link start from this Preset">✓ Default</span>'
-          : `<button type="button" class="btn sm" data-act="make-default-editor" data-id="${esc(state.editingPreset)}"${me() ? '' : ' disabled'}>Make default</button>`}
+          ? `<span class="chip-default" title="${te('configurator.defaultPresetTitle')}">✓ ${te('configurator.chipDefault')}</span>`
+          : `<button type="button" class="btn sm" data-act="make-default-editor" data-id="${esc(state.editingPreset)}"${me() ? '' : ' disabled'}>${te('configurator.makeDefault')}</button>`}
       </div>
       <p class="view-sub">${configs
-        ? `Used by <b>${configs}</b> Raid Train Config${configs === 1 ? '' : 's'} — changes here flow to ${configs === 1 ? 'it' : 'them'}, except fields a train has overridden.`
-        : 'Not used by any Raid Train Config yet.'}</p>
+        ? plural(configs, 'configurator.presetUsedByOne', 'configurator.presetUsedByMany', { n: `<b>${configs}</b>` })
+        : te('configurator.usedByNoneFull')}</p>
 
       <section class="card">
-        <div class="preview-frame">
-          <iframe id="preview" title="Overlay preview"></iframe>
-          <div class="preview-controls">
-            <button type="button" id="preview-roll" class="preview-btn">▶&nbsp;Roll it</button>
-            <button type="button" id="preview-still" class="preview-btn" hidden>◼&nbsp;Recenter</button>
-          </div>
-        </div>
-        <div class="preview-caption" id="preview-caption"></div>
+        ${previewFrameHtml()}
       </section>
 
       <section class="card">
-        <h2 class="card-h">Preset settings</h2>
+        <h2 class="card-h">${te('configurator.presetSettings')}</h2>
         <div id="settings-root"></div>
-        <div class="hint" style="margin-top:12px">Spotlights are not part of a Preset — standing Spotlights live in
-          <a href="#" data-act="goto-profile">Profile settings</a>, extras on each train's Raid Train Config.</div>
+        <div class="hint" style="margin-top:12px">${t('configurator.presetSpotlightNote')}</div>
       </section>`;
   }
 
   // ── View: Profile settings ─────────────────────────────────────────────
   function profileViewHtml() {
-    if (!me()) return '<div class="empty">Add a Profile first — use the button in the top right.</div>';
+    if (!me()) return `<div class="empty">${te('configurator.addProfileFirstView')}</div>`;
     const spots = myProfile().spotlight ?? [];
     const defaultId = myProfile().defaultPresetId ?? null;
-    return `<h2 class="view-title">Profile settings</h2>
-      <p class="view-sub">For <b>${esc(me())}</b> — these apply across every raid train this Profile runs.</p>
+    return `<h2 class="view-title">${te('configurator.navProfile')}</h2>
+      <p class="view-sub">${t('configurator.profileSub', { login: `<b>${esc(me())}</b>` })}</p>
 
       <section class="card">
-        <h2 class="card-h">Standing Spotlights</h2>
+        <h2 class="card-h">${te('configurator.standingSpotlights')}</h2>
         <div class="spot-edit-list">
           ${spots.length
-            ? spots.map((s) => `<span class="spot-edit-chip"><b>${esc(s)}</b><button type="button" class="chip-x" data-act="rm-spot" data-name="${esc(s)}" title="Remove ${esc(s)}" aria-label="Remove ${esc(s)}">✕</button></span>`).join('')
-            : '<span class="hint" style="margin:0">No standing Spotlights yet.</span>'}
+            ? spots.map((s) => `<span class="spot-edit-chip"><b>${esc(s)}</b><button type="button" class="chip-x" data-act="rm-spot" data-name="${esc(s)}" title="${te('configurator.removeName', { name: s })}" aria-label="${te('configurator.removeName', { name: s })}">✕</button></span>`).join('')
+            : `<span class="hint" style="margin:0">${te('configurator.noStandingSpotlightsFull')}</span>`}
         </div>
         <div class="spot-add">
-          <input type="text" id="spot-input" placeholder="Twitch username" autocomplete="off">
-          <button type="button" class="btn" data-act="add-spot">Add Spotlight</button>
+          <input type="text" id="spot-input" placeholder="${te('configurator.twitchUsername')}" autocomplete="off">
+          <button type="button" class="btn" data-act="add-spot">${te('configurator.addSpotlight')}</button>
         </div>
-        <div class="hint">These names glow on every raid train you run — always, on top of any per-train extras.</div>
+        <div class="hint">${te('configurator.standingSpotlightsHint')}</div>
       </section>
 
       <section class="card">
-        <h2 class="card-h">Default Preset</h2>
+        <h2 class="card-h">${te('configurator.defaultPreset')}</h2>
         <select id="default-preset-select" style="max-width:320px">
           ${listPresets(library).map((p) => `<option value="${esc(p.id)}"${p.id === defaultId ? ' selected' : ''}>${esc(p.name)}</option>`).join('')
-            || '<option value="">No Presets yet</option>'}
+            || `<option value="">${te('configurator.noPresets')}</option>`}
         </select>
-        <div class="hint">New Raid Train Configs and your Live Link start from this Preset. Same setting as the star in the
-          <a href="#" data-act="goto-presets">Preset Library</a>.</div>
+        <div class="hint">${t('configurator.defaultPresetHint')}</div>
       </section>
 
       <section class="card">
-        <h2 class="card-h">Backup</h2>
+        <h2 class="card-h">${te('configurator.backup')}</h2>
         <div class="backup-row">
-          <button type="button" class="btn" data-act="export-backup">Copy backup code</button>
-          <button type="button" class="btn" data-act="import-backup">Restore from code</button>
+          <button type="button" class="btn" data-act="export-backup">${te('configurator.backupCopy')}</button>
+          <button type="button" class="btn" data-act="import-backup">${te('configurator.backupRestore')}</button>
         </div>
-        <textarea id="backup-blob" placeholder="Paste a backup code here to restore it" spellcheck="false" aria-label="Backup code"></textarea>
-        <div class="hint">One code carries every Profile, Preset and Raid Train Config in this browser — the only way to move a
-          setup to another machine. Restoring <b>replaces</b> everything here.</div>
+        <textarea id="backup-blob" placeholder="${te('configurator.backupPlaceholder')}" spellcheck="false" aria-label="${te('configurator.backupAria')}"></textarea>
+        <div class="hint">${t('configurator.backupHint')}</div>
       </section>
 
       <section class="card">
-        <h2 class="card-h">This profile</h2>
-        <button type="button" class="btn" data-act="remove-profile">Remove ${esc(me())}</button>
-        <div class="hint">Removes this Profile and its Raid Train Configs from this browser. Presets are shared and stay.</div>
+        <h2 class="card-h">${te('configurator.thisProfile')}</h2>
+        <button type="button" class="btn" data-act="remove-profile">${te('configurator.removeName', { name: me() })}</button>
+        <div class="hint">${te('configurator.removeProfileHint')}</div>
       </section>`;
   }
 
@@ -1068,59 +1103,51 @@
   let manualEditor = null;
 
   function oneOffViewHtml() {
-    return `<h2 class="view-title">One-off link</h2>
-      <p class="view-sub">Build a single overlay link for any RaidPal event — or type a lineup in by hand. Nothing here touches your Profile, Presets or Live Link.</p>
+    return `<h2 class="view-title">${te('configurator.navOneOff')}</h2>
+      <p class="view-sub">${te('configurator.oneOffSub')}</p>
       <section class="card">
-        <div class="source-toggle" role="group" aria-label="Lineup source">
-          <button type="button" id="src-raidpal" class="src-btn${oneOff.source === 'raidpal' ? ' active' : ''}" aria-pressed="${oneOff.source === 'raidpal'}">RaidPal event</button>
-          <button type="button" id="src-manual" class="src-btn${oneOff.source === 'manual' ? ' active' : ''}" aria-pressed="${oneOff.source === 'manual'}">Build by hand</button>
+        <div class="source-toggle" role="group" aria-label="${te('configurator.lineupSourceAria')}">
+          <button type="button" id="src-raidpal" class="src-btn${oneOff.source === 'raidpal' ? ' active' : ''}" aria-pressed="${oneOff.source === 'raidpal'}">${te('configurator.sourceRaidpal')}</button>
+          <button type="button" id="src-manual" class="src-btn${oneOff.source === 'manual' ? ' active' : ''}" aria-pressed="${oneOff.source === 'manual'}">${te('configurator.sourceManual')}</button>
         </div>
         <div class="field" id="raidpal-source"${oneOff.source === 'raidpal' ? '' : ' hidden'}>
-          <div class="field-head"><label for="f-event">RaidPal event</label></div>
-          <input type="text" id="f-event" value="${esc(oneOff.event)}" placeholder="Paste your RaidPal event link" autocomplete="off">
-          <div class="hint">Paste the event's RaidPal link — the whole web address works.</div>
+          <div class="field-head"><label for="f-event">${te('configurator.eventLabel')}</label></div>
+          <input type="text" id="f-event" value="${esc(oneOff.event)}" placeholder="${te('configurator.eventPlaceholder')}" autocomplete="off">
+          <div class="hint">${te('configurator.eventHint')}</div>
           <div class="status-dot" id="slug-status"></div>
         </div>
         <div class="field" id="manual-source"${oneOff.source === 'manual' ? '' : ' hidden'}></div>
 
-        <div class="preview-frame" style="margin-top:14px">
-          <iframe id="preview" title="Overlay preview"></iframe>
-          <div class="preview-controls">
-            <button type="button" id="preview-roll" class="preview-btn">▶&nbsp;Roll it</button>
-            <button type="button" id="preview-still" class="preview-btn" hidden>◼&nbsp;Recenter</button>
-          </div>
-        </div>
-        <div class="preview-caption" id="preview-caption"></div>
+        <div style="margin-top:14px">${previewFrameHtml()}</div>
 
         <div class="url-row" style="margin-top:14px">
-          <input type="text" id="oneoff-url" readonly placeholder="Enter an event above to generate your URL" aria-label="Overlay URL">
-          <button type="button" class="btn primary" data-act="copy-oneoff" disabled>Copy</button>
+          <input type="text" id="oneoff-url" readonly placeholder="${te('configurator.urlPlaceholder')}" aria-label="${te('configurator.overlayUrlAria')}">
+          <button type="button" class="btn primary" data-act="copy-oneoff" disabled>${te('configurator.copy')}</button>
         </div>
       </section>
 
       <section class="card">
-        <h2 class="card-h">Spotlight broadcasters</h2>
-        <input type="text" id="one-spotlight" value="${esc(oneOff.spotlight)}" placeholder="DJ Alpha, DJ Charlie" autocomplete="off">
-        <div class="hint">Comma-separated names to highlight with a glow. Capitalization doesn't matter.</div>
+        <h2 class="card-h">${te('configurator.spotlightLabel')}</h2>
+        <input type="text" id="one-spotlight" value="${esc(oneOff.spotlight)}" placeholder="${te('configurator.spotlightPlaceholder')}" autocomplete="off">
+        <div class="hint">${te('configurator.spotlightHint')}</div>
       </section>
 
       <section class="card">
-        <h2 class="card-h">Settings</h2>
+        <h2 class="card-h">${te('configurator.settings')}</h2>
         <div id="settings-root"></div>
       </section>
 
       <div class="card">
-        <h2 class="card-h">Add this to OBS</h2>
+        <h2 class="card-h">${te('configurator.obsTitle')}</h2>
         <ol class="obs">
-          <li><strong>Copy your overlay URL</strong> with the Copy button above.</li>
-          <li>In OBS, under <strong>Sources</strong> click <strong>+</strong> and choose <strong>Browser</strong>.</li>
-          <li><strong>Paste your URL</strong> into the URL field.</li>
-          <li>Set <strong>Width 1920</strong> and <strong>Height 1080</strong>.</li>
-          <li>Leave the background transparent — the overlay is already see-through.</li>
-          <li><strong>Leave the source at full size, positioned at 0, 0</strong> — set <strong>Train size</strong> and
-            <strong>Vertical position</strong> with the sliders here instead, so they travel with the URL.</li>
+          <li>${t('configurator.obs1')}</li>
+          <li>${t('configurator.obs2')}</li>
+          <li>${t('configurator.obs3')}</li>
+          <li>${t('configurator.obs4')}</li>
+          <li>${t('configurator.obs5')}</li>
+          <li>${t('configurator.obs7')}</li>
         </ol>
-        <p class="hint">Changed something? Copy the new URL and paste it back into the same Browser source's URL field.</p>
+        <p class="hint">${te('configurator.obsChanged')}</p>
       </div>`;
   }
 
@@ -1171,15 +1198,18 @@
   function mountPreview() {
     const iframe = $('#preview');
     if (!iframe) return null;
-    return createPreviewFrame({ iframe, rollBtn: $('#preview-roll'), stillBtn: $('#preview-still'), overlayBase: OVERLAY_BASE });
+    return createPreviewFrame({
+      iframe, rollBtn: $('#preview-roll'), stillBtn: $('#preview-still'),
+      overlayBase: OVERLAY_BASE, t: (k, p) => t(k, p),
+    });
   }
   function previewCaption(settings) {
     const caption = $('#preview-caption');
     if (!caption) return;
     const s = normalizeSettings(settings);
     caption.textContent = s.mode === 'pass'
-      ? `Preview — on stream the train rolls across every ${parseConfig(`interval=${encodeURIComponent(s.interval)}`).interval} minutes.`
-      : 'Preview — on stream the train scrolls continuously.';
+      ? t('configurator.captionPass', { mins: parseConfig(`interval=${encodeURIComponent(s.interval)}`).interval })
+      : t('configurator.captionMarquee');
   }
 
   // ── Wiring: Raid Train Config editor ───────────────────────────────────
@@ -1214,7 +1244,7 @@
       const reset = $('.reset-all');
       if (reset) {
         reset.hidden = count === 0;
-        reset.textContent = `Reset ${count} override${count === 1 ? '' : 's'}`;
+        reset.textContent = resetOverridesLabel(count);
       }
       const url = $('#cfg-url');
       if (url) url.value = trainOverlayUrl(slug);
@@ -1226,6 +1256,7 @@
     settingsForm = mountSettingsForm({
       root: $('#settings-root'),
       prefix: 'cfg',
+      t: (k, p) => t(k, p),
       getState: () => {
         const config = readConfig();
         const base = basisFor(config);
@@ -1277,6 +1308,7 @@
     settingsForm = mountSettingsForm({
       root: $('#settings-root'),
       prefix: 'pst',
+      t: (k, p) => t(k, p),
       getState: () => ({ values: settingsOf(), base: null }),
       onChange: (key, value) => {
         library = updatePresetSettings(library, id, { ...settingsOf(), [key]: value });
@@ -1302,6 +1334,7 @@
     settingsForm = mountSettingsForm({
       root: $('#settings-root'),
       prefix: 'one',
+      t: (k, p) => t(k, p),
       getState: () => ({ values: oneOff.settings, base: null }),
       onChange: (key, value) => { oneOff.settings = normalizeSettings({ ...oneOff.settings, [key]: value }); refreshOneOff(); },
     });
@@ -1366,27 +1399,27 @@
       if (!slug) {
         // Empty field → preview the built-in demo so the page is never blank, while
         // the copy URL stays empty (the demo must never leak into a copied link).
-        if (status) { status.textContent = 'Previewing the built-in demo lineup.'; status.className = 'status-dot ok'; }
+        if (status) { status.textContent = t('configurator.slugDemo'); status.className = 'status-dot ok'; }
         preview?.render(buildOverlayQuery({ ...formState, event: DEMO_EVENT }), DEMO_EVENT);
         return;
       }
       if (slug === DEMO_EVENT || slug === validatedSlug) {
-        if (status) { status.textContent = `Found “${slug}”.`; status.className = 'status-dot ok'; }
+        if (status) { status.textContent = t('configurator.slugFound', { slug }); status.className = 'status-dot ok'; }
         preview?.render(query, slug);
         return;
       }
-      if (status) { status.textContent = 'Checking…'; status.className = 'status-dot checking'; }
+      if (status) { status.textContent = t('configurator.slugChecking'); status.className = 'status-dot checking'; }
       const token = ++validateToken;
       try {
         await loadEvent(slug);
         if (token !== validateToken) return;
         validatedSlug = slug;
-        if (status) { status.textContent = `Found “${slug}”.`; status.className = 'status-dot ok'; }
+        if (status) { status.textContent = t('configurator.slugFound', { slug }); status.className = 'status-dot ok'; }
         preview?.render(query, slug);
       } catch {
         if (token !== validateToken) return;
         validatedSlug = null;
-        if (status) { status.textContent = `No RaidPal event called “${slug}”.`; status.className = 'status-dot bad'; }
+        if (status) { status.textContent = t('configurator.slugNotFound', { slug }); status.className = 'status-dot bad'; }
         preview?.reset();
       }
     }, 350);
@@ -1444,7 +1477,7 @@
     const item = e.target.closest('[data-act]');
     if (!item) { e.stopPropagation(); return; }
     profileMenu.classList.remove('open');
-    if (item.dataset.act === 'switch-profile') { useProfile(item.dataset.name); toast(`Now acting as ${item.dataset.name}`); }
+    if (item.dataset.act === 'switch-profile') { useProfile(item.dataset.name); toast(t('configurator.toastActingAs', { name: item.dataset.name })); }
     if (item.dataset.act === 'manage-profile') go('profile');
   });
 
@@ -1474,10 +1507,10 @@
       const detail = await refreshEventDetail(el.dataset.slug, { fetchImpl: fetch.bind(window), storage: localStorage });
       state.feed.details[detail.slug] = detail;
       paintCard(detail.slug);
-      toast(detail.error ? 'RaidPal didn’t answer — showing the last good lineup' : 'Lineup refreshed from RaidPal');
+      toast(t(detail.error ? 'configurator.toastRefreshFailed' : 'configurator.toastRefreshed'));
       return;
     }
-    if (act === 'copy-train-link') { copyText(trainOverlayUrl(el.dataset.slug), 'Overlay link copied'); return; }
+    if (act === 'copy-train-link') { copyText(trainOverlayUrl(el.dataset.slug), t('configurator.toastLinkCopied')); return; }
     if (act === 'open-config') {
       state.editing = el.dataset.slug;
       state.editingPreset = null;
@@ -1486,15 +1519,15 @@
     }
     if (act === 'copy-live') {
       const url = liveLinkUrl();
-      if (!url) { toast('Add a Profile first'); return; }
-      copyText(url, 'Live Link copied — paste it into OBS');
+      if (!url) { toast(t('configurator.toastAddProfileFirst')); return; }
+      copyText(url, t('configurator.toastLiveLinkCopied'));
       return;
     }
-    if (act === 'copy-cfg-url') { copyText($('#cfg-url').value, 'Overlay link copied'); return; }
+    if (act === 'copy-cfg-url') { copyText($('#cfg-url').value, t('configurator.toastLinkCopied')); return; }
     if (act === 'copy-oneoff') {
       const url = $('#oneoff-url').value;
       if (!url) return;
-      copyText(url, 'Overlay link copied');
+      copyText(url, t('configurator.toastLinkCopied'));
       harvestStreamers();
       return;
     }
@@ -1503,13 +1536,13 @@
       profiles = upsertTrainConfig(profiles, me(), state.editing, { ...config, overrides: {} });
       saveProfiles();
       render();
-      toast('All overrides reset to the Preset');
+      toast(t('configurator.toastOverridesReset'));
       return;
     }
 
     // ── Preset library ──
     if (act === 'new-preset') {
-      const made = createPreset(library, 'New Preset', SETTINGS_DEFAULTS);
+      const made = createPreset(library, t('configurator.newPresetName'), SETTINGS_DEFAULTS);
       library = made.library;
       saveLibrary();
       go('presets', { renaming: made.id });
@@ -1531,26 +1564,26 @@
       return;
     }
     if (act === 'make-default' || act === 'make-default-editor') {
-      if (!me()) { toast('Add a Profile first'); return; }
+      if (!me()) { toast(t('configurator.toastAddProfileFirst')); return; }
       if (!getPreset(library, el.dataset.id)) { render(); return; } // a stale click must never dangle the default
       profiles = setDefaultPreset(profiles, me(), el.dataset.id);
       saveProfiles();
       render();
-      toast(`“${getPreset(library, el.dataset.id).name}” is now the default Preset`);
+      toast(t('configurator.toastNowDefault', { name: getPreset(library, el.dataset.id).name }));
       return;
     }
     if (act === 'del-preset') {
       const preset = getPreset(library, el.dataset.id);
       if (!preset) return;
       const { configs, defaults } = countPresetReferences(profiles, el.dataset.id);
-      openModal(`<h3>Delete “${esc(preset.name)}”?</h3>
+      openModal(`<h3>${te('configurator.delPresetHead', { name: preset.name })}</h3>
         ${configs
-          ? `<p><b>${configs} Raid Train Config${configs === 1 ? '' : 's'}</b> reference${configs === 1 ? 's' : ''} it. ${configs === 1 ? 'Its' : 'Their'} settings are kept — they're copied into ${configs === 1 ? 'that Config' : 'those Configs'}, so nothing changes on stream.</p>`
-          : '<p>No Raid Train Configs reference this Preset.</p>'}
-        ${defaults ? `<p><b>It is the default Preset</b> for ${defaults} profile${defaults === 1 ? '' : 's'}, which will be left without one.</p>` : ''}
+          ? `<p>${plural(configs, 'configurator.delPresetUsedOne', 'configurator.delPresetUsedMany', { n: `<b>${configs}</b>` })}</p>`
+          : `<p>${te('configurator.delPresetUnused')}</p>`}
+        ${defaults ? `<p>${plural(defaults, 'configurator.delPresetDefaultOne', 'configurator.delPresetDefaultMany')}</p>` : ''}
         <div class="m-actions">
-          <button type="button" class="btn" data-mact="cancel">Cancel</button>
-          <button type="button" class="btn danger-solid" data-mact="confirm-del" data-id="${esc(el.dataset.id)}">Delete Preset</button>
+          <button type="button" class="btn" data-mact="cancel">${te('configurator.cancel')}</button>
+          <button type="button" class="btn danger-solid" data-mact="confirm-del" data-id="${esc(el.dataset.id)}">${te('configurator.delPresetConfirm')}</button>
         </div>`);
       return;
     }
@@ -1564,7 +1597,7 @@
       saveProfiles();
       render();
       $('#spot-input')?.focus();
-      toast(`“${name}” will glow on every train`);
+      toast(t('configurator.toastSpotlightAdded', { name }));
       return;
     }
     if (act === 'rm-spot') {
@@ -1576,29 +1609,31 @@
     if (act === 'export-backup') {
       const blob = await encodeBackup({ presets: library, profiles, streamers });
       $('#backup-blob').value = blob;
-      copyText(blob, 'Backup code copied');
+      copyText(blob, t('configurator.toastBackupCopied'));
       return;
     }
     if (act === 'import-backup') {
       const decoded = await decodeBackup($('#backup-blob').value.trim());
-      if (!decoded) { toast('That doesn’t look like a backup code'); return; }
-      openModal(`<h3>Restore this backup?</h3>
-        <p>It carries <b>${Object.keys(decoded.presets).length} Preset(s)</b> and
-           <b>${listProfiles(decoded.profiles).length} Profile(s)</b>.</p>
-        <p>Everything currently in this browser is <b>replaced</b>.</p>
+      if (!decoded) { toast(t('configurator.toastBadBackup')); return; }
+      openModal(`<h3>${te('configurator.restoreHead')}</h3>
+        <p>${t('configurator.restoreCounts', {
+          presets: `<b>${Object.keys(decoded.presets).length}</b>`,
+          profiles: `<b>${listProfiles(decoded.profiles).length}</b>`,
+        })}</p>
+        <p>${t('configurator.restoreWarn')}</p>
         <div class="m-actions">
-          <button type="button" class="btn" data-mact="cancel">Cancel</button>
-          <button type="button" class="btn danger-solid" data-mact="confirm-import">Replace everything</button>
+          <button type="button" class="btn" data-mact="cancel">${te('configurator.cancel')}</button>
+          <button type="button" class="btn danger-solid" data-mact="confirm-import">${te('configurator.restoreConfirm')}</button>
         </div>`);
       pendingImport = decoded;
       return;
     }
     if (act === 'remove-profile') {
-      openModal(`<h3>Remove “${esc(me())}”?</h3>
-        <p>Its Raid Train Configs and standing Spotlights go with it. Presets are shared and stay.</p>
+      openModal(`<h3>${te('configurator.removeProfileHead', { login: me() })}</h3>
+        <p>${te('configurator.removeProfileBody')}</p>
         <div class="m-actions">
-          <button type="button" class="btn" data-mact="cancel">Cancel</button>
-          <button type="button" class="btn danger-solid" data-mact="confirm-remove-profile">Remove profile</button>
+          <button type="button" class="btn" data-mact="cancel">${te('configurator.cancel')}</button>
+          <button type="button" class="btn danger-solid" data-mact="confirm-remove-profile">${te('configurator.removeProfileConfirm')}</button>
         </div>`);
       return;
     }
@@ -1612,20 +1647,20 @@
       saveProfiles();
       horizon.disabled = !e.target.checked;
       $('#ll-url').value = liveLinkUrl();
-      toast(e.target.checked ? 'Idle card on — re-copy your Live Link' : 'Idle card off — re-copy your Live Link');
+      toast(t(e.target.checked ? 'configurator.toastIdleOn' : 'configurator.toastIdleOff'));
       return;
     }
     if (e.target.id === 'll-horizon') {
       profiles = setLiveLinkPrefs(profiles, me(), { upcoming: e.target.value });
       saveProfiles();
       $('#ll-url').value = liveLinkUrl();
-      toast('Horizon updated — re-copy your Live Link');
+      toast(t('configurator.toastHorizonUpdated'));
       return;
     }
     if (e.target.id === 'default-preset-select') {
       profiles = setDefaultPreset(profiles, me(), e.target.value || null);
       saveProfiles();
-      toast('Default Preset updated');
+      toast(t('configurator.toastDefaultUpdated'));
     }
   });
 
@@ -1666,7 +1701,7 @@
       if (!current || !name || name === current.name) { e.target.value = current?.name ?? ''; return; }
       library = renamePreset(library, id, name);
       saveLibrary();
-      toast(`Renamed to “${name}”`);
+      toast(t('configurator.toastRenamed', { name }));
       // Patch the label in place rather than re-rendering: an in-flight click on
       // "Make default" must still land on a Preset that exists.
       e.target.value = getPreset(library, id).name;
@@ -1691,7 +1726,7 @@
       saveLibrary();
       closeModal();
       go('presets');
-      toast(`Deleted “${name}”`);
+      toast(t('configurator.toastDeleted', { name }));
       return;
     }
     if (act === 'confirm-import') {
@@ -1704,7 +1739,7 @@
       closeModal();
       go('trains');
       loadFeed();
-      toast('Backup restored');
+      toast(t('configurator.toastBackupRestored'));
       return;
     }
     if (act === 'confirm-remove-profile') {
@@ -1713,7 +1748,7 @@
       closeModal();
       go('trains');
       if (me()) loadFeed();
-      toast('Profile removed');
+      toast(t('configurator.toastProfileRemoved'));
     }
   });
 
@@ -1722,14 +1757,27 @@
   // link opens the one-off view, hydrated from the query. Otherwise the
   // Profile's My Raid Trains is home.
   (async function start() {
-    // Bind the translator before anything mounts — the Build-by-hand editor
-    // renders through it, and an unbound `t` would paint raw message keys.
+    // Bind the translator before anything renders — every view goes through it,
+    // and an unbound `t` would paint raw message keys.
     const search = window.location.search.replace(/^\?/, '');
-    // An explicit ?lang= picks the page's language too, as the old Configurator did;
-    // otherwise follow the browser. (Most of this page's own chrome is still English
-    // until the i18n pass — this at least keeps the Build-by-hand editor honest.)
-    t = makeT(await loadMessages(resolveLocale(parseConfig(search).lang, navigator.languages)));
-    const wantsOneOff = search !== '' || window.location.hash === '#manual';
+    // An explicit ?lang= picks the page's language too; otherwise follow the browser.
+    pageLocale = resolveLocale(parseConfig(search).lang, navigator.languages);
+    const messages = await loadMessages(pageLocale);
+    t = makeT(messages);
+    // The header, sidebar and profile menu are authored as static markup, so they
+    // localize through data-i18n rather than a template literal. Everything below
+    // #main is rendered by render() and already reads through `t`.
+    document.documentElement.lang = pageLocale;
+    document.title = t('configurator.title');
+    localizeDom(document, messages);
+    // A query string means "build a one-off link from these params" — EXCEPT
+    // `lang`, which selects the page's own language and says nothing about
+    // which view to open. Counting it opened the One-off view for `?lang=de`,
+    // so the localized My Raid Trains / Preset / Profile views were unreachable
+    // by URL at all (a German browser reached them, a German link never did).
+    const viewParams = new URLSearchParams(search);
+    viewParams.delete('lang');
+    const wantsOneOff = [...viewParams.keys()].length > 0 || window.location.hash === '#manual';
     if (wantsOneOff) {
       const config = parseConfig(search);
       const params = new URLSearchParams(search);
