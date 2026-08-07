@@ -13,12 +13,12 @@
  * Event was last known to finish (epoch ms, or null when never observed).
  *
  * `endsAt` exists so the Live Link can stop encoding trains that have already
- * run (#31) on POSITIVE evidence. RaidPal's user endpoint returns only
- * upcoming events, so a departed train is simply absent — and absence also
- * means a renamed slug or a bad read. Recording the end time while the train
- * IS in a good read turns "it ended" into something the store knows outright,
- * and leaves absence meaning nothing at all. A record written before this
- * field existed has no endsAt, which reads as "no evidence" and keeps riding.
+ * run (#31). It is the secondary of the two grounds — the primary is simply
+ * being absent from a good read of the user endpoint — and covers the ~6h
+ * window in which a departed train is still listed, so it drops out of the
+ * URL the moment it ends rather than whenever the feed next turns over. A
+ * record written before this field existed has no endsAt and is judged on
+ * absence alone.
  *
  * Same discipline as presets.js: pure module, tolerant parse, never mutates;
  * the page owns localStorage. Preset CONTENT lives in preset-library.js —

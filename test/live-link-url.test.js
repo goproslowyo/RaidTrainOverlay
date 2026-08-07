@@ -98,13 +98,13 @@ test('an unknown or blank login has no Live Link', () => {
   assert.deepEqual(buildTrainMap(library, store, 'someone-else'), {});
 });
 
-// ── The ended-train filter (#31) ───────────────────────────────────────────
-// The rule is POSITIVE EVIDENCE — "present in a good read with endtime in the
-// future, or no evidence it ended" — never "absent from the feed". Absence
-// also means a renamed slug and a bad RaidPal read, so pruning on it would
-// blank an entire Live Link on one bad RaidPal day. The two rules pick nearly
-// the same set; the whole difference is the failure mode, and these tests are
-// mostly about that difference.
+// ── The unrunnable-train filter (#31) ──────────────────────────────────────
+// Two grounds for dropping a Config from the blob: absent from a GOOD read,
+// or a known end time in the past. Both rest on the Overlay resolving against
+// the same user endpoint — an entry it can never match is unreachable, so
+// dropping it changes nothing on stream. What must stay exact is the failure
+// mode: a read that failed or came back stale is not evidence of anything and
+// drops nothing at all.
 
 const NOW = Date.parse('2026-08-10T12:00:00Z');
 const ended = (event) => ({ ...event, endtime: new Date(NOW - 60_000) });
@@ -130,20 +130,30 @@ test('the filter drops a train known to have ended and keeps the live and lead o
   assert.deepEqual(Object.keys(map).sort(), ['departs-in-an-hour', 'on-stage-now']);
 });
 
-test('a train merely ABSENT from a good read is kept — renamed slug, not departed', () => {
-  const { library, store } = scheduled({ 'renamed-underneath-us': null });
-  // A good read that simply doesn't mention it. Under a prune-on-absence rule
-  // this train vanishes from the Live Link; under positive evidence it rides.
+test('a train absent from a GOOD read is dropped — departed, deleted or renamed alike', () => {
+  const { library, store } = scheduled({ 'renamed-underneath-us': null, 'still-listed': NOW + 86_400_000 });
+  // The endpoint returns only upcoming events, and the Overlay resolves
+  // against that same endpoint — so a slug it doesn't list can never be
+  // selected, whatever the reason. Carrying it is pure weight in the URL.
   const map = buildTrainMap(library, store, 'gostreamcore', {
-    now: NOW, events: [feedEvent('some-other-train', NOW + 86_400_000)],
+    now: NOW, events: [feedEvent('still-listed', NOW + 86_400_000)],
   });
-  assert.deepEqual(Object.keys(map), ['renamed-underneath-us']);
+  assert.deepEqual(Object.keys(map), ['still-listed']);
+});
+
+test('absence is read without a clock — the two grounds are independent', () => {
+  const { library, store } = scheduled({ 'gone-from-the-feed': null, kept: null });
+  const map = buildTrainMap(library, store, 'gostreamcore', { events: [feedEvent('kept', NOW)] });
+  assert.deepEqual(Object.keys(map), ['kept']);
 });
 
 test('a FAILED read drops nothing — one bad RaidPal day must not blank a Live Link', () => {
   const { library, store } = scheduled({ 'still-upcoming': NOW + 86_400_000, 'no-record-of': null });
-  // fetchUserPayload returns null for any unexpected 200 body, which reaches
-  // us as `events: null`. That is the absence of evidence, not evidence.
+  // The guard that matters most now that absence prunes. fetchUserPayload
+  // returns null for any unexpected 200 body, and the page passes `null`
+  // rather than `[]` for anything that failed or came back stale. Were a bad
+  // read ever to arrive here as an empty array instead, EVERY Config would be
+  // dropped and the streamer would copy a Live Link carrying nothing.
   const map = buildTrainMap(library, store, 'gostreamcore', { now: NOW, events: null });
   assert.deepEqual(Object.keys(map).sort(), ['no-record-of', 'still-upcoming']);
 });

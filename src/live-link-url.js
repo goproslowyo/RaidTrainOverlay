@@ -40,9 +40,9 @@ export function baseSettings(library, store, login) {
  * be rescheduled), and a slug the feed doesn't mention falls back to what the
  * store already observed.
  *
- * `events` must be null unless the read was GOOD. A stale or failed read is
- * not evidence of anything, and passing one here would let one bad RaidPal
- * moment reschedule trains it never actually saw.
+ * `events` must be null unless the read was GOOD — see buildTrainMap, which
+ * reads absence from the same argument and would prune the whole map on a bad
+ * read that got this far.
  */
 function endTimes(profile, events) {
   const ends = new Map();
@@ -68,32 +68,42 @@ function endTimes(profile, events) {
  * Overrides are RAW query values (checkboxes as `1`/`0`) so an override to OFF
  * survives the trip — an absent param would read as "inherit the base".
  *
- * Trains KNOWN to have ended are skipped, so the blob tracks the streamer's
- * upcoming schedule instead of growing with their history (#31). The Overlay
- * resolves which train renders against the live feed itself, so an entry for
- * a train that has already run is unreachable — dropping it changes nothing
- * on stream.
+ * Trains the streamer will not run are skipped, so the blob tracks their
+ * upcoming schedule instead of growing with their history (#31). Two grounds,
+ * and the load-bearing fact under both is that the Overlay resolves which
+ * train renders by fetching the SAME user endpoint. An entry it can never
+ * match is unreachable, so dropping it changes nothing on stream:
  *
- * The rule is POSITIVE EVIDENCE, never "absent from the feed". Absence also
- * means a renamed slug — the map's known fail-soft case — and a bad RaidPal
- * read, which `fetchUserPayload` reports as null for any unexpected 200 body.
- * Pruning on absence would blank an entire Live Link on one bad RaidPal day.
- * Because departed trains leave the feed within ~6h anyway the two rules pick
- * nearly the same set; the whole difference is the failure mode, and that is
- * the point. Pass `{ now }` to enable the filter at all: with no clock there
- * is no evidence, so nothing is dropped.
+ *   1. Absent from a GOOD read. The endpoint returns only upcoming events, so
+ *      a slug it does not list is one of: departed, deleted, or renamed. The
+ *      Overlay will never resolve to any of them — a renamed slug is as dead
+ *      as a departed one — so the entry is pure weight in the URL.
+ *   2. A known end time in the past. Catches the ~6h window where a departed
+ *      train is still listed, from `endsAt` recorded earlier or from the read
+ *      itself.
+ *
+ * The failure mode is the part to keep right: `events` MUST be null unless the
+ * read was good. `fetchUserPayload` returns null for any unexpected 200 body,
+ * and a read that failed or was served stale is not evidence of anything —
+ * pruning on one would blank an entire Live Link on a bad RaidPal day. With
+ * `events: null` nothing is dropped on absence, and with no `now` nothing is
+ * dropped on time either.
  */
 export function buildTrainMap(library, store, login, { now = null, events = null } = {}) {
   const profile = store.profiles?.[(login ?? '').toLowerCase()];
   if (!profile) return {};
   const at = now instanceof Date ? now.getTime() : now;
-  const ends = Number.isFinite(at) ? endTimes(profile, events) : new Map();
+  const haveClock = Number.isFinite(at);
+  const ends = haveClock ? endTimes(profile, events) : new Map();
+  // Only a good read (an actual array) can speak to absence.
+  const listed = Array.isArray(events) ? new Set(events.map((e) => e?.slug)) : null;
   const base = baseSettings(library, store, login);
   const map = {};
   for (const slug of Object.keys(profile.trains ?? {})) {
+    if (listed && !listed.has(slug)) continue;
     // A live or lead train always ends in the future, so a Live Link copied
     // mid-train is never affected.
-    if (ends.has(slug) && ends.get(slug) < at) continue;
+    if (haveClock && ends.has(slug) && ends.get(slug) < at) continue;
     const resolved = resolveTrainSettings(library, store, login, slug);
     // resolveTrainSettings returns a Preset-⊕-overrides object that may be
     // sparse (no Preset at all → `{}`); normalize before diffing so a missing
