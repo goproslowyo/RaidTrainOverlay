@@ -14,31 +14,14 @@
  * mirroring the event-feed's cold-start discipline. No DOM; runs in the Overlay and
  * in node:test alike (btoa/atob + TextEncoder/TextDecoder are globals in both).
  */
+import { encodeJsonBlob, decodeJsonBlob } from './blob-codec.js';
+
 const WIRE_VERSION = 1;
-// An ENCODED blob (the base64url string) over this many chars is rejected — a runaway
-// lineup that would approach browser/OBS URL limits. base64 is ~33% larger than the
-// JSON it carries, so this conservatively bounds the model below ~6 KB (hundreds of DJs).
-const MAX_BLOB_CHARS = 8192;
-
-function bytesToB64url(bytes) {
-  let bin = '';
-  for (let i = 0; i < bytes.length; i += 1) bin += String.fromCharCode(bytes[i]);
-  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
-
-function b64urlToBytes(str) {
-  const b64 = str.replace(/-/g, '+').replace(/_/g, '/');
-  const padded = b64 + '='.repeat((4 - (b64.length % 4)) % 4);
-  const bin = atob(padded); // throws on invalid base64 — caught by decodeLineup
-  const bytes = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i += 1) bytes[i] = bin.charCodeAt(i);
-  return bytes;
-}
 
 /** Manual-lineup model → URL-safe blob. Stamps the wire version. */
 export function encodeLineup(model) {
   const wire = { v: WIRE_VERSION, ...model };
-  return bytesToB64url(new TextEncoder().encode(JSON.stringify(wire)));
+  return encodeJsonBlob(wire);
 }
 
 /** A `{n, ...}` organiser, optional avatar. */
@@ -61,13 +44,7 @@ function isLineup(d) {
  * encodeLineup's input.
  */
 export function decodeLineup(str) {
-  if (typeof str !== 'string' || str === '' || str.length > MAX_BLOB_CHARS) return null;
-  let wire;
-  try {
-    wire = JSON.parse(new TextDecoder().decode(b64urlToBytes(str)));
-  } catch {
-    return null;
-  }
+  const wire = decodeJsonBlob(str);
   if (wire == null || typeof wire !== 'object' || wire.v !== WIRE_VERSION) return null;
   if (typeof wire.t !== 'string' || typeof wire.s !== 'string' || typeof wire.z !== 'string') return null;
   if (!isOrganiser(wire.o) || !isLineup(wire.d)) return null;

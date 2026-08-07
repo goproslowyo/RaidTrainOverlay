@@ -25,7 +25,7 @@ test('parseConfig ignores unknown and malformed params', () => {
   const config = parseConfig('?event=trainwreck-lucky-13&bogus=1&%%%');
   assert.equal(config.event, 'trainwreck-lucky-13');
   assert.deepEqual(Object.keys(config), [
-    'event', 'lineup', 'lang', 'mode', 'interval', 'speed', 'track', 'trackfadein', 'trackfadeout', 'scale',
+    'event', 'lineup', 'user', 'trains', 'lang', 'mode', 'interval', 'speed', 'track', 'trackfadein', 'trackfadeout', 'scale',
     'openslots', 'spotlight', 'tz', 'height', 'hidefinished', 'enginedim', 'refresh', 'theme',
   ]);
 });
@@ -332,4 +332,33 @@ test('parse(serialize(parse(q))) round-trips every param (the Configurator contr
     const parsed = parseConfig(query);
     assert.deepEqual(parseConfig(serializeConfig(parsed)), parsed, `round-trip failed for: ${query}`);
   }
+});
+
+// ---- Live Link params (user= / trains=) ----
+
+test('parseConfig reads user= (the Live Link login) and trains= (the raw mapping blob)', () => {
+  const config = parseConfig('?user=GoProFlowYo&trains=abc123');
+  assert.equal(config.user, 'GoProFlowYo');
+  assert.equal(config.trains, 'abc123');
+});
+
+test('parseConfig defaults user and trains to null', () => {
+  const config = parseConfig('?event=luna-hao8');
+  assert.equal(config.user, null);
+  assert.equal(config.trains, null);
+});
+
+test('serializeConfig emits user (suppressing event/lineup — user wins) and trains', () => {
+  const config = parseConfig('?user=goproflowyo&trains=abc&theme=lava');
+  config.event = 'sneaky';
+  const q = new URLSearchParams(serializeConfig(config));
+  assert.equal(q.get('user'), 'goproflowyo');
+  assert.equal(q.get('trains'), 'abc');
+  assert.equal(q.get('event'), null);
+  assert.equal(q.get('theme'), 'lava');
+});
+
+test('serialize∘parse round-trips a Live Link config', () => {
+  const q = serializeConfig(parseConfig('?user=goproflowyo&trains=abc&mode=marquee'));
+  assert.equal(serializeConfig(parseConfig('?' + q)), q);
 });

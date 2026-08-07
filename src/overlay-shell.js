@@ -7,6 +7,7 @@
  */
 import { parseConfig } from './config.js';
 import { startEventFeed } from './event-feed.js';
+import { startLiveLinkFeed } from './live-link-feed.js';
 import { buildTrain } from './lineup-engine.js';
 import { renderTrain, SHIPPED_THEMES } from './train-renderer.js';
 import { DEMO_SLUG, DEMO_SPOTLIGHT, makeDemoEvent } from './demo-event.js';
@@ -39,8 +40,8 @@ container.style.setProperty('--train-pos', String(config.height / 100));
 // --train-height baseline by this; inherits down to the Train SVG.
 container.style.setProperty('--train-scale', String(config.scale));
 
-if (!config.event && !config.lineup) {
-  console.error('RaidTrainOverlay: missing required ?event=<slug> or ?lineup=<blob> query param — nothing to render.');
+if (!config.event && !config.lineup && !config.user) {
+  console.error('RaidTrainOverlay: missing required ?event=<slug>, ?lineup=<blob>, or ?user=<login> query param — nothing to render.');
 } else {
   // The most recent Event + its rendered view. The feed re-renders on a lineup
   // change; the time tick re-derives from it; theme=shuffle re-renders with a
@@ -94,7 +95,44 @@ if (!config.event && !config.lineup) {
     else if (event.animationName === 'rt-preview-roll' && config.preview && config.previewRoll) cycle();
   });
 
-  if (config.event === DEMO_SLUG) {
+  if (config.user) {
+    // Live Link: the most specific source wins — one URL keyed to a login that
+    // auto-resolves the live/next train. The feed owns which train renders and
+    // its effective (mapping-merged) config; the shell just applies each switch.
+    if (config.event || config.lineup) {
+      console.warn('RaidTrainOverlay: ?user= (Live Link) overrides ?event=/?lineup= — ignoring them.');
+    }
+    startLiveLinkFeed(window.location.search, {
+      fetchImpl: globalThis.fetch.bind(globalThis),
+      storage: window.localStorage,
+      async onSwitch(slug, effective) {
+        // Swap the per-train effective config in wholesale (the preview-path
+        // pattern), then re-derive everything config-driven.
+        Object.assign(config, effective, { preview: config.preview });
+        const nextLocale = resolveLocale(config.lang, navigator.languages);
+        if (nextLocale !== config.locale) await applyLocale(nextLocale);
+        container.style.setProperty('--train-pos', String(config.height / 100));
+        container.style.setProperty('--train-scale', String(config.scale));
+        if (config.theme === 'shuffle') shownTheme = bag.next();
+        applyCadence();
+      },
+      onEvent(event) {
+        current = { event, view: null };
+        render();
+      },
+      onIdle() {
+        // Nothing live and nothing near departure: a fully empty overlay (the
+        // opt-in upcoming card is a follow-up). An ended train must never roll
+        // over a live stream.
+        current = null;
+        container.replaceChildren();
+      },
+      onError(err) {
+        const state = current ? 'showing the last-good state' : 'nothing rendered yet';
+        console.error(`RaidTrainOverlay: Live Link for "${config.user}" — ${state}.`, err);
+      },
+    });
+  } else if (config.event === DEMO_SLUG) {
     // Built-in demo lineup (event=demo): a contrived Event rendered with no RaidPal
     // fetch — so the preview/landing page always has something live-looking to show.
     // Spotlight the demo VIPs unless the viewer set their own spotlight.
