@@ -106,6 +106,20 @@ export function shouldSelfReload({ loadedAt, now }) {
   return now - loadedAt > IDLE_RELOAD_MS;
 }
 
+/** The idle card never grows past this many rows — it must not creep up a stream. */
+export const CARD_MAX_ROWS = 3;
+
+/**
+ * The card's visible window: everything when it fits, else a wrapped
+ * CARD_MAX_ROWS slice starting at `offset` (any integer — normalized here),
+ * so the card can slowly cycle through a long list at constant height.
+ */
+export function visibleUpcoming(trains, offset) {
+  if (trains.length <= CARD_MAX_ROWS) return [...trains];
+  const start = ((offset % trains.length) + trains.length) % trains.length;
+  return Array.from({ length: CARD_MAX_ROWS }, (_, i) => trains[(start + i) % trains.length]);
+}
+
 // A mapping entry may only tune settings — never re-point the Overlay at a
 // different Event source or a second mapping.
 const PROTECTED_PARAMS = ['user', 'trains', 'event', 'lineup'];
