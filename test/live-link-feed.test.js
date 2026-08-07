@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { startLiveLinkFeed, userCacheKey } from '../src/live-link-feed.js';
 import { encodeTrainMap } from '../src/live-link.js';
+import { MAX_BLOB_CHARS } from '../src/blob-codec.js';
 import { makeUserPayload } from './fixtures/user-payload.js';
 import { makeEventPayload } from './fixtures/event-payload.js';
 
@@ -104,6 +105,58 @@ test('the trains= mapping shapes the switched-to config; base params flow throug
   assert.equal(config.theme, 'lava'); // per-train override
   assert.equal(config.scale, 1.2); // base setting flows
   assert.deepEqual(config.spotlight, ['guest']); // parseConfig lowercases spotlight names (existing URL semantics)
+});
+
+// ── An unreadable trains= is audible (#33) ─────────────────────────────────
+// The fallback to base settings is right — a corrupt blob must never stop the
+// Overlay — but `?? {}` used to make it the quietest failure in the codebase:
+// every train renders wrong and nothing anywhere says why.
+
+/** Run `fn` with console.warn captured. */
+async function capturingWarns(fn) {
+  const warns = [];
+  const original = console.warn;
+  console.warn = (...args) => warns.push(args.join(' '));
+  try {
+    await fn();
+  } finally {
+    console.warn = original;
+  }
+  return warns;
+}
+
+test('an unreadable trains= warns on the console and falls back to the base settings', async () => {
+  let calls;
+  const warns = await capturingWarns(async () => {
+    // Over MAX_BLOB_CHARS, so decodeJsonBlob rejects it on length alone — the
+    // exact shape a Configurator with too many materialized Configs emits.
+    const oversized = 'A'.repeat(MAX_BLOB_CHARS + 1);
+    const h = harness({
+      query: `?user=goproflowyo&theme=synthwave&trains=${oversized}`,
+      clockMs: DURING_LUNA,
+      routes: { [userUrl]: okUser, [eventUrl('luna-hao8')]: okEvent('LUNA') },
+    });
+    await h.feed.ready;
+    calls = h.calls;
+  });
+  assert.equal(warns.length, 1, 'exactly one warning, at startup — not once per tick');
+  assert.match(warns[0], /RaidTrainOverlay: \?trains= could not be read/);
+  assert.match(warns[0], new RegExp(String(MAX_BLOB_CHARS)), 'names the limit so it is actionable');
+  // Still renders — with the base settings, which is the damage being reported.
+  assert.equal(calls.switches.length, 1);
+  assert.equal(calls.switches[0].config.theme, 'synthwave');
+});
+
+test('an absent trains= is silent — no blob is not a broken blob', async () => {
+  const warns = await capturingWarns(async () => {
+    const { feed } = harness({
+      query: '?user=goproflowyo&theme=synthwave',
+      clockMs: DURING_LUNA,
+      routes: { [userUrl]: okUser, [eventUrl('luna-hao8')]: okEvent('LUNA') },
+    });
+    await feed.ready;
+  });
+  assert.deepEqual(warns, []);
 });
 
 test('no live train and none within lead: onIdle with the upcoming list, no event fetch', async () => {

@@ -12,6 +12,7 @@
  * Link decision (#6) was chosen to protect.
  */
 
+import { MAX_BLOB_CHARS } from './blob-codec.js';
 import { buildOverlayQuery } from './configurator.js';
 import { encodeTrainMap } from './live-link.js';
 import { getPreset } from './preset-library.js';
@@ -64,21 +65,52 @@ export function buildTrainMap(library, store, login) {
 }
 
 /**
- * The Live Link query string (no leading `?`) for a Profile: `user=` + the
- * base settings + the optional `trains=` blob + the optional `upcoming=` idle
- * horizon. Returns '' for an unknown or blank login — there is no Live Link
- * without an identity to resolve.
+ * The Live Link for a Profile: the query string, plus what the panel needs to
+ * tell the streamer the truth about it.
+ *
+ * `oversize` is the point of this function existing. The `trains=` cap lives
+ * in blob-codec and is enforced on DECODE only, so before this the
+ * Configurator would hand over a URL whose every per-train override was
+ * already dead on arrival — the Overlay's `decodeTrainMap` returns null and
+ * the feed's `?? {}` swallows it, silently (#33).
+ *
+ * Deliberately NOT truncated. A blob trimmed to fit would drop some trains
+ * and keep others, which is the same silent wrong-settings failure moved one
+ * layer up and made harder to see. The blob rides whole, the panel says it is
+ * too big, and the fix is the streamer's to make: fewer trains carrying their
+ * own Config, or less overridden on each. (A blob that is oversize today also
+ * starts working unchanged if the cap is ever raised.)
+ *
+ * Returns `{ query: '' }` with a zero count for an unknown or blank login —
+ * there is no Live Link without an identity to resolve.
  */
-export function buildLiveLinkQuery(library, store, login) {
+export function buildLiveLink(library, store, login) {
   const key = (login ?? '').trim().toLowerCase();
   const profile = store.profiles?.[key];
-  if (key === '' || !profile) return '';
+  const empty = { query: '', trainCount: 0, blobChars: 0, maxBlobChars: MAX_BLOB_CHARS, oversize: false };
+  if (key === '' || !profile) return empty;
   const map = buildTrainMap(library, store, login);
-  return buildOverlayQuery({
-    ...baseSettings(library, store, login),
-    user: key,
-    trains: Object.keys(map).length > 0 ? encodeTrainMap(map) : '',
-    upcoming: profile.liveLink?.upcoming ?? '',
-    spotlight: (profile.spotlight ?? []).join(','),
-  });
+  const trainCount = Object.keys(map).length;
+  const blob = trainCount > 0 ? encodeTrainMap(map) : '';
+  return {
+    query: buildOverlayQuery({
+      ...baseSettings(library, store, login),
+      user: key,
+      trains: blob,
+      upcoming: profile.liveLink?.upcoming ?? '',
+      spotlight: (profile.spotlight ?? []).join(','),
+    }),
+    trainCount,
+    blobChars: blob.length,
+    maxBlobChars: MAX_BLOB_CHARS,
+    oversize: blob.length > MAX_BLOB_CHARS,
+  };
+}
+
+/**
+ * Just the query string (no leading `?`) — the common case. Callers that need
+ * to know whether the blob fits want buildLiveLink instead.
+ */
+export function buildLiveLinkQuery(library, store, login) {
+  return buildLiveLink(library, store, login).query;
 }

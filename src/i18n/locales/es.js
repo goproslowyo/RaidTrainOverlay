@@ -225,6 +225,7 @@ export default {
   'configurator.llUrlAria': 'URL del Enlace en Vivo',
   'configurator.llCopy': 'Copiar Enlace en Vivo',
   'configurator.llWarn': 'Si cambias los ajustes, cambia esta URL. Después de un cambio, cópiala de nuevo y pégala en la misma fuente de navegador de OBS.',
+  'configurator.llTooBig': 'Este enlace es demasiado largo para que el overlay pueda leerlo ({chars} de {max} caracteres), así que los {trains} trenes configurados volverían a tus ajustes base. Da su propia Config de raid train a menos trenes, o anula menos ajustes en cada uno.',
   'configurator.llIdleToggle': 'Mostrar una tarjeta de próximos trenes mientras no haya ninguno en vivo',
   'configurator.llHorizonAria': 'Horizonte de la tarjeta de próximos trenes',
   'configurator.llStyledBy': 'Con el estilo de tu Preajuste predeterminado: {preset} — <a href="#" data-act="goto-presets">gestionar Preajustes</a>. Los trenes con su propia Config de raid train mantienen sus ajustes guardados.',

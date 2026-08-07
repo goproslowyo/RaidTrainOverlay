@@ -231,6 +231,7 @@ export default {
   'configurator.llUrlAria': 'Tiesioginės nuorodos URL',
   'configurator.llCopy': 'Kopijuoti Tiesioginę nuorodą',
   'configurator.llWarn': 'Pakeitus nustatymus pasikeičia ir šis URL. Po pakeitimo nukopijuok jį iš naujo ir įklijuok į tą patį OBS naršyklės šaltinį.',
+  'configurator.llTooBig': 'Ši nuoroda per ilga, kad perdanga ją perskaitytų ({chars} iš {max} simbolių), tad visi {trains} sukonfigūruoti traukiniai grįžtų prie tavo bazinių nustatymų. Suteik savo Raid traukinio konfigūraciją mažiau traukinių arba kiekviename perrašyk mažiau nustatymų.',
   'configurator.llIdleToggle': 'Rodyti artimiausių traukinių kortelę, kol nė vienas nevyksta',
   'configurator.llHorizonAria': 'Artimiausių traukinių kortelės laikotarpis',
   'configurator.llStyledBy': 'Stilių lemia tavo numatytasis šablonas: {preset} — <a href="#" data-act="goto-presets">tvarkyti šablonus</a>. Traukiniai su sava Raid traukinio konfigūracija išlaiko savo išsaugotus nustatymus.',

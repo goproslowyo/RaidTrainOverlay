@@ -217,6 +217,7 @@ export default {
   'configurator.llUrlAria': 'Live-Link-URL',
   'configurator.llCopy': 'Live-Link kopieren',
   'configurator.llWarn': 'Wenn du Einstellungen änderst, ändert sich diese URL. Kopiere sie danach erneut und füge sie wieder in dieselbe OBS-Browserquelle ein.',
+  'configurator.llTooBig': 'Dieser Link ist zu lang, als dass das Overlay ihn lesen könnte ({chars} von {max} Zeichen) — alle {trains} konfigurierten Züge würden auf deine Basiseinstellungen zurückfallen. Gib weniger Zügen eine eigene Raid-Train-Konfiguration oder überschreibe pro Zug weniger Einstellungen.',
   'configurator.llIdleToggle': 'Karte mit kommenden Zügen zeigen, solange keiner läuft',
   'configurator.llHorizonAria': 'Zeitraum der Karte mit kommenden Zügen',
   'configurator.llStyledBy': 'Gestaltet durch deine Standardvorlage: {preset} — <a href="#" data-act="goto-presets">Vorlagen verwalten</a>. Züge mit eigener Raid-Train-Konfiguration behalten ihre gespeicherten Einstellungen.',
