@@ -264,4 +264,12 @@ export function build(train, opts = {}) {
   };
 }
 
-export default { key: 'synthwave', ensureStyles, build, buildTrack };
+/** Baseline (`foot`) — this Theme's FLOOR as a fraction of --rt-th, measured down
+ *  from the top of the Train's box; the renderer drops the Train until this line
+ *  reaches the bottom edge at height=100 (see --rt-foot in train-renderer.js).
+ *  An HTML Theme's floor is a CSS box edge, so it is written in the same design
+ *  units as --u: the Car box bottoms out 193u down a DESIGN_H-tall holder (the
+ *  wheels tuck inside it), leaving the rest of the box as headroom. */
+export const foot = 193 / DESIGN_H;
+
+export default { key: 'synthwave', ensureStyles, build, buildTrack, foot };

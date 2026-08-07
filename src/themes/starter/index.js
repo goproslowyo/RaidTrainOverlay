@@ -162,5 +162,14 @@ export function build(train, opts = {}) {
   };
 }
 
-// 4) The default export IS the Theme: register it in src/train-renderer.js.
-export default { key: 'starter', ensureStyles, build, buildTrack };
+/* 4) foot — the Theme's BASELINE: where its floor sits, as a fraction of the Train
+ *    height, measured down from the top of your box. Almost no Theme's art ends
+ *    exactly at its box, so the renderer uses this (not the box) to place the Train:
+ *    at height=100 THIS line rests on the bottom edge, which is what makes every
+ *    Theme bottom out identically. Write it from your own art constants so it stays
+ *    right when you move the art. Here the lowest art is the wheels (cy = railY + 12,
+ *    r = 16), and the viewBox has 24 units of dead space below them. */
+export const foot = (railY + 12 + 16) / VIEW_H;
+
+// 5) The default export IS the Theme: register it in src/train-renderer.js.
+export default { key: 'starter', ensureStyles, build, buildTrack, foot };

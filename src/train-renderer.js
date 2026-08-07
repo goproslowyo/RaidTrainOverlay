@@ -67,8 +67,18 @@ function ensureBaseStyles() {
       /* Clamp the Train within the canvas: --train-pos (0..1, the
          height param / 100) places it from top-flush (0) to bottom-flush (1),
          centred at 0.5. The Train is always fully on-canvas and a lower-third
-         stays put when resized — no centre-anchored vertical clip. */
-      top: calc(var(--train-pos, 0.5) * (100vh - var(--rt-th)));
+         stays put when resized — no centre-anchored vertical clip.
+
+         --rt-foot is the Theme's BASELINE: where its floor sits, as a fraction of
+         --rt-th measured from the Stage top (set per Theme from theme.foot below).
+         No Theme's art happens to end exactly at its layout box — some leave dead
+         space below the wheels, some bleed past — so measuring the drop against the
+         raw box made the height param mean a different thing on every Theme (floors landed
+         anywhere from 20px below the canvas edge to 65px above it). Measuring it
+         against the FLOOR instead makes height=100 mean "this Theme's floor rests on
+         the bottom edge" everywhere, so a Preset needs no per-Theme nudge. Defaults
+         to 1 (the old behaviour) for a Theme that declares no baseline. */
+      top: calc(var(--train-pos, 0.5) * (100vh - var(--rt-th) * var(--rt-foot, 1)));
     }
     .rt-track {
       display: flex;
@@ -356,6 +366,10 @@ export function renderTrain(train, container, config) {
   // within the Track. Two elements so the transforms compose without clobbering.
   const stage = document.createElement('div');
   stage.className = 'rt-stage';
+  // The Theme's baseline (see --rt-foot in the base CSS): `height` drops the Train
+  // until its FLOOR — not its layout box — reaches the bottom edge, so every Theme
+  // bottoms out identically. A Theme with no declared baseline falls back to 1.
+  stage.style.setProperty('--rt-foot', String(Number.isFinite(theme.foot) ? theme.foot : 1));
   const track = document.createElement('div');
   track.className = 'rt-track';
 

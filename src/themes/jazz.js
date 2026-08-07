@@ -548,4 +548,17 @@ export function build(train, opts = {}) {
 }
 
 // 4) The default export IS the Theme: register it in src/train-renderer.js.
-export default { key: 'jazz', ensureStyles, build, buildTrack };
+/** Baseline (`foot`) — this Theme's FLOOR as a fraction of --rt-th, measured down
+ *  from the top of the Train's box; the renderer drops the Train until this line
+ *  reaches the bottom edge at height=100 (see --rt-foot in train-renderer.js).
+ *
+ *  INTENTIONAL OFFSET: jazz takes its floor from the TRACK, not the Train. The
+ *  records float above the console, so the Train's own art stops ~0.79 of the way
+ *  down the box — aligning on that would drop the wood console's bottom edge clean
+ *  off the canvas. The console IS the ground here, so its bottom edge is the floor:
+ *  buildTrack's deck top (cy + 78 in viewBox units) + its 64-unit height + the
+ *  0.012×--rt-th lip it draws as a border. The translucent spill band below it is
+ *  backing, not floor, and is allowed to run off the edge. */
+export const foot = (cy + 78 + 64 - VIEW_TOP) / VIEW_H + 0.012;
+
+export default { key: 'jazz', ensureStyles, build, buildTrack, foot };

@@ -329,4 +329,11 @@ export function build(train, opts = {}) {
   };
 }
 
-export default { key: 'classic', ensureStyles, build, buildTrack };
+/** Baseline (`foot`) — this Theme's FLOOR as a fraction of --rt-th, measured down
+ *  from the top of the Train's box. The renderer drops the Train until this line
+ *  reaches the bottom edge at height=100, so every Theme bottoms out identically
+ *  (no per-Theme height nudge in a Preset). Floor here = the driving wheels'
+ *  contact patch (wy = railY + 14, r = 26); the rail band above it stops higher. */
+export const foot = (railY + 14 + 26 - VIEW_TOP) / VIEW_H;
+
+export default { key: 'classic', ensureStyles, build, buildTrack, foot };

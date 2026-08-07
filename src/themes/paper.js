@@ -250,4 +250,11 @@ export function build(train, opts = {}) {
   };
 }
 
-export default { key: 'paper', ensureStyles, build, buildTrack };
+/** Baseline (`foot`) — this Theme's FLOOR as a fraction of --rt-th, measured down
+ *  from the top of the Train's box; the renderer drops the Train until this line
+ *  reaches the bottom edge at height=100 (see --rt-foot in train-renderer.js).
+ *  Floor here = the engine wheel's drop shadow (paperWheel offsets it to cy + 1;
+ *  the largest wheel is r = 17 at y = railY). */
+export const foot = (railY + 18 - VIEW_TOP) / VIEW_H;
+
+export default { key: 'paper', ensureStyles, build, buildTrack, foot };

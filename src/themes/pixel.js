@@ -399,4 +399,15 @@ export function build(train, opts = {}) {
   };
 }
 
-export default { key: 'pixel', ensureStyles, build, buildTrack };
+/** Baseline (`foot`) — this Theme's FLOOR as a fraction of --rt-th, measured down
+ *  from the top of the Train's box; the renderer drops the Train until this line
+ *  reaches the bottom edge at height=100 (see --rt-foot in train-renderer.js).
+ *  Floor here is the bottom of the sub-line, which is the exact sum of the holder's
+ *  stack: the canvas (46u) + the name row's margin (4u) + one name line + one sub
+ *  line (both line-height 1.25). DESIGN_H is only an approximation of that stack
+ *  (see its comment), which is why the two differ. A name long enough to wrap adds
+ *  another name line to that one Car and will overhang the baseline — the .rt-fit
+ *  shrink-to-fit is what keeps that rare. */
+export const foot = (46 + 4 + 4.5 * 1.25 + 3.8 * 1.25) / DESIGN_H;
+
+export default { key: 'pixel', ensureStyles, build, buildTrack, foot };

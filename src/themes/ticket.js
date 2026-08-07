@@ -285,4 +285,12 @@ export function build(train, opts = {}) {
   };
 }
 
-export default { key: 'ticket', ensureStyles, build, buildTrack };
+/** Baseline (`foot`) — this Theme's FLOOR as a fraction of --rt-th, measured down
+ *  from the top of the Train's box; the renderer drops the Train until this line
+ *  reaches the bottom edge at height=100 (see --rt-foot in train-renderer.js).
+ *  The card fills the whole DESIGN_H box, so the card's foot IS the box foot — this
+ *  Theme was already flush and stays put. (buildTrack's tie band hangs below it, but
+ *  that is Track scenery and is allowed to run off the bottom edge.) */
+export const foot = 1;
+
+export default { key: 'ticket', ensureStyles, build, buildTrack, foot };

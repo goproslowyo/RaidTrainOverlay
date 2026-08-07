@@ -292,4 +292,12 @@ export function build(train, opts = {}) {
   };
 }
 
-export default { key: 'flat', ensureStyles, build, buildTrack };
+/** Baseline (`foot`) — this Theme's FLOOR as a fraction of --rt-th, measured down
+ *  from the top of the Train's box; the renderer drops the Train until this line
+ *  reaches the bottom edge at height=100 (see --rt-foot in train-renderer.js).
+ *  Floor here = the largest wheel's rim (flatWheel draws r + 2 at y = railY, r = 19).
+ *  The sleeper band runs a few units lower, but it is Track scenery — the Train's
+ *  own art is what the baseline aligns. */
+export const foot = (railY + 21 - VIEW_TOP) / VIEW_H;
+
+export default { key: 'flat', ensureStyles, build, buildTrack, foot };

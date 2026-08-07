@@ -44,6 +44,16 @@ test('every registered Theme satisfies the renderer contract', () => {
     if ('buildTrack' in theme) {
       assert.equal(typeof theme.buildTrack, 'function', `${key}: buildTrack, when present, is a function`);
     }
+    // The BASELINE: every shipped Theme declares where its floor sits, as a
+    // fraction of the Train height, so `height` drops the floor (not the layout
+    // box) onto the bottom edge and the whole roster bottoms out identically.
+    // A missing/NaN value silently falls back to 1 in the renderer — the exact
+    // per-Theme drift issue #24 fixed — so assert it is present and sane. The
+    // band is generous on purpose (a Theme whose art overhangs its box, like
+    // departures' slung bogies, is legitimately > 1); it only catches a typo or
+    // a value expressed in design units instead of a fraction.
+    assert.equal(typeof theme.foot, 'number', `${key}: declares a numeric foot (baseline)`);
+    assert.ok(theme.foot > 0.5 && theme.foot <= 1.25, `${key}: foot ${theme.foot} is a plausible fraction of --rt-th`);
   }
 });
 
