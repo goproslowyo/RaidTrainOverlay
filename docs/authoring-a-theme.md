@@ -305,8 +305,8 @@ the first one only — it's an authoring reference, not a roster Theme):
 
 1. **`src/train-renderer.js`** — `import` it and add it to the `THEMES` map.
 2. **`src/config.js`** — add the key to the `theme` enum (the `oneOf([...])` list).
-3. **`configurator.html`** — add an `<option value="<key>">Your Label</option>` to the
-   theme `<select>`, and add the key to the validation array that guards `els.theme.value`.
+3. **`src/settings-schema.js`** — add `key: 'Your Label'` to `THEME_OPTIONS`. That one map
+   feeds the theme `<select>` in both Configurator editors and the Preset summary chips.
 
 Unknown keys fall back to `classic`, so a half-registered Theme degrades gracefully rather
 than blanking the Overlay.

@@ -4,7 +4,8 @@
  * A Profile is a bare Twitch login (lowercased key; RaidPal lookup is
  * case-insensitive) owning: a standing Spotlight list (names always
  * highlighted — self, friends, team members), a default Preset reference
- * (the base look, and the Live Link fallback for unmapped trains), and its
+ * (the base look, and the Live Link fallback for unmapped trains), its Live
+ * Link preferences (the idle card's horizon), and its
  * Raid Train Configs keyed by Event slug — `{ presetId, overrides, spotlight }`
  * where overrides is a per-field sparse diff against the referenced Preset
  * and spotlight is per-train ADDITIONS (union with the standing list, never
@@ -60,7 +61,10 @@ export function addProfile(store, login) {
   if (key === '' || store.profiles[key]) return { ...store };
   return {
     active: store.active ?? key,
-    profiles: { ...store.profiles, [key]: { spotlight: [], defaultPresetId: null, trains: {} } },
+    profiles: {
+      ...store.profiles,
+      [key]: { spotlight: [], defaultPresetId: null, trains: {}, liveLink: { upcoming: null } },
+    },
   };
 }
 
@@ -88,6 +92,22 @@ export function listProfiles(store) {
 /** The acting Profile's login, or null when none exist. */
 export function activeProfile(store) {
   return store.active ?? null;
+}
+
+/**
+ * The Profile's Live Link preferences — currently just the idle card's
+ * `upcoming` horizon (`'3'`, `'2w'`, `'1m'`, `'all'`, or null for "no card").
+ * It lives on the Profile, not in the URL alone, so the Live Link panel
+ * regenerates the SAME URL on every visit; a Profile written before this field
+ * existed reads as "no card".
+ */
+export function liveLinkPrefs(store, login) {
+  return { upcoming: null, ...(store.profiles[normalizeLogin(login)]?.liveLink ?? {}) };
+}
+
+/** Set the Profile's Live Link preferences (merged over what's there). */
+export function setLiveLinkPrefs(store, login, prefs) {
+  return withProfile(store, login, (p) => ({ ...p, liveLink: { ...(p.liveLink ?? {}), ...prefs } }));
 }
 
 /** Set (or clear, with null) a Profile's default Preset reference. */
@@ -161,14 +181,29 @@ export function resolveTrainSettings(library, store, login, slug) {
   };
 }
 
-/** How many Raid Train Configs and Profile defaults reference a Preset — the delete-confirm numbers. */
+/**
+ * The Preset a Config actually renders through: its own reference, else the
+ * Profile's default. resolveTrainSettings has always read it this way, so
+ * anything that reasons about "which Configs use this Preset" must too — a
+ * Config with a null reference is not unaffiliated, it is on the default.
+ */
+function effectivePresetId(profile, config) {
+  return config.presetId ?? profile.defaultPresetId ?? null;
+}
+
+/**
+ * How many Raid Train Configs and Profile defaults a Preset is reaching — the
+ * delete-confirm numbers. Counts Configs that reach it THROUGH the Profile
+ * default too, because those are exactly the ones a delete would change on
+ * stream; counting only explicit references understated the blast radius.
+ */
 export function countPresetReferences(store, presetId) {
   let configs = 0;
   let defaults = 0;
   for (const profile of Object.values(store.profiles)) {
     if (profile.defaultPresetId === presetId) defaults += 1;
     for (const config of Object.values(profile.trains)) {
-      if (config.presetId === presetId) configs += 1;
+      if (effectivePresetId(profile, config) === presetId) configs += 1;
     }
   }
   return { configs, defaults };
@@ -176,9 +211,15 @@ export function countPresetReferences(store, presetId) {
 
 /**
  * Delete-while-referenced, the store half: bake the Preset's settings into
- * every referencing Config as full overrides (nothing changes visually,
- * nothing dangles) and clear matching Profile defaults. Run this BEFORE
- * deletePreset(library, id); the confirm dialog runs on countPresetReferences.
+ * every Config that RENDERS through it as full overrides (nothing changes
+ * visually, nothing dangles) and clear matching Profile defaults. Run this
+ * BEFORE deletePreset(library, id); the confirm dialog runs on
+ * countPresetReferences.
+ *
+ * "Renders through it" includes Configs with a null reference sitting on the
+ * Profile default — the same pass clears that default, so skipping them would
+ * silently drop their look on stream, which is the one thing this function
+ * exists to prevent.
  */
 export function materializePreset(store, library, presetId) {
   const preset = getPreset(library, presetId);
@@ -186,7 +227,7 @@ export function materializePreset(store, library, presetId) {
   for (const [login, profile] of Object.entries(store.profiles)) {
     const trains = {};
     for (const [slug, config] of Object.entries(profile.trains)) {
-      trains[slug] = config.presetId === presetId
+      trains[slug] = effectivePresetId(profile, config) === presetId
         ? { ...config, presetId: null, overrides: { ...(preset?.settings ?? {}), ...config.overrides } }
         : config;
     }

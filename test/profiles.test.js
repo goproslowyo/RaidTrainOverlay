@@ -6,6 +6,7 @@ import {
   setDefaultPreset, addSpotlight, removeSpotlight,
   upsertTrainConfig, deleteTrainConfig, getTrainConfig,
   resolveTrainSettings, countPresetReferences, materializePreset,
+  liveLinkPrefs, setLiveLinkPrefs,
 } from '../src/profiles.js';
 import { createPreset } from '../src/preset-library.js';
 
@@ -59,6 +60,52 @@ test('setDefaultPreset stores the Profile default Preset reference (null clears 
   assert.equal(store.profiles.alpha.defaultPresetId, 'id-1');
   store = setDefaultPreset(store, 'alpha', null);
   assert.equal(store.profiles.alpha.defaultPresetId, null);
+});
+
+test('a Config on the Profile default counts as a reference, and is materialized', () => {
+  // The trap: resolveTrainSettings reads `config.presetId ?? profile.defaultPresetId`,
+  // so a Config with a null reference still RENDERS through the default Preset.
+  // Deleting that Preset clears the default in the same pass, so if the bake skips
+  // those Configs their look vanishes from stream — the exact thing the delete
+  // confirm promises cannot happen.
+  const library = libWith('id-1', { theme: 'tron', height: '80' });
+  let store = addProfile(EMPTY, 'alpha');
+  store = setDefaultPreset(store, 'alpha', 'id-1');
+  store = upsertTrainConfig(store, 'alpha', 'explicit', { presetId: 'id-1' });
+  store = upsertTrainConfig(store, 'alpha', 'inherits', { presetId: null, overrides: { height: '40' } });
+
+  // Both trains render through id-1, so both must be counted.
+  assert.deepEqual(countPresetReferences(store, 'id-1'), { configs: 2, defaults: 1 });
+  assert.equal(resolveTrainSettings(library, store, 'alpha', 'inherits').settings.theme, 'tron');
+
+  const after = materializePreset(store, library, 'id-1');
+  // Nothing changes on stream: the inheriting train keeps tron and its own override.
+  const resolved = resolveTrainSettings({}, after, 'alpha', 'inherits');
+  assert.equal(resolved.settings.theme, 'tron');
+  assert.equal(resolved.settings.height, '40', 'its own override still wins over the baked value');
+  assert.equal(after.profiles.alpha.defaultPresetId, null, 'the dangling default is cleared');
+  assert.equal(resolveTrainSettings({}, after, 'alpha', 'explicit').settings.theme, 'tron');
+});
+
+test('countPresetReferences ignores a Preset no Config reaches', () => {
+  const store = upsertTrainConfig(
+    setDefaultPreset(addProfile(EMPTY, 'alpha'), 'alpha', 'id-1'), 'alpha', 'x', { presetId: 'id-1' },
+  );
+  assert.deepEqual(countPresetReferences(store, 'id-other'), { configs: 0, defaults: 0 });
+});
+
+test('liveLinkPrefs round-trips the idle-card horizon, and defaults to no card', () => {
+  let store = addProfile(EMPTY, 'alpha');
+  assert.deepEqual(liveLinkPrefs(store, 'alpha'), { upcoming: null });
+  store = setLiveLinkPrefs(store, 'alpha', { upcoming: '2w' });
+  assert.deepEqual(liveLinkPrefs(store, 'ALPHA'), { upcoming: '2w' });
+  store = setLiveLinkPrefs(store, 'alpha', { upcoming: null });
+  assert.equal(liveLinkPrefs(store, 'alpha').upcoming, null);
+  // A Profile written before the field existed reads as "no card", never a throw.
+  const legacy = { active: 'beta', profiles: { beta: { spotlight: [], defaultPresetId: null, trains: {} } } };
+  assert.deepEqual(liveLinkPrefs(legacy, 'beta'), { upcoming: null });
+  assert.deepEqual(liveLinkPrefs(legacy, 'nobody'), { upcoming: null });
+  assert.equal(setLiveLinkPrefs(legacy, 'beta', { upcoming: 'all' }).profiles.beta.liveLink.upcoming, 'all');
 });
 
 test('addSpotlight builds the standing promote list, deduped case-insensitively; removeSpotlight drops', () => {
