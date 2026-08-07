@@ -156,3 +156,21 @@ test('shouldSelfReload: only when idle AND the page is over an hour old', () => 
   assert.equal(shouldSelfReload({ loadedAt: NOW.getTime() - 10 * MIN, now: NOW.getTime() }), false);
   assert.equal(IDLE_RELOAD_MS, 60 * MIN);
 });
+
+// ---- card window rotation (many upcoming trains must not grow the card) ----
+
+import { visibleUpcoming, CARD_MAX_ROWS } from '../src/live-link.js';
+
+test('visibleUpcoming shows everything when it fits — no rotation needed', () => {
+  assert.equal(CARD_MAX_ROWS, 3);
+  assert.deepEqual(visibleUpcoming(UP.slice(0, 2), 0).map((e) => e.slug), ['a', 'b']);
+  assert.deepEqual(visibleUpcoming(UP.slice(0, 3), 7).map((e) => e.slug), ['a', 'b', 'c']);
+});
+
+test('visibleUpcoming slides a wrapped 3-row window by the offset', () => {
+  assert.deepEqual(visibleUpcoming(UP, 0).map((e) => e.slug), ['a', 'b', 'c']);
+  assert.deepEqual(visibleUpcoming(UP, 1).map((e) => e.slug), ['b', 'c', 'd']);
+  assert.deepEqual(visibleUpcoming(UP, 2).map((e) => e.slug), ['c', 'd', 'a']);
+  // The offset itself wraps: any integer is safe to feed back in forever.
+  assert.deepEqual(visibleUpcoming(UP, 4).map((e) => e.slug), ['a', 'b', 'c']);
+});
