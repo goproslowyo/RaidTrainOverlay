@@ -98,6 +98,88 @@ test('an unknown or blank login has no Live Link', () => {
   assert.deepEqual(buildTrainMap(library, store, 'someone-else'), {});
 });
 
+// ── The ended-train filter (#31) ───────────────────────────────────────────
+// The rule is POSITIVE EVIDENCE — "present in a good read with endtime in the
+// future, or no evidence it ended" — never "absent from the feed". Absence
+// also means a renamed slug and a bad RaidPal read, so pruning on it would
+// blank an entire Live Link on one bad RaidPal day. The two rules pick nearly
+// the same set; the whole difference is the failure mode, and these tests are
+// mostly about that difference.
+
+const NOW = Date.parse('2026-08-10T12:00:00Z');
+const ended = (event) => ({ ...event, endtime: new Date(NOW - 60_000) });
+const feedEvent = (slug, endsAtMs) => ({ slug, endtime: new Date(endsAtMs) });
+
+/** A Profile with one overriding Config per slug, each stamped with an end time. */
+function scheduled(entries) {
+  const { library, presetId, store } = fixture();
+  let s = store;
+  for (const [slug, endsAt] of Object.entries(entries)) {
+    s = upsertTrainConfig(s, 'gostreamcore', slug, { presetId, overrides: { theme: 'tron' }, endsAt });
+  }
+  return { library, store: s };
+}
+
+test('the filter drops a train known to have ended and keeps the live and lead ones', () => {
+  const { library, store } = scheduled({
+    'ran-last-week': NOW - 7 * 86_400_000,
+    'on-stage-now': NOW + 2 * 3_600_000, // live: started earlier, ends later
+    'departs-in-an-hour': NOW + 3 * 3_600_000,
+  });
+  const map = buildTrainMap(library, store, 'gostreamcore', { now: NOW });
+  assert.deepEqual(Object.keys(map).sort(), ['departs-in-an-hour', 'on-stage-now']);
+});
+
+test('a train merely ABSENT from a good read is kept — renamed slug, not departed', () => {
+  const { library, store } = scheduled({ 'renamed-underneath-us': null });
+  // A good read that simply doesn't mention it. Under a prune-on-absence rule
+  // this train vanishes from the Live Link; under positive evidence it rides.
+  const map = buildTrainMap(library, store, 'gostreamcore', {
+    now: NOW, events: [feedEvent('some-other-train', NOW + 86_400_000)],
+  });
+  assert.deepEqual(Object.keys(map), ['renamed-underneath-us']);
+});
+
+test('a FAILED read drops nothing — one bad RaidPal day must not blank a Live Link', () => {
+  const { library, store } = scheduled({ 'still-upcoming': NOW + 86_400_000, 'no-record-of': null });
+  // fetchUserPayload returns null for any unexpected 200 body, which reaches
+  // us as `events: null`. That is the absence of evidence, not evidence.
+  const map = buildTrainMap(library, store, 'gostreamcore', { now: NOW, events: null });
+  assert.deepEqual(Object.keys(map).sort(), ['no-record-of', 'still-upcoming']);
+});
+
+test('the feed outranks the stored end time, so a rescheduled train comes back', () => {
+  const { library, store } = scheduled({ 'moved-later': NOW - 3_600_000 }); // stored as ended
+  assert.deepEqual(Object.keys(buildTrainMap(library, store, 'gostreamcore', { now: NOW })), [],
+    'on the stored evidence alone it is gone');
+  const map = buildTrainMap(library, store, 'gostreamcore', {
+    now: NOW, events: [feedEvent('moved-later', NOW + 86_400_000)],
+  });
+  assert.deepEqual(Object.keys(map), ['moved-later'], 'a good read saying otherwise wins');
+  // ...and the reverse: the feed can end a train the store thought was upcoming.
+  const { library: l2, store: s2 } = scheduled({ 'moved-earlier': NOW + 86_400_000 });
+  assert.deepEqual(Object.keys(buildTrainMap(l2, s2, 'gostreamcore', {
+    now: NOW, events: [ended(feedEvent('moved-earlier', 0))],
+  })), []);
+});
+
+test('with no clock nothing is filtered — no evidence without a now', () => {
+  const { library, store } = scheduled({ 'ran-last-week': NOW - 7 * 86_400_000 });
+  assert.deepEqual(Object.keys(buildTrainMap(library, store, 'gostreamcore')), ['ran-last-week']);
+});
+
+test('the filter shrinks the blob and the coverage count reports what survived', () => {
+  const { library, store } = scheduled({
+    past1: NOW - 86_400_000, past2: NOW - 2 * 86_400_000, next1: NOW + 86_400_000,
+  });
+  const before = buildLiveLink(library, store, 'gostreamcore');
+  const after = buildLiveLink(library, store, 'gostreamcore', { now: NOW });
+  assert.equal(before.trainCount, 3);
+  assert.equal(after.trainCount, 1, 'the panel says "covers 1", not "covers 3"');
+  assert.ok(after.blobChars < before.blobChars, `${after.blobChars} < ${before.blobChars}`);
+  assert.deepEqual(Object.keys(decodeTrainMap(new URLSearchParams(after.query).get('trains'))), ['next1']);
+});
+
 // ── The encode-side blob cap (#33) ─────────────────────────────────────────
 // MAX_BLOB_CHARS was enforced on decode only, so an oversized blob rode into
 // OBS looking fine and reverted EVERY per-train override with no signal

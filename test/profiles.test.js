@@ -4,7 +4,7 @@ import {
   parseProfiles, serializeProfiles,
   addProfile, removeProfile, setActiveProfile, listProfiles, activeProfile,
   setDefaultPreset, addSpotlight, removeSpotlight,
-  upsertTrainConfig, deleteTrainConfig, getTrainConfig,
+  upsertTrainConfig, deleteTrainConfig, getTrainConfig, isEmptyTrainConfig,
   resolveTrainSettings, countPresetReferences, materializePreset,
   liveLinkPrefs, setLiveLinkPrefs,
 } from '../src/profiles.js';
@@ -71,7 +71,9 @@ test('a Config on the Profile default counts as a reference, and is materialized
   const library = libWith('id-1', { theme: 'tron', height: '80' });
   let store = addProfile(EMPTY, 'alpha');
   store = setDefaultPreset(store, 'alpha', 'id-1');
-  store = upsertTrainConfig(store, 'alpha', 'explicit', { presetId: 'id-1' });
+  // Both carry an override so the auto-prune keeps them: a Config pointing at
+  // the Profile default with nothing overridden holds nothing and is deleted.
+  store = upsertTrainConfig(store, 'alpha', 'explicit', { presetId: 'id-1', overrides: { height: '60' } });
   store = upsertTrainConfig(store, 'alpha', 'inherits', { presetId: null, overrides: { height: '40' } });
 
   // Both trains render through id-1, so both must be counted.
@@ -134,6 +136,62 @@ test('upsertTrainConfig keeps overrides sparse: only settings-only fields surviv
   assert.deepEqual(getTrainConfig(store, 'alpha', 'luna-hao8').overrides, { theme: 'lava' });
 });
 
+// ---- auto-prune + endsAt (#31) ----
+
+test('a Config left holding nothing is DELETED, not stored as an empty record', () => {
+  let store = setDefaultPreset(addProfile(EMPTY, 'alpha'), 'alpha', 'id-1');
+  store = upsertTrainConfig(store, 'alpha', 'luna-hao8', { presetId: 'id-1', overrides: { theme: 'lava' } });
+  assert.ok(getTrainConfig(store, 'alpha', 'luna-hao8'), 'an override is something');
+
+  // "Reset N overrides" — the exact case this exists for. The old behaviour
+  // kept the record, which then rode the Live Link's blob carrying its
+  // Preset's whole diff against the base.
+  store = upsertTrainConfig(store, 'alpha', 'luna-hao8', { presetId: 'id-1', overrides: {} });
+  assert.equal(getTrainConfig(store, 'alpha', 'luna-hao8'), null, 'nothing left to keep');
+  assert.deepEqual(Object.keys(store.profiles.alpha.trains), []);
+});
+
+test('a Config is only empty when it holds none of the three things a streamer chooses', () => {
+  let store = setDefaultPreset(addProfile(EMPTY, 'alpha'), 'alpha', 'id-1');
+  // A per-train Spotlight is a choice, even with no overrides.
+  store = upsertTrainConfig(store, 'alpha', 'spot', { presetId: 'id-1', spotlight: ['Guest'] });
+  assert.ok(getTrainConfig(store, 'alpha', 'spot'));
+  // So is pinning a train to a Preset that ISN'T the Profile default —
+  // including pinning it to no Preset at all, which means built-in defaults.
+  store = upsertTrainConfig(store, 'alpha', 'other', { presetId: 'id-2' });
+  assert.ok(getTrainConfig(store, 'alpha', 'other'));
+  store = upsertTrainConfig(store, 'alpha', 'bare', { presetId: null });
+  assert.ok(getTrainConfig(store, 'alpha', 'bare'), 'null ≠ the id-1 default, so it is a choice');
+
+  assert.equal(isEmptyTrainConfig({ presetId: 'id-1', overrides: {}, spotlight: [] }, 'id-1'), true);
+  assert.equal(isEmptyTrainConfig({ presetId: null, overrides: {}, spotlight: [] }, null), true);
+  assert.equal(isEmptyTrainConfig(null, null), true);
+  // endsAt is observed fact, never a choice — a record holding only one is empty.
+  assert.equal(isEmptyTrainConfig({ presetId: null, overrides: {}, spotlight: [], endsAt: 123 }, null), true);
+});
+
+test('endsAt is stored as epoch ms from a Date, a number or an ISO string; junk reads as null', () => {
+  const when = Date.parse('2026-08-10T18:00:00Z');
+  let store = addProfile(EMPTY, 'alpha');
+  const put = (slug, endsAt) => {
+    store = upsertTrainConfig(store, 'alpha', slug, { overrides: { theme: 'lava' }, endsAt });
+    return getTrainConfig(store, 'alpha', slug).endsAt;
+  };
+  assert.equal(put('a', new Date(when)), when);
+  assert.equal(put('b', when), when);
+  assert.equal(put('c', '2026-08-10T18:00:00Z'), when);
+  assert.equal(put('d', 'not a date'), null);
+  assert.equal(put('e', undefined), null, 'a writer that never saw the feed records nothing');
+});
+
+test('a record written before endsAt existed parses and reads as no evidence', () => {
+  const legacy = '{"active":"alpha","profiles":{"alpha":{"spotlight":[],"defaultPresetId":null,'
+    + '"trains":{"luna-hao8":{"presetId":null,"overrides":{"theme":"lava"},"spotlight":[]}}}}}';
+  const store = parseProfiles(legacy);
+  assert.equal(getTrainConfig(store, 'alpha', 'luna-hao8').endsAt, undefined);
+  assert.equal(getTrainConfig(store, 'alpha', 'luna-hao8').overrides.theme, 'lava');
+});
+
 // ---- resolution ----
 
 test('resolveTrainSettings: preset ⊕ overrides, spotlight = standing ∪ additions', () => {
@@ -169,7 +227,9 @@ test('countPresetReferences counts referencing Raid Train Configs and Profile de
   store = setDefaultPreset(store, 'beta', 'id-1');
   store = upsertTrainConfig(store, 'alpha', 'luna-hao8', { presetId: 'id-1', overrides: {} });
   store = upsertTrainConfig(store, 'alpha', 'other-train', { presetId: 'id-2', overrides: {} });
-  store = upsertTrainConfig(store, 'beta', 'luna-hao8', { presetId: 'id-1', overrides: {} });
+  // beta's default IS id-1, so this Config needs an override to survive the
+  // auto-prune — otherwise it holds nothing and is deleted rather than stored.
+  store = upsertTrainConfig(store, 'beta', 'luna-hao8', { presetId: 'id-1', overrides: { theme: 'lava' } });
   assert.deepEqual(countPresetReferences(store, 'id-1'), { configs: 2, defaults: 1 });
 });
 

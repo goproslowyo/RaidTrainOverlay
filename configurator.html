@@ -451,6 +451,15 @@
     .modal .m-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
     .btn.danger-solid { background: #52242a; border-color: #7c3540; color: #ffb4ba; }
     .btn.danger-solid:hover { background: #6b2d35; }
+    /* The outline destructive: offers the action, doesn't confirm it. The
+       modal's danger-solid is the button that actually deletes. */
+    .btn.destructive { background: transparent; border-color: #4a262c; color: #d9737c; }
+    .btn.destructive:hover { background: #52242a; border-color: #7c3540; color: #ffb4ba; }
+    .cfg-danger {
+      display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+      margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line);
+    }
+    .cfg-danger .hint { margin: 0; flex: 1; min-width: 220px; }
 
     @media (max-width: 860px) {
       .shell { flex-direction: column; gap: 12px; padding: 18px 16px 48px; }
@@ -521,7 +530,7 @@
   } from './src/preset-library.js';
   import {
     parseProfiles, serializeProfiles, addProfile, removeProfile, setActiveProfile, listProfiles,
-    activeProfile, setDefaultPreset, addSpotlight, removeSpotlight, upsertTrainConfig, getTrainConfig,
+    activeProfile, setDefaultPreset, addSpotlight, removeSpotlight, upsertTrainConfig, getTrainConfig, deleteTrainConfig,
     resolveTrainSettings, countPresetReferences, materializePreset, liveLinkPrefs, setLiveLinkPrefs,
   } from './src/profiles.js';
   import { loadMyRaidTrains, loadEventDetails, refreshEventDetail, userCacheKey } from './src/my-raid-trains.js';
@@ -665,9 +674,24 @@
     const query = buildOverlayQuery({ ...settings, event: slug, spotlight: spotlight.join(',') });
     return `${OVERLAY_BASE}?${query}`;
   }
-  /** The Live Link plus its size verdict — the panel needs both (see #33). */
+  /**
+   * The feed's events, but ONLY when this read is trustworthy — a fresh
+   * `ready` with no error and nothing served from a stale cache. Everything
+   * downstream treats these as positive evidence about when trains end (#31),
+   * so a doubtful read must contribute none.
+   */
+  function goodFeedEvents() {
+    const f = state.feed;
+    return f.status === 'ready' && !f.stale && !f.error ? f.events : null;
+  }
+  /** When the feed says this train ends, as epoch ms — only from a good read. */
+  function feedEndsAt(slug) {
+    const event = (goodFeedEvents() ?? []).find((e) => e.slug === slug);
+    return event ? event.endtime.getTime() : null;
+  }
+  /** The Live Link plus its size verdict (#33) and its train coverage (#31). */
   const liveLink = () => {
-    const link = buildLiveLink(library, profiles, me());
+    const link = buildLiveLink(library, profiles, me(), { now: Date.now(), events: goodFeedEvents() });
     return { ...link, url: link.query ? `${OVERLAY_BASE}?${link.query}` : '' };
   };
   const liveLinkUrl = () => liveLink().url;
@@ -859,6 +883,9 @@
           ${te('configurator.llIdleToggle')}</label>
         <select id="ll-horizon"${on ? '' : ' disabled'} aria-label="${te('configurator.llHorizonAria')}">${options}</select>
       </div>
+      <div class="ll-meta">${esc(link.trainCount === 0
+        ? t('configurator.llCoversNone')
+        : plural(link.trainCount, 'configurator.llCoversOne', 'configurator.llCoversMany'))}</div>
       <div class="ll-meta">${t('configurator.llStyledBy', {
         preset: `<b>${esc(base?.name ?? t('configurator.noneYet'))}</b>${base ? ` (${esc(themeLabel(normalizeSettings(base.settings).theme))})` : ''}`,
       })}</div>
@@ -977,7 +1004,12 @@
           <button type="button" class="btn primary" data-act="copy-cfg-url">${te('configurator.copy')}</button>
         </div>
         <div class="hint">${te('configurator.cfgLinkHint')}</div>
-      </section>`;
+      </section>
+
+      ${config ? `<div class="cfg-danger">
+        <button type="button" class="btn destructive" data-act="forget-config">${te('configurator.cfgForgetAction')}</button>
+        <span class="hint">${te('configurator.cfgForgetHint')}</span>
+      </div>` : ''}`;
   }
 
   // ── View: Preset Library + Preset editor ───────────────────────────────
@@ -1254,7 +1286,13 @@
     };
 
     function persist(config) {
-      profiles = upsertTrainConfig(profiles, login, slug, config);
+      // Stamp when this Event ends while we can still see it in a good read.
+      // Once it leaves the feed the store is the only thing that remembers,
+      // and that memory is what lets the Live Link drop it on positive
+      // evidence rather than on absence (#31).
+      profiles = upsertTrainConfig(profiles, login, slug, {
+        ...config, endsAt: feedEndsAt(slug) ?? config.endsAt ?? null,
+      });
       saveProfiles();
       refreshEditorChrome();
     }
@@ -1268,6 +1306,10 @@
       }
       const url = $('#cfg-url');
       if (url) url.value = trainOverlayUrl(slug);
+      // The chip on the train's card carries the override count. An auto-prune
+      // (#31) removes the record entirely, so without this the stale "+0"
+      // artifact just persists in the DOM. No-ops when the card isn't mounted.
+      paintCard(slug);
       const { settings, spotlight } = trainSettings(slug);
       previewCaption(settings);
       preview?.render(buildOverlayQuery({ ...settings, event: slug, spotlight: spotlight.join(',') }), slug);
@@ -1560,6 +1602,29 @@
       return;
     }
 
+    if (act === 'forget-config') {
+      const slug = state.editing;
+      const config = getTrainConfig(profiles, me(), slug);
+      if (!config) return;
+      const count = Object.keys(config.overrides ?? {}).length;
+      // What it drops TO is the Profile's default Preset, not this Config's own
+      // reference — with the record gone, resolveTrainSettings has nothing else
+      // to read. No default means normalizeSettings({}): classic theme, pass
+      // mode. That is the sharp edge, so the confirm names it outright.
+      const preset = getPreset(library, myProfile()?.defaultPresetId ?? null);
+      openModal(`<h3>${te('configurator.cfgForgetHead')}</h3>
+        <p>${plural(count, 'configurator.cfgForgetCountOne', 'configurator.cfgForgetCountMany', { n: `<b>${count}</b>` })}</p>
+        <p>${preset
+          ? t('configurator.cfgForgetDropsToPreset', { name: `<b>${esc(preset.name)}</b>` })
+          : te('configurator.cfgForgetDropsToDefaults')}</p>
+        <p>${te('configurator.cfgForgetLinksNote')}</p>
+        <div class="m-actions">
+          <button type="button" class="btn" data-mact="cancel">${te('configurator.cancel')}</button>
+          <button type="button" class="btn danger-solid" data-mact="confirm-forget" data-slug="${esc(slug)}">${te('configurator.cfgForgetConfirm')}</button>
+        </div>`);
+      return;
+    }
+
     // ── Preset library ──
     if (act === 'new-preset') {
       const made = createPreset(library, t('configurator.newPresetName'), SETTINGS_DEFAULTS);
@@ -1747,6 +1812,18 @@
       closeModal();
       go('presets');
       toast(t('configurator.toastDeleted', { name }));
+      return;
+    }
+    if (act === 'confirm-forget') {
+      // Back to the train list, not the editor: the editor would immediately
+      // re-synthesize a default Config from readConfig() and the deletion
+      // would read as having done nothing.
+      profiles = deleteTrainConfig(profiles, me(), el.dataset.slug);
+      saveProfiles();
+      closeModal();
+      state.editing = null;
+      go('trains');
+      toast(t('configurator.toastConfigForgotten'));
       return;
     }
     if (act === 'confirm-import') {
