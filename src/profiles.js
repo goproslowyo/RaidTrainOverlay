@@ -181,14 +181,29 @@ export function resolveTrainSettings(library, store, login, slug) {
   };
 }
 
-/** How many Raid Train Configs and Profile defaults reference a Preset — the delete-confirm numbers. */
+/**
+ * The Preset a Config actually renders through: its own reference, else the
+ * Profile's default. resolveTrainSettings has always read it this way, so
+ * anything that reasons about "which Configs use this Preset" must too — a
+ * Config with a null reference is not unaffiliated, it is on the default.
+ */
+function effectivePresetId(profile, config) {
+  return config.presetId ?? profile.defaultPresetId ?? null;
+}
+
+/**
+ * How many Raid Train Configs and Profile defaults a Preset is reaching — the
+ * delete-confirm numbers. Counts Configs that reach it THROUGH the Profile
+ * default too, because those are exactly the ones a delete would change on
+ * stream; counting only explicit references understated the blast radius.
+ */
 export function countPresetReferences(store, presetId) {
   let configs = 0;
   let defaults = 0;
   for (const profile of Object.values(store.profiles)) {
     if (profile.defaultPresetId === presetId) defaults += 1;
     for (const config of Object.values(profile.trains)) {
-      if (config.presetId === presetId) configs += 1;
+      if (effectivePresetId(profile, config) === presetId) configs += 1;
     }
   }
   return { configs, defaults };
@@ -196,9 +211,15 @@ export function countPresetReferences(store, presetId) {
 
 /**
  * Delete-while-referenced, the store half: bake the Preset's settings into
- * every referencing Config as full overrides (nothing changes visually,
- * nothing dangles) and clear matching Profile defaults. Run this BEFORE
- * deletePreset(library, id); the confirm dialog runs on countPresetReferences.
+ * every Config that RENDERS through it as full overrides (nothing changes
+ * visually, nothing dangles) and clear matching Profile defaults. Run this
+ * BEFORE deletePreset(library, id); the confirm dialog runs on
+ * countPresetReferences.
+ *
+ * "Renders through it" includes Configs with a null reference sitting on the
+ * Profile default — the same pass clears that default, so skipping them would
+ * silently drop their look on stream, which is the one thing this function
+ * exists to prevent.
  */
 export function materializePreset(store, library, presetId) {
   const preset = getPreset(library, presetId);
@@ -206,7 +227,7 @@ export function materializePreset(store, library, presetId) {
   for (const [login, profile] of Object.entries(store.profiles)) {
     const trains = {};
     for (const [slug, config] of Object.entries(profile.trains)) {
-      trains[slug] = config.presetId === presetId
+      trains[slug] = effectivePresetId(profile, config) === presetId
         ? { ...config, presetId: null, overrides: { ...(preset?.settings ?? {}), ...config.overrides } }
         : config;
     }

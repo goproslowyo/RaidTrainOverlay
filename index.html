@@ -146,7 +146,10 @@
         for (const c of chips) c.classList.toggle('active', c.dataset.theme === theme);
         const q = theme && theme !== 'classic' ? `?theme=${theme}` : '';
         preview.href = `./preview.html${q}`;
-        build.href = `./configurator.html${q}`;
+        // Always carry the theme to the Configurator, even `classic`: the param is
+        // what opens the one-off builder rather than My Raid Trains, so dropping it
+        // for the default landed "Build with this theme" somewhere else entirely.
+        build.href = `./configurator.html?theme=${theme || 'classic'}`;
       }
       for (const c of chips) c.addEventListener('click', () => pick(c.dataset.theme));
       pick('classic');

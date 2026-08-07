@@ -181,8 +181,10 @@ export function mountSettingsForm({ root, prefix = 'sf', getState, onChange = ()
     refresh();
   }
 
+  // `input` only: selects and checkboxes fire it too, so also listening for
+  // `change` ran every edit twice — two store writes and two preview re-renders
+  // per keystroke on a slider drag.
   root.addEventListener('input', (e) => handleEdit(e.target));
-  root.addEventListener('change', (e) => handleEdit(e.target));
   root.addEventListener('click', (e) => {
     const button = e.target.closest('[data-srevert]');
     if (!button) return;

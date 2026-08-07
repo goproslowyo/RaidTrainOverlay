@@ -46,7 +46,6 @@ export function buildTrainMap(library, store, login) {
   const profile = store.profiles?.[(login ?? '').toLowerCase()];
   if (!profile) return {};
   const base = baseSettings(library, store, login);
-  const baseQueryValues = toQueryValues(base);
   const map = {};
   for (const slug of Object.keys(profile.trains ?? {})) {
     const resolved = resolveTrainSettings(library, store, login, slug);
@@ -56,7 +55,7 @@ export function buildTrainMap(library, store, login) {
     const diff = diffSettings(base, resolved.settings);
     const effective = toQueryValues(resolved.settings);
     const overrides = {};
-    for (const key of Object.keys(diff)) overrides[key] = effective[key] ?? baseQueryValues[key];
+    for (const key of Object.keys(diff)) overrides[key] = effective[key];
     const spotlight = spotlightAdditions(profile.spotlight ?? [], resolved.spotlight ?? []);
     if (Object.keys(overrides).length === 0 && spotlight.length === 0) continue;
     map[slug] = { overrides, spotlight };

@@ -502,7 +502,7 @@
   import { decodeLineup } from './src/lineup-codec.js';
   import { instantToZonedWallClock, snapDuration } from './src/manual-lineup.js';
   import { parseStreamers, serializeStreamers, addStreamers, removeStreamer, listStreamers } from './src/streamers.js';
-  import { loadEvent } from './src/raidpal-client.js';
+  import { loadEvent, normalizeUser } from './src/raidpal-client.js';
   import { parseConfig } from './src/config.js';
   import { createPreviewFrame } from './src/preview-frame.js';
   import { resolveLocale, loadMessages, makeT } from './src/i18n/index.js';
@@ -515,7 +515,7 @@
     activeProfile, setDefaultPreset, addSpotlight, removeSpotlight, upsertTrainConfig, getTrainConfig,
     resolveTrainSettings, countPresetReferences, materializePreset, liveLinkPrefs, setLiveLinkPrefs,
   } from './src/profiles.js';
-  import { loadMyRaidTrains, loadEventDetails, refreshEventDetail } from './src/my-raid-trains.js';
+  import { loadMyRaidTrains, loadEventDetails, refreshEventDetail, userCacheKey } from './src/my-raid-trains.js';
   import { buildLiveLinkQuery, baseSettings } from './src/live-link-url.js';
   import {
     SETTINGS_DEFAULTS, SETTING_FIELDS, THEME_OPTIONS, applySettings, diffSettings, normalizeSettings,
@@ -643,6 +643,18 @@
    * failed read serves the stale cache and says so — it is never "you left the
    * train".
    */
+  /** The last-good user record for a login, straight from my-raid-trains' cache, or null. */
+  function cachedUser(login) {
+    try {
+      const raw = localStorage.getItem(userCacheKey(login));
+      if (raw == null) return null;
+      const entry = JSON.parse(raw);
+      return entry?.payload ? normalizeUser(entry.payload) : null;
+    } catch {
+      return null;
+    }
+  }
+
   async function loadFeed({ force = false } = {}) {
     const login = me();
     if (!login) { state.feed = { status: 'idle', events: [], details: {}, error: null, login: null }; return; }
@@ -651,7 +663,19 @@
     try {
       const result = await loadMyRaidTrains(login, { fetchImpl: fetch.bind(window), storage: localStorage, force });
       if (me() !== login) return; // the Profile switched while we were away
-      if (result.notFound) { state.feed = { ...state.feed, status: 'notfound' }; renderMain(); return; }
+      if (result.notFound) {
+        // "No such user" is a 204 — but the undocumented API also answers a bad
+        // moment (an HTML error page, a truncated body) with something that isn't
+        // `{ user: … }`, which reads here as the same thing. my-raid-trains keeps the
+        // last-good cache for exactly this reason, so serve it: a streamer with 13
+        // trains must never be told they have no profile because one read went odd.
+        const cached = cachedUser(login);
+        state.feed = cached
+          ? { ...state.feed, status: 'ready', events: cached.events, stale: 'notfound' }
+          : { ...state.feed, status: 'notfound' };
+        renderMain();
+        return;
+      }
       state.feed = { ...state.feed, status: 'ready', events: result.user.events, error: result.error ?? null };
       renderMain();
       await loadEventDetails(result.user.events, {
@@ -681,6 +705,12 @@
   function cardView(event, status, now) {
     const config = me() ? getTrainConfig(profiles, me(), event.slug) : null;
     const preset = config ? presetFor(config) : null;
+    // Count what the editor would show, not the raw stored keys: a Config that has
+    // been materialized carries all fifteen fields, most of which no longer differ
+    // from its base. Counting raw keys had the card saying "+15" over an editor
+    // saying "Reset 1 override".
+    const base = normalizeSettings(preset?.settings ?? {});
+    const liveOverrides = config ? diffSettings(base, applySettings(base, config.overrides)) : {};
     return {
       event,
       status,
@@ -688,7 +718,7 @@
       detail: detailCounts(event.slug),
       error: state.feed.details[event.slug]?.error ?? null,
       config: config
-        ? { presetName: preset?.name ?? 'Custom', overrideCount: Object.keys(config.overrides ?? {}).length }
+        ? { presetName: preset?.name ?? 'Custom', overrideCount: Object.keys(liveOverrides).length }
         : null,
     };
   }
@@ -792,7 +822,8 @@
     if (state.feed.status === 'notfound') {
       return `${head}<section class="card"><h2 class="card-h">RaidPal doesn't know that username</h2>
         <div class="hint">RaidPal has no public profile for <b>${esc(me())}</b>. Check the spelling — it's your Twitch login, not your display name — or
-        <a href="#" data-act="goto-oneoff">build a one-off link</a> instead.</div></section>`;
+        <a href="#" data-act="goto-oneoff">build a one-off link</a> instead.
+        <button type="button" class="btn sm" data-act="refresh-all" style="margin-left:8px">Try again</button></div></section>`;
     }
     if (state.feed.status === 'error') {
       return `${head}<section class="card"><h2 class="card-h">Couldn't reach RaidPal</h2>
@@ -801,7 +832,13 @@
     }
     const now = Date.now();
     const { live, upcoming, past } = classifyTrains(state.feed.events, now);
-    const stale = state.feed.error ? '<div class="hint" style="margin:-6px 0 12px">Showing the last good list — RaidPal didn\'t answer just now.</div>' : '';
+    const staleNote = state.feed.stale === 'notfound'
+      ? `RaidPal didn't return a profile for <b>${esc(me())}</b> just now — showing your last good list.`
+      : state.feed.error ? 'Showing the last good list — RaidPal didn\'t answer just now.' : '';
+    const stale = staleNote
+      ? `<div class="hint" style="margin:-6px 0 12px">${staleNote}
+           <button type="button" class="btn sm" data-act="refresh-all" style="margin-left:6px">Try again</button></div>`
+      : '';
     const cards = [...live, ...upcoming].map((e) => trainCardHtml(cardView(e, live.includes(e) ? 'live' : 'upcoming', now))).join('');
     const emptyNote = (live.length + upcoming.length) === 0
       ? '<div class="empty">No live or upcoming raid trains. Join one on RaidPal and it appears here.</div>' : '';
@@ -1021,6 +1058,10 @@
   const oneOff = {
     source: 'raidpal',
     event: '',
+    // Spotlight is per-link here, not a Preset field: the one-off door has no
+    // Profile to hold a standing list, so it needs its own control (and must
+    // rehydrate from a shared ?spotlight= link).
+    spotlight: '',
     settings: normalizeSettings({}),
     manual: { title: '', organiser: '', zone: detectedZone, startISO: freshStartISO(), slotMins: 60, djs: [] },
   };
@@ -1055,6 +1096,12 @@
           <input type="text" id="oneoff-url" readonly placeholder="Enter an event above to generate your URL" aria-label="Overlay URL">
           <button type="button" class="btn primary" data-act="copy-oneoff" disabled>Copy</button>
         </div>
+      </section>
+
+      <section class="card">
+        <h2 class="card-h">Spotlight broadcasters</h2>
+        <input type="text" id="one-spotlight" value="${esc(oneOff.spotlight)}" placeholder="DJ Alpha, DJ Charlie" autocomplete="off">
+        <div class="hint">Comma-separated names to highlight with a glow. Capitalization doesn't matter.</div>
       </section>
 
       <section class="card">
@@ -1280,6 +1327,7 @@
     $('#src-raidpal').addEventListener('click', () => setSource('raidpal'));
     $('#src-manual').addEventListener('click', () => setSource('manual'));
     $('#f-event').addEventListener('input', (e) => { oneOff.event = e.target.value; refreshOneOff(); });
+    $('#one-spotlight').addEventListener('input', (e) => { oneOff.spotlight = e.target.value; refreshOneOff(); });
     $('#f-event').addEventListener('blur', () => {
       const slug = extractSlug(oneOff.event);
       if (slug && slug !== oneOff.event.trim()) { oneOff.event = slug; $('#f-event').value = slug; refreshOneOff(); }
@@ -1294,7 +1342,7 @@
   let validateToken = 0;
   let oneOffTimer = null;
   function refreshOneOff() {
-    const formState = { source: oneOff.source, event: oneOff.event, manual: oneOff.manual, ...oneOff.settings };
+    const formState = { source: oneOff.source, event: oneOff.event, manual: oneOff.manual, ...oneOff.settings, spotlight: oneOff.spotlight };
     const query = buildOverlayQuery(formState);
     const params = new URLSearchParams(query);
     const urlBox = $('#oneoff-url');
@@ -1676,13 +1724,17 @@
   (async function start() {
     // Bind the translator before anything mounts — the Build-by-hand editor
     // renders through it, and an unbound `t` would paint raw message keys.
-    t = makeT(await loadMessages(resolveLocale(undefined, navigator.languages)));
     const search = window.location.search.replace(/^\?/, '');
+    // An explicit ?lang= picks the page's language too, as the old Configurator did;
+    // otherwise follow the browser. (Most of this page's own chrome is still English
+    // until the i18n pass — this at least keeps the Build-by-hand editor honest.)
+    t = makeT(await loadMessages(resolveLocale(parseConfig(search).lang, navigator.languages)));
     const wantsOneOff = search !== '' || window.location.hash === '#manual';
     if (wantsOneOff) {
       const config = parseConfig(search);
       const params = new URLSearchParams(search);
       oneOff.event = config.event ?? '';
+      oneOff.spotlight = params.get('spotlight') ?? '';   // raw, so the form keeps the typed casing
       oneOff.settings = normalizeSettings({
         theme: config.theme,
         mode: config.mode,
