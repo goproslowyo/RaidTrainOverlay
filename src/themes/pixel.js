@@ -62,7 +62,16 @@ export function ensureStyles() {
     }
     .pix-canvas { display: block; height: ${u(46)}; width: auto; image-rendering: pixelated; }
     .pix-row { display: flex; width: 100%; margin-top: ${u(4)}; }
-    .pix-cell { flex: 1; min-width: 0; padding: 0 ${u(2)}; text-align: center; line-height: 1.25; }
+    /* Column + bottom-aligned sub: the Cars' sub-lines must form ONE level strip
+       across the Train. fitAll shrinks each name to fit its Car, so names end up at
+       different font sizes and different line-box heights; with the cell as a plain
+       block that difference pushed each sub-line down by its own name's height, and a
+       name that took two lines dropped its sub ~26px below the rest. Stretching the
+       cells to a common height and pinning the sub to the bottom makes the strip level
+       whatever the name above it does — which is also what keeps the baseline honest. */
+    .pix-cell { flex: 1; min-width: 0; padding: 0 ${u(2)}; text-align: center; line-height: 1.25;
+      display: flex; flex-direction: column; }
+    .pix-sub { margin-top: auto; }
     /* Width-constrain the name so fitAll can shrink it (pixel doesn't load the
        shared-html .rt-fit rule). */
     .pix .rt-fit { display: block; max-width: 100%; overflow-wrap: anywhere; }

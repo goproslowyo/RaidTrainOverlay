@@ -383,6 +383,8 @@ export function renderTrain(train, container, config) {
   stage.style.setProperty('--rt-foot', String(Number.isFinite(declaredFoot) ? declaredFoot : 1));
   // Every built copy (the first, plus any marquee duplicates) is collected so a
   // time tick updates all of them — and afterAttach runs once each are in the DOM.
+  // afterAttach must run SYNCHRONOUSLY (see the call below): it needs the DOM, not
+  // a paint.
   const built = [];
   const buildCopy = () => {
     const copy = theme.build(train, { config, maxTimeLines });
@@ -398,10 +400,16 @@ export function renderTrain(train, container, config) {
   stage.appendChild(track);
   container.appendChild(stage);
   applyMode(track, config, buildCopy);
-  requestAnimationFrame(() => {
-    for (const copy of built) copy.afterAttach?.();
-    pinLeadBadges(track, config);
-  });
+  // The post-attach pass — every Theme's shrink-to-fit (fitAll) and the lead badge.
+  // NEVER defer this to requestAnimationFrame: rAF does not fire in a document that is
+  // never painted, and an OBS browser source sitting in an inactive scene is exactly
+  // that. Deferred, the pass silently never ran there: names rendered at full size, a
+  // name too wide for its Car wrapped to a second line, that Car's sub-line dropped
+  // below the rest, and the extra line pushed the Train past its baseline so `height=100`
+  // clipped it. Whether it happened came down to whether the tab was in front at load.
+  // Nothing here needs a paint — only layout, which applyMode above has already forced.
+  for (const copy of built) copy.afterAttach?.();
+  pinLeadBadges(track, config);
 
   return {
     /** In-place time-state update: classes and text only, never structure. */
