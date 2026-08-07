@@ -337,6 +337,40 @@
   .star-btn { color: var(--muted); font-size: 16px; }
   .star-btn.on { color: var(--gold); border-color: #4a4126; }
 
+  .preset-info { cursor: pointer; }
+  .preset-info:hover .preset-name { color: var(--accent); }
+
+  /* ── Preset editor + Profile settings ────────────────────────────── */
+  .preset-title-input {
+    width: auto; min-width: 200px; max-width: 420px;
+    font-size: 19px; font-weight: 700; letter-spacing: -.3px;
+    background: transparent; border: 1px solid transparent; border-radius: 7px;
+    padding: 4px 9px; margin-left: -9px; color: var(--ink);
+  }
+  .preset-title-input:hover { border-color: var(--line); background: var(--panel); }
+  .preset-title-input:focus { border-color: var(--accent); background: var(--panel-2); outline: none; }
+  .spot-edit-link {
+    background: none; border: 0; padding: 2px 4px; color: var(--accent-dim);
+    font-size: 12px; font-weight: 600; align-self: center;
+  }
+  .spot-edit-link:hover { color: var(--accent); text-decoration: underline; }
+  .spot-edit-list { display: flex; gap: 7px; flex-wrap: wrap; margin-bottom: 12px; }
+  .spot-edit-chip {
+    display: inline-flex; align-items: center; gap: 7px;
+    font-size: 13px; color: var(--muted); border: 1px solid var(--line);
+    background: #0c0f14; border-radius: 999px; padding: 4px 6px 4px 13px;
+  }
+  .spot-edit-chip b { color: var(--accent-dim); font-weight: 600; }
+  .chip-x {
+    width: 20px; height: 20px; border-radius: 50%; border: 0; background: var(--panel-2);
+    color: var(--muted); font-size: 10px; line-height: 1;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .chip-x:hover { background: #52242a; color: #ffb4ba; }
+  .spot-add { display: flex; gap: 8px; max-width: 420px; }
+  .p-manage { border-top: 1px solid var(--line); border-radius: 0 0 8px 8px; margin-top: 6px; }
+  .p-gear { width: 26px; text-align: center; color: var(--muted); font-size: 15px; flex: none; }
+
   /* ── Manual view ─────────────────────────────────────────────────── */
   .manual-ghost { opacity: .5; pointer-events: none; user-select: none; }
   .src-toggle { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; margin-bottom: 12px; }
@@ -407,6 +441,7 @@
     <button class="nav-item" data-nav="trains">My Raid Trains <span class="n-count" id="nc-trains"></span></button>
     <button class="nav-item" data-nav="livelink"><span class="n-gold">Live Link</span></button>
     <button class="nav-item" data-nav="presets">Preset Library <span class="n-count" id="nc-presets"></span></button>
+    <button class="nav-item" data-nav="profile">Profile settings</button>
     <hr>
     <button class="nav-item secondary" data-nav="manual">Build by hand</button>
     <div class="side-note">No RaidPal event? Build a one-off lineup by hand — same as before.</div>
@@ -433,7 +468,9 @@ const MODES = { pass: 'Pass — rolls across every few minutes', marquee: 'Marqu
 const HORIZONS = { next3: 'Next 3 trains', next5: 'Next 5 trains', w2: 'Next 2 weeks', m1: 'Next month', all: 'All upcoming' };
 const CAR_COLORS = ['#1e3a5f', '#5b2a78', '#14361f', '#6b3d12', '#3d1f42', '#173a3a'];
 const OVERLAY_BASE = 'https://goproslowyo.github.io/RaidTrainOverlay/overlay.html';
-const FIELDS = ['theme', 'mode', 'scale', 'spotlight'];
+// A Preset carries settings only. Spotlight is never a Preset field: standing
+// Spotlights live on the Profile, extra ones live on the Raid Train Config.
+const FIELDS = ['theme', 'mode', 'scale'];
 
 const DB = {
   order: ['gostreamcore', 'vinyl_veda'],
@@ -444,13 +481,13 @@ const DB = {
       defaultPreset: 'House Default',
       liveLink: { idle: false, horizon: 'next3' },
       presets: [
-        { name: 'House Default',     theme: 'classic',    mode: 'pass',    scale: '1',   spotlight: '' },
-        { name: 'Friday Night Funk', theme: 'synthwave',  mode: 'marquee', scale: '1.2', spotlight: 'DJ_Nova' },
-        { name: 'Minimal Marquee',   theme: 'departures', mode: 'marquee', scale: '0.8', spotlight: '' },
+        { name: 'House Default',     theme: 'classic',    mode: 'pass',    scale: '1' },
+        { name: 'Friday Night Funk', theme: 'synthwave',  mode: 'marquee', scale: '1.2' },
+        { name: 'Minimal Marquee',   theme: 'departures', mode: 'marquee', scale: '0.8' },
       ],
       configs: {
-        'synthwave-saturdays-42': { preset: 'Friday Night Funk', overrides: { theme: 'tron' } },
-        'trainwreck-lucky-13':    { preset: 'House Default',     overrides: {} },
+        'synthwave-saturdays-42': { preset: 'Friday Night Funk', overrides: { theme: 'tron' }, spotlight: 'guest_dj_kai' },
+        'trainwreck-lucky-13':    { preset: 'House Default',     overrides: {}, spotlight: '' },
       },
       events: [
         { slug: 'synthwave-saturdays-42', title: 'Synthwave Saturdays #42', status: 'live',
@@ -473,7 +510,7 @@ const DB = {
       defaultPreset: 'Jazz Nights',
       liveLink: { idle: true, horizon: 'w2' },
       presets: [
-        { name: 'Jazz Nights', theme: 'jazz', mode: 'pass', scale: '1', spotlight: '' },
+        { name: 'Jazz Nights', theme: 'jazz', mode: 'pass', scale: '1' },
       ],
       configs: {},
       events: [
@@ -488,10 +525,11 @@ const DB = {
 
 const state = {
   profile: 'gostreamcore',
-  view: 'trains',        // 'trains' | 'presets' | 'manual'
+  view: 'trains',        // 'trains' | 'presets' | 'manual' | 'profile'
   editing: null,         // event slug when the Raid Train Config editor is open
+  editingPreset: null,   // preset name when the Preset editor is open
   pastOpen: false,
-  renaming: null,        // preset name currently in inline-rename
+  renaming: null,        // preset name currently in inline-rename (library rows)
 };
 
 /* ══════════════ Helpers ══════════════ */
@@ -507,7 +545,7 @@ function refCount(presetName) {
   return Object.values(P().configs).filter((c) => c.preset === presetName).length;
 }
 function ensureConfig(slug) {
-  if (!P().configs[slug]) P().configs[slug] = { preset: P().defaultPreset, overrides: {} };
+  if (!P().configs[slug]) P().configs[slug] = { preset: P().defaultPreset, overrides: {}, spotlight: '' };
   return P().configs[slug];
 }
 function effective(cfg) {
@@ -523,7 +561,7 @@ function eventOverlayUrl(slug) {
   if (eff.theme !== 'classic') sp.set('theme', eff.theme);
   if (eff.mode !== 'pass') sp.set('mode', eff.mode);
   if (String(eff.scale) !== '1') sp.set('scale', eff.scale);
-  const raw = [...P().spotlights, ...String(eff.spotlight).split(',').map((s) => s.trim()).filter(Boolean)];
+  const raw = [...P().spotlights, ...String(cfg.spotlight || '').split(',').map((s) => s.trim()).filter(Boolean)];
   const seen = new Set(), spots = raw.filter((s) => { const k = s.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true; });
   if (spots.length) sp.set('spotlight', spots.join(','));
   return `${OVERLAY_BASE}?${sp}`;
@@ -572,7 +610,11 @@ function renderTopbar() {
         <span class="p-sub">${trains} raid trains · ${presets} presets</span></span>
       ${name === state.profile ? '<span class="p-check">✓</span>' : ''}
     </button>`;
-  }).join('');
+  }).join('') + `<button class="profile-item p-manage" data-act="manage-profile">
+      <span class="p-gear" aria-hidden="true">⚙</span>
+      <span><span class="p-name">Manage profile…</span>
+        <span class="p-sub">Standing Spotlights and default Preset for ${esc(state.profile)}</span></span>
+    </button>`;
 }
 
 function renderSidebar() {
@@ -581,8 +623,8 @@ function renderSidebar() {
   $$('.nav-item').forEach((el) => {
     const nav = el.dataset.nav;
     const active = (state.view === nav) || (nav === 'trains' && state.editing) ||
-      (nav === 'livelink' && false);
-    el.classList.toggle('active', active && nav !== 'livelink');
+      (nav === 'presets' && state.editingPreset);
+    el.classList.toggle('active', Boolean(active) && nav !== 'livelink');
   });
 }
 
@@ -689,8 +731,7 @@ function presetValueHint(field) {
   const base = presetByName(cfg.preset);
   if (!base || !(field in cfg.overrides)) return '';
   const v = base[field];
-  const label = field === 'theme' ? THEMES[v] : field === 'mode' ? (v === 'pass' ? 'Pass' : 'Marquee')
-    : field === 'spotlight' ? (v || 'none') : v;
+  const label = field === 'theme' ? THEMES[v] : field === 'mode' ? (v === 'pass' ? 'Pass' : 'Marquee') : v;
   return `Preset value: ${esc(label)}`;
 }
 
@@ -751,10 +792,15 @@ function renderEditor() {
       </div>
 
       <div class="field">
-        <div class="field-head"><label for="f-spotlight">Extra Spotlights for this train</label><span class="ovr-slot" id="ovr-spotlight">${overrideBadge('spotlight')}</span></div>
-        ${P().spotlights.length ? `<div class="spot-chips">${P().spotlights.map((s) => `<span class="spot-chip">Always on: <b>${esc(s)}</b></span>`).join('')}</div>` : ''}
-        <input type="text" id="f-spotlight" data-field="spotlight" value="${esc(eff.spotlight)}" placeholder="DJ Alpha, DJ Charlie" autocomplete="off">
-        <div class="hint" id="ph-spotlight">${presetValueHint('spotlight') || 'Comma-separated names to glow — added on top of your standing Spotlights above.'}</div>
+        <div class="field-head"><label for="f-spotlight">Extra Spotlights for this train</label></div>
+        <div class="spot-chips">
+          ${P().spotlights.length
+            ? P().spotlights.map((s) => `<span class="spot-chip">Always on: <b>${esc(s)}</b></span>`).join('')
+            : '<span class="spot-chip">No standing Spotlights yet</span>'}
+          <button class="spot-edit-link" data-act="goto-profile">Edit in Profile settings →</button>
+        </div>
+        <input type="text" id="f-spotlight" data-field="spotlight" value="${esc(cfg.spotlight || '')}" placeholder="DJ Alpha, DJ Charlie" autocomplete="off">
+        <div class="hint">Comma-separated names to glow — this train only, on top of your standing Spotlights above.</div>
       </div>
     </section>
 
@@ -775,8 +821,7 @@ function refreshEditorChrome() {
     const slot = $('#ovr-' + f);
     if (slot) slot.innerHTML = overrideBadge(f);
     const ph = $('#ph-' + f);
-    if (ph) ph.textContent = presetValueHint(f) ||
-      (f === 'spotlight' ? 'Comma-separated names to glow — added on top of your standing Spotlights above.' : '');
+    if (ph) ph.textContent = presetValueHint(f);
   }
   const out = $('#f-scale-out');
   if (out) out.textContent = effective(cfg).scale;
@@ -803,7 +848,6 @@ function refreshEditorChrome() {
 
 function presetSummary(p) {
   const bits = [THEMES[p.theme], p.mode === 'pass' ? 'Pass' : 'Marquee', `size ${p.scale}`];
-  if (p.spotlight) bits.push(`spotlight: ${p.spotlight}`);
   return bits.map((b) => `<span class="sum-chip">${esc(b)}</span>`).join('');
 }
 
@@ -815,7 +859,7 @@ function renderPresets() {
       ? `<input type="text" id="rename-input" value="${esc(p.name)}" data-old="${esc(p.name)}" autocomplete="off">`
       : `<span class="preset-name">${esc(p.name)}</span>`;
     return `<div class="card preset-row">
-      <div class="preset-info">
+      <div class="preset-info" data-act="edit-preset" data-name="${esc(p.name)}" title="Open this Preset">
         <div class="preset-name-row">
           ${nameCell}
           ${isDefault ? '<span class="chip-default">Default</span>' : ''}
@@ -825,6 +869,7 @@ function renderPresets() {
       </div>
       <div class="preset-actions">
         <button class="icon-btn star-btn${isDefault ? ' on' : ''}" data-act="make-default" data-name="${esc(p.name)}" title="${isDefault ? 'This is the default Preset' : 'Make this the default Preset'}">${isDefault ? '★' : '☆'}</button>
+        <button class="btn sm" data-act="edit-preset" data-name="${esc(p.name)}">Edit</button>
         <button class="btn sm primary" data-act="dup-preset" data-name="${esc(p.name)}">Duplicate</button>
         <button class="btn sm" data-act="rename-preset" data-name="${esc(p.name)}">Rename</button>
         <button class="btn sm danger" data-act="del-preset" data-name="${esc(p.name)}">Delete</button>
@@ -833,7 +878,7 @@ function renderPresets() {
   }).join('');
   $('#main').innerHTML = `
     <h2 class="view-title">Preset Library</h2>
-    <p class="view-sub">Presets are saved settings — no event attached. Raid Train Configs point at a Preset and override only what differs. Duplicate one to branch a new look in seconds.</p>
+    <p class="view-sub">Presets are saved settings — no event attached. Raid Train Configs point at a Preset and override only what differs. Click a Preset to edit it, or duplicate one to branch a new look in seconds.</p>
     ${rows || '<div class="empty">No Presets yet.</div>'}`;
   const input = $('#rename-input');
   if (input) { input.focus(); input.select(); }
@@ -851,6 +896,101 @@ function commitRename(input) {
   for (const c of Object.values(P().configs)) if (c.preset === oldName) c.preset = newName;
   renderPresets();
   toast(`Renamed to "${newName}"`);
+}
+
+/* ══════════════ Render: Preset editor ══════════════ */
+
+function renderPresetEditor() {
+  const p = presetByName(state.editingPreset);
+  if (!p) { state.editingPreset = null; renderPresets(); return; }
+  const used = refCount(p.name);
+  const isDefault = p.name === P().defaultPreset;
+  $('#main').innerHTML = `
+    <button class="back-link" data-act="back-presets">← Preset Library</button>
+    <div class="editor-head-row">
+      <input type="text" class="preset-title-input" id="preset-title-input" value="${esc(p.name)}" data-old="${esc(p.name)}" autocomplete="off" title="Rename this Preset">
+      ${isDefault ? '<span class="chip-default">Default</span>' : `<button class="btn sm" data-act="make-default-editor" data-name="${esc(p.name)}">Make default</button>`}
+    </div>
+    <p class="view-sub">${used
+      ? `Used by <b style="color:var(--accent-dim)">${used}</b> Raid Train Config${used === 1 ? '' : 's'} — changes here flow to ${used === 1 ? 'it' : 'them'}, except fields a train has overridden.`
+      : 'Not used by any Raid Train Config yet.'}</p>
+
+    <section class="card">
+      <h2 class="card-h">Preset settings</h2>
+
+      <div class="field">
+        <div class="field-head"><label for="f-p-theme">Theme</label></div>
+        <select id="f-p-theme" data-pfield="theme">
+          ${Object.entries(THEMES).map(([k, v]) => `<option value="${k}" ${p.theme === k ? 'selected' : ''}>${esc(v)}</option>`).join('')}
+        </select>
+      </div>
+
+      <div class="field">
+        <div class="field-head"><label for="f-p-mode">Display style</label></div>
+        <select id="f-p-mode" data-pfield="mode">
+          ${Object.entries(MODES).map(([k, v]) => `<option value="${k}" ${p.mode === k ? 'selected' : ''}>${esc(v)}</option>`).join('')}
+        </select>
+      </div>
+
+      <div class="field">
+        <div class="field-head"><label for="f-p-scale">Train size</label></div>
+        <div class="range-row">
+          <input type="range" id="f-p-scale" data-pfield="scale" min="0.5" max="2" step="0.1" value="${esc(p.scale)}">
+          <span class="range-out" id="f-p-scale-out">${esc(p.scale)}</span>
+        </div>
+      </div>
+
+      <div class="hint">Spotlights are not part of a Preset — standing Spotlights live in <a href="#" data-act="goto-profile">Profile settings</a>, extras on each train's Raid Train Config.</div>
+    </section>`;
+}
+
+function commitPresetTitleRename(input) {
+  const oldName = input.dataset.old;
+  const newName = input.value.trim();
+  if (!newName || newName === oldName) { input.value = oldName; return; }
+  if (P().presets.some((q) => q.name === newName)) {
+    toast('A Preset with that name already exists');
+    input.value = oldName;
+    return;
+  }
+  const p = presetByName(oldName);
+  p.name = newName;
+  if (P().defaultPreset === oldName) P().defaultPreset = newName;
+  for (const c of Object.values(P().configs)) if (c.preset === oldName) c.preset = newName;
+  state.editingPreset = newName;
+  input.dataset.old = newName;
+  toast(`Renamed to "${newName}"`);
+}
+
+/* ══════════════ Render: Profile settings ══════════════ */
+
+function renderProfile() {
+  const spots = P().spotlights;
+  $('#main').innerHTML = `
+    <h2 class="view-title">Profile settings</h2>
+    <p class="view-sub">For <b style="color:var(--ink)">${esc(state.profile)}</b> — these apply across every raid train this Profile runs.</p>
+
+    <section class="card">
+      <h2 class="card-h">Standing Spotlights</h2>
+      <div class="spot-edit-list">
+        ${spots.length
+          ? spots.map((s) => `<span class="spot-edit-chip"><b>${esc(s)}</b><button class="chip-x" data-act="rm-spot" data-name="${esc(s)}" title="Remove ${esc(s)}">✕</button></span>`).join('')
+          : '<span class="hint" style="margin:0">No standing Spotlights yet.</span>'}
+      </div>
+      <div class="spot-add">
+        <input type="text" id="spot-input" placeholder="Twitch username" autocomplete="off">
+        <button class="btn" data-act="add-spot">Add Spotlight</button>
+      </div>
+      <div class="hint">These names glow on every raid train you run — always, on top of any per-train extras. Great for your regular crew.</div>
+    </section>
+
+    <section class="card">
+      <h2 class="card-h">Default Preset</h2>
+      <select id="default-preset-select" style="max-width:320px">
+        ${P().presets.map((q) => `<option value="${esc(q.name)}" ${q.name === P().defaultPreset ? 'selected' : ''}>${esc(q.name)}</option>`).join('')}
+      </select>
+      <div class="hint">New Raid Train Configs and your Live Link start from this Preset. Same setting as the star in the <a href="#" data-act="goto-presets">Preset Library</a>.</div>
+    </section>`;
 }
 
 /* ══════════════ Render: Build by hand ══════════════ */
@@ -882,7 +1022,9 @@ function render(opts) {
   renderTopbar();
   renderSidebar();
   if (state.editing) renderEditor();
+  else if (state.editingPreset) renderPresetEditor();
   else if (state.view === 'presets') renderPresets();
+  else if (state.view === 'profile') renderProfile();
   else if (state.view === 'manual') renderManual();
   else renderTrains(opts && opts.flashLiveLink);
 }
@@ -893,6 +1035,7 @@ function render(opts) {
 $$('.nav-item').forEach((el) => el.addEventListener('click', () => {
   const nav = el.dataset.nav;
   state.renaming = null;
+  state.editingPreset = null;
   if (nav === 'livelink') { state.view = 'trains'; state.editing = null; render({ flashLiveLink: true }); return; }
   state.view = nav;
   state.editing = null;
@@ -920,14 +1063,15 @@ function addProfile() {
     DB.profiles[name] = {
       color: '#5ed18a', spotlights: [], defaultPreset: 'House Default',
       liveLink: { idle: false, horizon: 'next3' },
-      presets: [{ name: 'House Default', theme: 'classic', mode: 'pass', scale: '1', spotlight: '' }],
+      presets: [{ name: 'House Default', theme: 'classic', mode: 'pass', scale: '1' }],
       configs: {}, events: [],
     };
     DB.order.push(name);
   }
   input.value = '';
   state.profile = name;
-  state.editing = null; state.view = 'trains'; state.pastOpen = false; state.renaming = null;
+  state.editing = null; state.editingPreset = null; state.view = 'trains';
+  state.pastOpen = false; state.renaming = null;
   pmenu.classList.remove('open');
   render();
   toast(`Now acting as ${name}`);
@@ -935,13 +1079,20 @@ function addProfile() {
 $('#profile-add-btn').addEventListener('click', addProfile);
 $('#profile-add-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') addProfile(); });
 $('#profile-menu').addEventListener('click', (e) => {
-  const item = e.target.closest('[data-act="switch-profile"]');
+  const item = e.target.closest('[data-act]');
   if (!item) { e.stopPropagation(); return; }
-  state.profile = item.dataset.name;
-  state.editing = null; state.view = 'trains'; state.pastOpen = false; state.renaming = null;
-  pmenu.classList.remove('open');
-  render();
-  toast(`Now acting as ${state.profile}`);
+  if (item.dataset.act === 'switch-profile') {
+    state.profile = item.dataset.name;
+    state.editing = null; state.editingPreset = null; state.view = 'trains';
+    state.pastOpen = false; state.renaming = null;
+    pmenu.classList.remove('open');
+    render();
+    toast(`Now acting as ${state.profile}`);
+  } else if (item.dataset.act === 'manage-profile') {
+    state.view = 'profile'; state.editing = null; state.editingPreset = null; state.renaming = null;
+    pmenu.classList.remove('open');
+    render();
+  }
 });
 
 // Main-content delegation: clicks
@@ -967,7 +1118,8 @@ $('#main').addEventListener('click', (e) => {
   if (act === 'back') { state.editing = null; render(); return; }
   if (act === 'copy-live') { copyText(liveLinkUrl(), 'Live Link copied — paste it into OBS'); return; }
   if (act === 'copy-cfg-url') { copyText(eventOverlayUrl(state.editing), 'Overlay link copied'); return; }
-  if (act === 'goto-presets') { e.preventDefault(); state.view = 'presets'; state.editing = null; render(); return; }
+  if (act === 'goto-presets') { e.preventDefault(); state.view = 'presets'; state.editing = null; state.editingPreset = null; render(); return; }
+  if (act === 'goto-profile') { e.preventDefault(); state.view = 'profile'; state.editing = null; state.editingPreset = null; render(); return; }
 
   if (act === 'revert') {
     const cfg = ensureConfig(state.editing);
@@ -994,10 +1146,40 @@ $('#main').addEventListener('click', (e) => {
     return;
   }
   if (act === 'rename-preset') { state.renaming = el.dataset.name; renderPresets(); return; }
+  if (act === 'edit-preset') {
+    if (e.target.id === 'rename-input') return; // inline rename in progress — don't navigate
+    state.renaming = null;
+    state.editingPreset = el.dataset.name;
+    render();
+    return;
+  }
+  if (act === 'back-presets') { state.editingPreset = null; render(); return; }
   if (act === 'make-default') {
     P().defaultPreset = el.dataset.name;
     renderPresets();
     toast(`"${el.dataset.name}" is now the default Preset`);
+    return;
+  }
+  if (act === 'make-default-editor') {
+    P().defaultPreset = el.dataset.name;
+    render();
+    toast(`"${el.dataset.name}" is now the default Preset`);
+    return;
+  }
+  if (act === 'add-spot') {
+    const inp = document.getElementById('spot-input');
+    const name = inp.value.trim().replace(/,+/g, '');
+    if (!name) return;
+    if (!P().spotlights.some((s) => s.toLowerCase() === name.toLowerCase())) P().spotlights.push(name);
+    inp.value = '';
+    renderProfile();
+    document.getElementById('spot-input').focus();
+    toast(`"${name}" will glow on every train`);
+    return;
+  }
+  if (act === 'rm-spot') {
+    P().spotlights = P().spotlights.filter((s) => s !== el.dataset.name);
+    renderProfile();
     return;
   }
   if (act === 'del-preset') {
@@ -1028,13 +1210,27 @@ function handleFieldEdit(el) {
   const base = presetByName(cfg.preset);
   const f = el.dataset.field;
   const val = el.value;
-  if (String(val) === String(base[f])) delete cfg.overrides[f];
-  else cfg.overrides[f] = val;
+  if (f === 'spotlight') {
+    // Pure per-train field — not part of the Preset, so no override machinery.
+    cfg.spotlight = val;
+  } else if (String(val) === String(base[f])) {
+    delete cfg.overrides[f];
+  } else {
+    cfg.overrides[f] = val;
+  }
   refreshEditorChrome();
 }
 $('#main').addEventListener('input', (e) => {
   const el = e.target;
   if (el.dataset && el.dataset.field) handleFieldEdit(el);
+  if (el.dataset && el.dataset.pfield && state.editingPreset) {
+    // Direct edit of the Preset itself — flows to every referencing Raid Train
+    // Config that hasn't overridden the field (they read the Preset live).
+    const p = presetByName(state.editingPreset);
+    p[el.dataset.pfield] = el.value;
+    const out = $('#f-p-scale-out');
+    if (out && el.dataset.pfield === 'scale') out.textContent = el.value;
+  }
 });
 $('#main').addEventListener('change', (e) => {
   const el = e.target;
@@ -1056,6 +1252,11 @@ $('#main').addEventListener('change', (e) => {
     toast('Horizon updated — re-copy your Live Link');
     return;
   }
+  if (el.id === 'default-preset-select') {
+    P().defaultPreset = el.value;
+    toast(`"${el.value}" is now the default Preset`);
+    return;
+  }
 });
 
 // Rename commit (Enter / blur), via delegation since the input is re-rendered
@@ -1064,9 +1265,18 @@ $('#main').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') commitRename(e.target);
     if (e.key === 'Escape') { state.renaming = null; renderPresets(); }
   }
+  if (e.target.id === 'preset-title-input') {
+    if (e.key === 'Enter') e.target.blur(); // commit via focusout
+    if (e.key === 'Escape') { e.target.value = e.target.dataset.old; e.target.blur(); }
+  }
+  if (e.target.id === 'spot-input' && e.key === 'Enter') {
+    const btn = document.querySelector('[data-act="add-spot"]');
+    if (btn) btn.click();
+  }
 });
 $('#main').addEventListener('focusout', (e) => {
   if (e.target.id === 'rename-input' && state.renaming) commitRename(e.target);
+  if (e.target.id === 'preset-title-input' && state.editingPreset) commitPresetTitleRename(e.target);
 });
 
 // Modal
@@ -1078,7 +1288,7 @@ $('#modal-scrim').addEventListener('click', (e) => {
   if (el.dataset.mact === 'confirm-del') {
     const name = el.dataset.name;
     P().presets = P().presets.filter((p) => p.name !== name);
-    if (!P().presets.length) P().presets.push({ name: 'House Default', theme: 'classic', mode: 'pass', scale: '1', spotlight: '' });
+    if (!P().presets.length) P().presets.push({ name: 'House Default', theme: 'classic', mode: 'pass', scale: '1' });
     if (P().defaultPreset === name) P().defaultPreset = P().presets[0].name;
     for (const c of Object.values(P().configs)) if (c.preset === name) c.preset = P().defaultPreset;
     closeModal();
