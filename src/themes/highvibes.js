@@ -677,4 +677,12 @@ function nowMarkerSVG(cx, y) {
 }
 
 // 4) The default export IS the Theme: register it in src/train-renderer.js.
-export default { key: 'highvibes', ensureStyles, build, buildTrack };
+/** Baseline (`foot`) — this Theme's FLOOR as a fraction of --rt-th, measured down
+ *  from the top of the Train's box; the renderer drops the Train until this line
+ *  reaches the bottom edge at height=100 (see --rt-foot in train-renderer.js).
+ *  Floor here = the name line's ink (baseline baseY + 108, 17px type → ~4 units of
+ *  descender), which sits BELOW the viewBox — the name overhangs the box by design
+ *  and shows via the renderer's .rt-track > svg overflow:visible, so foot > 1. */
+export const foot = (baseY + 112) / VIEW_H;
+
+export default { key: 'highvibes', ensureStyles, build, buildTrack, foot };

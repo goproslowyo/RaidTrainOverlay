@@ -379,4 +379,12 @@ export function build(train, opts = {}) {
   };
 }
 
-export default { key: 'departures', ensureStyles, build, buildTrack };
+/** Baseline (`foot`) — this Theme's FLOOR as a fraction of --rt-th, measured down
+ *  from the top of the Train's box; the renderer drops the Train until this line
+ *  reaches the bottom edge at height=100 (see --rt-foot in train-renderer.js).
+ *  The bogies are slung UNDER the board: .dp-wheels pulls itself up with a -11u
+ *  bottom margin, so the 18u wheels overhang the Car box and the floor lands ~10.5u
+ *  past DESIGN_H. foot > 1 — those wheels used to be sliced off at height=100. */
+export const foot = (DESIGN_H + 10.5) / DESIGN_H;
+
+export default { key: 'departures', ensureStyles, build, buildTrack, foot };

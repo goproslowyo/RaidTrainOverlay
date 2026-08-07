@@ -585,4 +585,12 @@ export function build(train, opts = {}) {
 }
 
 // 4) The default export IS the Theme: register it in src/train-renderer.js.
-export default { key: 'bullet', ensureStyles, build, buildTrack };
+/** Baseline (`foot`) — this Theme's FLOOR as a fraction of --rt-th, measured down
+ *  from the top of the Train's box; the renderer drops the Train until this line
+ *  reaches the bottom edge at height=100 (see --rt-foot in train-renderer.js).
+ *  Floor here = the time line's ink (baseline railY + 62, 12px type → ~2 units of
+ *  descender). The NOW power-up burst (.bl-live) radiates well past this on the live
+ *  coach — it is a transient effect and is allowed to bleed, like smoke off the top. */
+export const foot = (railY + 64 - VIEW_TOP) / VIEW_H;
+
+export default { key: 'bullet', ensureStyles, build, buildTrack, foot };

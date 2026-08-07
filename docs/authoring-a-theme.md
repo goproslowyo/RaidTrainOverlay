@@ -38,7 +38,7 @@ Your module's `default` export is the Theme: an object with a **key** and three
 functions.
 
 ```js
-export default { key, ensureStyles, build, buildTrack };
+export default { key, ensureStyles, build, buildTrack, foot };
 ```
 
 | Member | Required | What it does |
@@ -46,6 +46,7 @@ export default { key, ensureStyles, build, buildTrack };
 | `key` | ✅ | The Theme's id. Must match its registry slot and the config enum (section 8). |
 | `ensureStyles()` | ✅ | Inject the Theme's CSS once (guard by a style-id so re-renders don't duplicate it). |
 | `build(train, opts)` | ✅ | Build the train art once; return a **handle** `{ node, update, afterAttach }`. |
+| `foot` | ✅ | The Theme's **baseline** — where its floor sits, as a fraction of the train height, or a function of `{ maxTimeLines }` when the box height is content-driven (section 5). Omitting it falls back to `1` (the pre-baseline behaviour), which is a silent per-Theme drift — every shipped Theme declares one. |
 | `buildTrack(opts)` | optional | Return the stationary rail/ground the train rolls over, or omit it. |
 
 ### `build` returns a handle
@@ -182,6 +183,52 @@ The renderer sizes your Theme to the train height (`--rt-th`, which already fold
 
 **Start with SVG** unless you specifically need HTML layout or a pixel buffer.
 
+### The baseline (`foot`) — where your floor sits
+
+Sizing tells the renderer how **tall** your art is. `foot` tells it where the art's
+**floor** is. Almost no Theme's art ends exactly at the bottom of its box: an SVG
+viewBox usually keeps a few units of slack under the wheels, and an HTML Car can
+overhang its holder. If the renderer positioned the train by its box, the `height`
+param would mean a different thing on every Theme — which is exactly the drift that
+made owners nudge `height` per Theme before this existed.
+
+So declare it: **the fraction of the train height, measured down from the top of your
+box, at which your floor sits.**
+
+```js
+const VIEW_H = 220;                       // your viewBox height
+const railY = 168;                        // your wheel line
+export const foot = (railY + 12 + 16) / VIEW_H;   // wheels: cy = railY + 12, r = 16
+```
+
+The renderer drops the train until *that* line reaches the bottom edge at
+`height=100`, so every Theme bottoms out identically and a Preset needs no per-Theme
+compensation. Rules of thumb:
+
+- **Write it from your own art constants**, not as a magic decimal — then it stays
+  right when you move the art. HTML Themes express it in the same design units as
+  `--u` (`export const foot = (DESIGN_H - 3) / DESIGN_H`).
+- **Measure the lowest *resting* art** — wheels, a ground shadow, or a name/time line
+  that hangs below them. It may exceed `1` if your art overhangs its box (departures'
+  bogies are slung under the board); that is fine and is the point.
+- **Ignore effects that bleed on purpose**: smoke, glows, the NOW marker, a departed
+  stamp, a live-only burst. They come and go with state, and a baseline that moved
+  with the live car would be worse than no baseline at all.
+- **If your box height is content-driven, declare a function, not a constant.** A
+  fixed-`viewBox` SVG Theme always has the same floor, but an HTML Theme whose card
+  grows with its content does not: `synthwave` stacks one time line per `tz` zone
+  *inside* the card, so three zones push its floor 40px further down. Those Themes
+  export `foot` as `({ maxTimeLines }) => …` and the renderer evaluates it per render.
+  Pin any line box the formula counts (`line-height` in `--u`) so the arithmetic is
+  exact rather than a platform font metric.
+- **Usually the Train, occasionally the Track.** Take the floor from the train's own
+  art. Take it from `buildTrack` only when the track paints the physical ground the
+  train *rests on* and that ground reads as the floor — `jazz` (the wood console the
+  records sit on) and `lava` (the lounge floor line the lamp stands on) are the two
+  Themes that do, and both say so in a comment. Decorative bands that merely run
+  downward — tie strips, receding grids, translucent backing — are scenery and are
+  allowed to bleed off the bottom edge.
+
 ---
 
 ## 6. Bringing your own art (PNG · JPG · SVG · WebP)
@@ -275,6 +322,9 @@ than blanking the Overlay.
   re-rasterises every frame and tanks performance.
 - **Undulate is sway + rock, not a bob** — and it's free via `undulate()`. Keep added
   motion compositor-only and reduced-motion-safe.
+- **Declare your baseline** — `foot`, the fraction of the train height at which your
+  floor sits, written from your own art constants. Without it the Theme rides at its
+  own private `height` offset and users have to nudge it per Theme.
 - **Never truncate a name** — mark names `.rt-fit` and call `fitAll()` in `afterAttach`.
 - **Survive a 404 avatar** — paint initials first, the image over them, so a failed CDN
   load shows initials, not a hole (the shared `avatarSVG` / `htmlAvatar` do this).

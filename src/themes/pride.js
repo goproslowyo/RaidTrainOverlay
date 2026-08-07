@@ -437,4 +437,11 @@ export function build(train, opts = {}) {
 }
 
 // 4) The default export IS the Theme: register it in src/train-renderer.js.
-export default { key: 'pride', ensureStyles, build, buildTrack };
+/** Baseline (`foot`) — this Theme's FLOOR as a fraction of --rt-th, measured down
+ *  from the top of the Train's box; the renderer drops the Train until this line
+ *  reaches the bottom edge at height=100 (see --rt-foot in train-renderer.js).
+ *  Floor here = the time line's ink (baseline timeY, 12px type → ~3 units of
+ *  descender), which hangs below the wheels. */
+export const foot = (timeY + 3 - VIEW_TOP) / VIEW_H;
+
+export default { key: 'pride', ensureStyles, build, buildTrack, foot };

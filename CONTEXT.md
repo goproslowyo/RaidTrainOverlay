@@ -66,6 +66,10 @@ _Avoid_: rail line, road, railroad
 **Track visibility**:
 Whether the Track is shown *periodically* (the default) or *always*. Periodic visibility shows the Track only around each **Pass** — it fades in before the Train enters and fades out after the Train clears, so the Overlay goes fully empty between Passes (reclaiming the lower-third) and a Theme's scenery never lingers on screen with no Train. `always` keeps the Track up the whole time, for a persistent lower-third. Honors "the Track never moves": the change is a fade, not a slide. A `pass`-Mode-only concept — marquee and preview always show the Track.
 
+**Baseline**:
+Where a Theme's **floor** sits — the lowest resting art of its Train (wheels, a ground shadow, a name/time line hanging below them) — expressed as a fraction of the Train height, measured down from the top of the Theme's box. Declared per Theme as `foot`. The Overlay's `height` param drops the Baseline onto the bottom edge rather than the Theme's layout box, so every Theme bottoms out identically and a Preset never needs per-Theme height compensation. Effects that bleed on purpose (smoke, glows, the Now Marker, a departed stamp) are excluded — the Baseline must not move with live state. Two Themes take their Baseline from the **Track** instead of the Train, because there the Track paints the ground the Train rests on: jazz (the console deck the records sit on) and lava (the lounge floor line the lamp stands on). Decorative Track bands that merely run downward — tie strips, receding grids, translucent backing — are scenery and may bleed off the bottom edge.
+_Avoid_: offset, anchor, ground line
+
 **Ambient animation**:
 The Train's per-Theme idle motion — wheels turning, smoke puffing, and Cars undulating — distinct from the macro **Mode** traversal. Organic and varied rather than a uniform mechanical wave: each Theme sets its own **Ride character** and may bump a little off the rail for liveliness without ever reading as derailed. Makes the Train read as rolling, not gliding.
 _Avoid_: idle, fidget

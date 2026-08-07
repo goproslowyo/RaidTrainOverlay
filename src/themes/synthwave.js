@@ -35,6 +35,9 @@ const STYLE_ID = 'rt-theme-synthwave-style';
 // Design height in px (Car body + wheels); the floating Now pointer overhangs
 // above it into the canvas. --u = --rt-th / this.
 const DESIGN_H = 210;
+// One tz time line, in design units — the pinned `.sw-time span` line box. Every
+// zone past the first stacks another of these into the card, so `foot` counts them.
+const TIME_LINE_U = 14;
 const u = (n) => `calc(${n} * var(--u))`;
 
 export function ensureStyles() {
@@ -64,7 +67,11 @@ export function ensureStyles() {
     }
     .sw-name { font-weight: 800; font-size: ${u(14)}; color: #fff; letter-spacing: ${u(0.5)}; text-shadow: 0 0 ${u(8)} #ff2bd6, 0 ${u(1)} 0 #5b1a5b; }
     .sw-time { font-size: ${u(12)}; color: #ffe1f5; margin-top: ${u(2)}; text-shadow: 0 0 ${u(6)} #ff2bd688; }
-    .sw-time span { display: block; }
+    /* Pin the line box: each tz zone stacks one line into the card's flow, so the
+       Theme's floor (foot, below) grows per zone. Left at the font's normal metric
+       that growth is platform-dependent; at a fixed ${TIME_LINE_U}u it is arithmetic
+       the baseline can state exactly. */
+    .sw-time span { display: block; line-height: ${u(TIME_LINE_U)}; }
     .sw-wheels { display: flex; justify-content: space-between; padding: 0 ${u(14)}; margin: ${u(10)} ${u(-6)} 0; }
     .sw-w { width: ${u(22)}; height: ${u(22)}; background: #0a0618; box-shadow: 0 0 ${u(10)} #00e5ff88, inset 0 0 0 ${u(2)} #00e5ff; --spk: #6ff7ff; }
     .sw-pointer { position: absolute; top: ${u(-24)}; left: 50%; transform: translateX(-50%); color: #2a0a2a; background: #ffe75c; font-weight: 800; font-size: ${u(11)}; padding: ${u(2)} ${u(8)}; border-radius: ${u(5)}; box-shadow: 0 0 ${u(12)} #ffe75caa; white-space: nowrap; }
@@ -264,4 +271,20 @@ export function build(train, opts = {}) {
   };
 }
 
-export default { key: 'synthwave', ensureStyles, build, buildTrack };
+/** Baseline (`foot`) — this Theme's FLOOR as a fraction of --rt-th, measured down
+ *  from the top of the Train's box; the renderer drops the Train until this line
+ *  reaches the bottom edge at height=100 (see --rt-foot in train-renderer.js).
+ *  An HTML Theme's floor is a CSS box edge, so it is written in the same design
+ *  units as --u: the Car box bottoms out 193u down a DESIGN_H-tall holder (the
+ *  wheels tuck inside it), leaving the rest of the box as headroom.
+ *
+ *  A FUNCTION, not a constant, because this Card's height is content-driven: the
+ *  tz time block stacks one `.sw-time span` per zone INSIDE the card flow, so
+ *  every zone past the first grows the box by exactly one TIME_LINE_U line (the
+ *  line box is pinned in ensureStyles precisely so this stays arithmetic rather
+ *  than a font metric). A constant floor left `tz=PT,ET,GMT` hanging 40.8px off
+ *  the bottom edge at height=100. */
+export const foot = ({ maxTimeLines = 1 } = {}) =>
+  (193 + Math.max(0, maxTimeLines - 1) * TIME_LINE_U) / DESIGN_H;
+
+export default { key: 'synthwave', ensureStyles, build, buildTrack, foot };

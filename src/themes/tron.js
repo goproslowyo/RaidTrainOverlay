@@ -326,4 +326,12 @@ export function build(train, opts = {}) {
   };
 }
 
-export default { key: 'tron', ensureStyles, build, buildTrack };
+/** Baseline (`foot`) — this Theme's FLOOR as a fraction of --rt-th, measured down
+ *  from the top of the Train's box; the renderer drops the Train until this line
+ *  reaches the bottom edge at height=100 (see --rt-foot in train-renderer.js).
+ *  Floor here is the time line under each bike, which hangs lower than the
+ *  light-cycle wheels: .tr-car is DESIGN_H tall and .tr-time is pinned 3u off its
+ *  bottom, so the ink stops 3u short of the box. */
+export const foot = (DESIGN_H - 3) / DESIGN_H;
+
+export default { key: 'tron', ensureStyles, build, buildTrack, foot };

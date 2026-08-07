@@ -378,4 +378,15 @@ export function build(train, opts = {}) {
 }
 
 // 4) The default export IS the Theme: register it in src/train-renderer.js.
-export default { key: 'lava', ensureStyles, build, buildTrack };
+/** Baseline (`foot`) — this Theme's FLOOR as a fraction of --rt-th, measured down
+ *  from the top of the Train's box; the renderer drops the Train until this line
+ *  reaches the bottom edge at height=100 (see --rt-foot in train-renderer.js).
+ *
+ *  INTENTIONAL OFFSET: lava takes its floor from the TRACK, not the Train. There
+ *  are no wheels — the lamp stands on the lounge floor, and that floor is the thin
+ *  violet line buildTrack insets at the bottom of its band. Aligning on the Train's
+ *  own art (the time line, ~0.95) would push that floor line off the canvas, so the
+ *  band's bottom edge is the baseline: the same top fraction + 0.96 height it uses. */
+export const foot = (VES_TOP - 8) / VIEW_H + 0.96;
+
+export default { key: 'lava', ensureStyles, build, buildTrack, foot };

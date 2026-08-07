@@ -289,4 +289,10 @@ export function build(train, opts = {}) {
   };
 }
 
-export default { key: 'comic', ensureStyles, build, buildTrack };
+/** Baseline (`foot`) — this Theme's FLOOR as a fraction of --rt-th, measured down
+ *  from the top of the Train's box; the renderer drops the Train until this line
+ *  reaches the bottom edge at height=100 (see --rt-foot in train-renderer.js).
+ *  Floor here = the biggest inked wheel (cy = railY, r = 19). */
+export const foot = (railY + 19 - VIEW_TOP) / VIEW_H;
+
+export default { key: 'comic', ensureStyles, build, buildTrack, foot };

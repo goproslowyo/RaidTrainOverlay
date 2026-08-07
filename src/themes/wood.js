@@ -313,4 +313,11 @@ export function buildTrack() {
   return el;
 }
 
-export default { key: 'wood', ensureStyles, build, buildTrack };
+/** Baseline (`foot`) — this Theme's FLOOR as a fraction of --rt-th, measured down
+ *  from the top of the Train's box; the renderer drops the Train until this line
+ *  reaches the bottom edge at height=100 (see --rt-foot in train-renderer.js).
+ *  The wooden Car box (wheels included) fills the whole DESIGN_H holder, so this
+ *  Theme was already flush and stays put. */
+export const foot = 1;
+
+export default { key: 'wood', ensureStyles, build, buildTrack, foot };

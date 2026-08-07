@@ -67,8 +67,18 @@ function ensureBaseStyles() {
       /* Clamp the Train within the canvas: --train-pos (0..1, the
          height param / 100) places it from top-flush (0) to bottom-flush (1),
          centred at 0.5. The Train is always fully on-canvas and a lower-third
-         stays put when resized — no centre-anchored vertical clip. */
-      top: calc(var(--train-pos, 0.5) * (100vh - var(--rt-th)));
+         stays put when resized — no centre-anchored vertical clip.
+
+         --rt-foot is the Theme's BASELINE: where its floor sits, as a fraction of
+         --rt-th measured from the Stage top (set per Theme from theme.foot below).
+         No Theme's art happens to end exactly at its layout box — some leave dead
+         space below the wheels, some bleed past — so measuring the drop against the
+         raw box made the height param mean a different thing on every Theme (floors landed
+         anywhere from 20px below the canvas edge to 65px above it). Measuring it
+         against the FLOOR instead makes height=100 mean "this Theme's floor rests on
+         the bottom edge" everywhere, so a Preset needs no per-Theme nudge. Defaults
+         to 1 (the old behaviour) for a Theme that declares no baseline. */
+      top: calc(var(--train-pos, 0.5) * (100vh - var(--rt-th) * var(--rt-foot, 1)));
     }
     .rt-track {
       display: flex;
@@ -361,6 +371,16 @@ export function renderTrain(train, container, config) {
 
   // tz zone count reserves vertical room for the stacked time block per Car.
   const maxTimeLines = config?.tz?.length || 1;
+  // The Theme's baseline (see --rt-foot in the base CSS): `height` drops the Train
+  // until its FLOOR — not its layout box — reaches the bottom edge, so every Theme
+  // bottoms out identically. A Theme with no declared baseline falls back to 1.
+  //
+  // A Theme whose box is content-driven declares `foot` as a FUNCTION of the render
+  // context instead of a constant, because its floor moves with the content: synthwave
+  // stacks one time line per tz zone inside the card, so three zones push its floor
+  // 40px further down. That is why this is stamped after maxTimeLines is known.
+  const declaredFoot = typeof theme.foot === 'function' ? theme.foot({ maxTimeLines }) : theme.foot;
+  stage.style.setProperty('--rt-foot', String(Number.isFinite(declaredFoot) ? declaredFoot : 1));
   // Every built copy (the first, plus any marquee duplicates) is collected so a
   // time tick updates all of them — and afterAttach runs once each are in the DOM.
   const built = [];
