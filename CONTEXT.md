@@ -104,7 +104,7 @@ A per-Event saved settings record, keyed by the Event's slug and scoped to a Pro
 _Avoid_: train setup, booking, override set (for the whole record)
 
 **Orphaned Config**:
-A Raid Train Config whose slug is absent from the Profile's current My Raid Trains feed. Three causes the store cannot tell apart: the Event departed, its slug was renamed, or the read was bad. Because absence is ambiguous it is never on its own grounds to drop a Config — the Live Link filters on *positive* evidence that an Event ended (a recorded or freshly-read `endsAt` in the past).
+A Raid Train Config whose slug is absent from the Profile's current My Raid Trains feed — the Event departed, was deleted, or was renamed. The store cannot tell these apart, and does not need to: the Overlay resolves against that same feed, so none of the three can ever be selected again. The Live Link therefore drops an Orphaned Config, on the strict condition that the read was *good* — a failed or stale read makes no train an orphan.
 _Avoid_: stale config, dead config, dangling train
 
 **Live Link**:
