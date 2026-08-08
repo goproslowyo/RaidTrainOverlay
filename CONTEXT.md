@@ -125,6 +125,16 @@ A **good** read is one nothing is visibly wrong with: it completed, it returned 
 The distinction exists because the two things the feed is used for need different evidence. When a train **ends** is a fact RaidPal reported, and a fact does not decay — a good read is enough. That a train is **absent** is an inference, and it does decay: a cached feed can be six hours old, and one degraded-but-well-formed response poisons it for that whole window. So absence only prunes on a verified read (`configurator.html`'s `feedVerified`, `buildTrainMap`'s `verified` option); end times prune on any good read.
 _Avoid_: stale config, dead config, dangling train
 
+**Cleanup** _(the store's own prune, #41)_:
+The Configurator removes an Orphaned Config from the **store** — not just from the Live Link — once it is both unreachable and finished. #31 settled the opposite ("the URL filters and the store does not"), and this **deliberately overturns it**. Do not restore #31's rule: the premise it rested on has changed. #31 rejected store-pruning because a bad RaidPal day makes every train look absent, and at that time nothing could tell a fresh read from a six-hour-old cached one. #39 made that detectable (**Verified read**), so absence can now be trusted under conditions #31 had no way to express.
+
+Five conditions, all required, and each one exists because dropping it deletes real settings on some real day: the read was **good**; it was **Verified**; it returned **at least one Event** (`normalizeUser` merges `wire.events ?? []`, so an empty list is indistinguishable from a payload that arrived without the key); the Config belongs to the Profile that was read; and its `endsAt` is in the **past**.
+
+That last one is the rename guard, and it is the load-bearing one. RaidPal has no stable event id, so a renamed *upcoming* train is absent under its old slug and reads exactly like a deleted one — while its settings are about to be needed. A Config with a future `endsAt`, or none at all, is therefore never removed. `endsAt` is a **guard here, never a trigger**: absence alone does not delete, and being over alone does not either.
+
+The streamer is told after the fact by a standing notice with a **Keep them** button (an in-memory restore, suppressed for the rest of the session so the next read does not undo their choice). There is no setting for any of this — a setting would put the question to every streamer forever, which is the friction the feature exists to remove.
+_Avoid_: garbage collection, expiry, auto-delete (the last two name what #31 rejected, which this is not)
+
 **Live Link**:
 An Overlay URL keyed to a Profile's username rather than one Event: the Overlay resolves the currently-live (or next) Event from the RaidPal user endpoint at load. Set once in OBS, never edited per train. Carries its settings — including any per-Event mappings — encoded in the URL itself; it never reads the Configurator's localStorage.
 _Avoid_: magic URL (in code; fine in prose)
@@ -142,6 +152,7 @@ _Avoid_: skin, style (style is the CSS/code sense), look, art (in code; fine in 
 - "Conductor" was used for the Organiser's engine role; canonical split: the *person* is the **Organiser**, the *vehicle* is the **Engine**.
 - **Spotlight** vs **Now Marker**: Spotlight is user-configured emphasis; Now Marker is time-derived. A Car can have both.
 - **"Animation"** is overloaded: the macro screen traversal is a **Pass** (a Mode behavior); the per-Theme idle motion (wheels, smoke, undulation) is **Ambient animation**. Always say which — never a bare "animation".
+- **Does renaming a RaidPal Event change its slug?** Unknown, and it decides whether "renamed" is a real cause of an Orphaned Config or a phantom. `raidpal_link` looks title-and-date derived (`…/event/house-is-a-feeling-raid-train-27-aug-8-9`), which suggests yes, but that is inference — the API exposes no id field to check against (`docs/research/raidpal-user-endpoint-edge-cases.md`). Only an actual rename of a real Event would settle it. **Cleanup** does not depend on the answer: its `endsAt` guard protects renamed upcoming trains either way.
 
 ## Example dialogue
 

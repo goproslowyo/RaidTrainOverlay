@@ -6,7 +6,7 @@ import {
   setDefaultPreset, addSpotlight, removeSpotlight,
   upsertTrainConfig, deleteTrainConfig, getTrainConfig, isEmptyTrainConfig,
   resolveTrainSettings, countPresetReferences, materializePreset,
-  liveLinkPrefs, setLiveLinkPrefs,
+  liveLinkPrefs, setLiveLinkPrefs, pruneOrphanedConfigs, restoreTrainConfigs,
 } from '../src/profiles.js';
 import { createPreset } from '../src/preset-library.js';
 
@@ -254,4 +254,113 @@ test('serialize/parse round-trips the Profiles store', () => {
   let store = addProfile(EMPTY, 'alpha');
   store = upsertTrainConfig(store, 'alpha', 'luna-hao8', { presetId: 'id-1', overrides: { theme: 'lava' } });
   assert.deepEqual(parseProfiles(serializeProfiles(store)), store);
+});
+
+// ── #41: pruning Configs the streamer can no longer reach ────────────────────
+
+const HOUR = 3_600_000;
+const NOW = Date.UTC(2026, 7, 7, 12);
+
+/** A Profile holding one Config per slug, each with the given endsAt. */
+function withTrains(spec) {
+  let store = addProfile(EMPTY, 'me');
+  for (const [slug, endsAt] of Object.entries(spec)) {
+    store = upsertTrainConfig(store, 'me', slug, { overrides: { scale: '120' }, endsAt });
+  }
+  return store;
+}
+
+const prunedSlugs = (result) => result.removed.map((r) => r.slug).sort();
+
+test('prune drops a Config that is absent from the feed AND already over', () => {
+  const store = withTrains({ 'gone-and-over': NOW - HOUR });
+  const { store: after, removed } = pruneOrphanedConfigs(store, 'me', {
+    events: [{ slug: 'still-listed' }], verified: true, now: NOW,
+  });
+  assert.deepEqual(prunedSlugs({ removed }), ['gone-and-over']);
+  assert.equal(getTrainConfig(after, 'me', 'gone-and-over'), null);
+});
+
+test('prune keeps a Config still listed in the feed, however old its endsAt', () => {
+  const store = withTrains({ 'listed-but-past': NOW - 10 * HOUR });
+  const { store: after, removed } = pruneOrphanedConfigs(store, 'me', {
+    events: [{ slug: 'listed-but-past' }], verified: true, now: NOW,
+  });
+  assert.deepEqual(removed, []);
+  assert.ok(getTrainConfig(after, 'me', 'listed-but-past'));
+});
+
+test('an UPCOMING train that vanished is protected — a rename reads exactly like a delete', () => {
+  // RaidPal has no stable event id, so a renamed upcoming train is absent under
+  // its old slug. Deleting it would drop settings that are about to be needed.
+  const store = withTrains({ 'renamed-upcoming': NOW + 48 * HOUR });
+  const { store: after, removed } = pruneOrphanedConfigs(store, 'me', {
+    events: [{ slug: 'something-else' }], verified: true, now: NOW,
+  });
+  assert.deepEqual(removed, []);
+  assert.ok(getTrainConfig(after, 'me', 'renamed-upcoming'));
+});
+
+test('a Config with no endsAt is protected — undatable means unreasonable-about', () => {
+  const store = withTrains({ 'no-end-time': null });
+  const { removed } = pruneOrphanedConfigs(store, 'me', {
+    events: [{ slug: 'other' }], verified: true, now: NOW,
+  });
+  assert.deepEqual(removed, []);
+});
+
+test('an EMPTY feed prunes nothing, even verified — absent events is not "all gone"', () => {
+  // normalizeUser merges `wire.events ?? []`, so a payload arriving without the
+  // key is indistinguishable from a streamer with nothing booked.
+  const store = withTrains({ 'gone-and-over': NOW - HOUR });
+  const { removed } = pruneOrphanedConfigs(store, 'me', { events: [], verified: true, now: NOW });
+  assert.deepEqual(removed, []);
+});
+
+test('an UNVERIFIED read prunes nothing — a 6h cache hit is not evidence', () => {
+  const store = withTrains({ 'gone-and-over': NOW - HOUR });
+  const { removed } = pruneOrphanedConfigs(store, 'me', {
+    events: [{ slug: 'other' }], verified: false, now: NOW,
+  });
+  assert.deepEqual(removed, []);
+});
+
+test('prune needs a clock, an array, and a known Profile — each missing one is a no-op', () => {
+  const store = withTrains({ 'gone-and-over': NOW - HOUR });
+  const base = { events: [{ slug: 'other' }], verified: true, now: NOW };
+  assert.deepEqual(pruneOrphanedConfigs(store, 'me', { ...base, now: null }).removed, []);
+  assert.deepEqual(pruneOrphanedConfigs(store, 'me', { ...base, events: null }).removed, []);
+  assert.deepEqual(pruneOrphanedConfigs(store, 'nobody', base).removed, []);
+  assert.deepEqual(pruneOrphanedConfigs(store, 'me', {}).removed, []);
+});
+
+test('prune leaves the original store untouched and only touches the named Profile', () => {
+  let store = withTrains({ 'gone-and-over': NOW - HOUR });
+  store = addProfile(store, 'someone-else');
+  store = upsertTrainConfig(store, 'someone-else', 'gone-and-over', { overrides: { scale: '90' }, endsAt: NOW - HOUR });
+  const { store: after } = pruneOrphanedConfigs(store, 'me', {
+    events: [{ slug: 'other' }], verified: true, now: NOW,
+  });
+  assert.ok(getTrainConfig(store, 'me', 'gone-and-over'), 'input store must not be mutated');
+  assert.ok(getTrainConfig(after, 'someone-else', 'gone-and-over'), 'the other Profile is untouched');
+});
+
+test('restoreTrainConfigs puts back exactly what the prune removed', () => {
+  const store = withTrains({ 'gone-and-over': NOW - HOUR, 'also-over': NOW - 2 * HOUR });
+  const before = getTrainConfig(store, 'me', 'gone-and-over');
+  const { store: after, removed } = pruneOrphanedConfigs(store, 'me', {
+    events: [{ slug: 'other' }], verified: true, now: NOW,
+  });
+  assert.equal(removed.length, 2);
+  const back = restoreTrainConfigs(after, 'me', removed);
+  assert.deepEqual(getTrainConfig(back, 'me', 'gone-and-over'), before);
+  assert.deepEqual(prunedSlugs({ removed }), ['also-over', 'gone-and-over']);
+});
+
+test('restoreTrainConfigs is a no-op for an empty list and skips malformed entries', () => {
+  const store = withTrains({ keeper: NOW + HOUR });
+  assert.equal(restoreTrainConfigs(store, 'me', []), store);
+  assert.equal(restoreTrainConfigs(store, 'me', null), store);
+  const back = restoreTrainConfigs(store, 'me', [{ slug: '', config: {} }, { slug: 'x', config: null }]);
+  assert.deepEqual(Object.keys(back.profiles.me.trains), ['keeper']);
 });

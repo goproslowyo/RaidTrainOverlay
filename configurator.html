@@ -448,6 +448,23 @@
       margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line);
     }
     .cfg-danger .hint { margin: 0; flex: 1; min-width: 220px; }
+    /* #41's cleanup notice. Informational, not a warning — the cleanup is the
+       expected outcome, so it must not read like something went wrong. */
+    .cleanup-note {
+      display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap;
+      margin-bottom: 12px; border-color: #2c3a46;
+    }
+    .cleanup-body { flex: 1; min-width: 240px; }
+    .cleanup-head { font-weight: 650; margin-bottom: 4px; }
+    .cleanup-counts { color: var(--muted); font-size: 13px; }
+    .cleanup-slugs { margin-top: 7px; display: flex; flex-wrap: wrap; gap: 5px; }
+    .cleanup-slugs code {
+      font-size: 11.5px; color: var(--muted); background: #10161c;
+      border: 1px solid #232d36; border-radius: 5px; padding: 2px 6px;
+    }
+    .cleanup-actions { display: flex; gap: 8px; align-items: center; flex: none; }
+    .btn.ghost { background: transparent; border-color: transparent; color: var(--muted); }
+    .btn.ghost:hover { color: var(--text); border-color: #2c3a46; }
 
     @media (max-width: 860px) {
       .shell { flex-direction: column; gap: 12px; padding: 18px 16px 48px; }
@@ -520,6 +537,7 @@
     parseProfiles, serializeProfiles, addProfile, removeProfile, setActiveProfile, listProfiles,
     activeProfile, setDefaultPreset, addSpotlight, removeSpotlight, upsertTrainConfig, getTrainConfig, deleteTrainConfig,
     resolveTrainSettings, countPresetReferences, materializePreset, liveLinkPrefs, setLiveLinkPrefs,
+    pruneOrphanedConfigs, restoreTrainConfigs,
   } from './src/profiles.js';
   import { loadMyRaidTrains, loadEventDetails, refreshEventDetail, userCacheKey } from './src/my-raid-trains.js';
   import { buildLiveLink, baseSettings } from './src/live-link-url.js';
@@ -598,6 +616,14 @@
     pastOpen: false,
     // My Raid Trains data for the ACTIVE Profile.
     feed: { status: 'idle', events: [], details: {}, error: null, login: null },
+    // #41 cleanup. `cleanup` is the standing notice ({ removed, at }) or null —
+    // it persists until the streamer dismisses it, so a Configurator left in a
+    // background tab still reports what happened when they come back to it.
+    // `cleanupRan` throttles the automatic pass to once per session; `kept` is
+    // the undo's suppression set. Both are deliberately memory-only.
+    cleanup: null,
+    cleanupRan: false,
+    kept: new Set(),
   };
 
   const me = () => activeProfile(profiles);
@@ -681,6 +707,37 @@
    * train's overrides on a stale inference is silent data loss.
    */
   const feedVerified = () => goodFeedEvents() != null && state.feed.fromCache === false;
+  /**
+   * Drop Configs for trains that are over and gone (#41), and offer them back.
+   *
+   * Runs on every EXPLICIT refresh and at most once otherwise, so a session
+   * that opens the Configurator repeatedly does not keep re-testing the same
+   * rule against the same feed. The guards that make it safe all live in
+   * pruneOrphanedConfigs; the only judgement here is WHEN to ask it.
+   *
+   * `kept` is the session-scoped suppression behind the notice's undo. Without
+   * it the next verified read would delete exactly what the streamer just asked
+   * us to keep — possibly before they finished reading the notice. It lives in
+   * memory and dies with the page, matching the undo's own lifetime: nothing
+   * new is written to disk to remember a decision we believe was already right.
+   */
+  function cleanUpOrphans({ force = false } = {}) {
+    if (!force && state.cleanupRan) return;
+    if (!feedVerified()) return;
+    state.cleanupRan = true;
+    const { store, removed } = pruneOrphanedConfigs(profiles, me(), {
+      events: goodFeedEvents(), verified: true, now: Date.now(),
+    });
+    if (removed.length === 0) return;
+    // The prune is blind to `kept` by design — it answers "is this reachable?",
+    // not "did the streamer overrule us?". So put the held ones straight back.
+    const held = removed.filter((r) => state.kept.has(r.slug));
+    const fresh = removed.filter((r) => !state.kept.has(r.slug));
+    if (fresh.length === 0) return;
+    profiles = held.length ? restoreTrainConfigs(store, me(), held) : store;
+    saveProfiles();
+    state.cleanup = { removed: fresh, at: Date.now() };
+  }
   /** When the feed says this train ends, as epoch ms — only from a good read. */
   function feedEndsAt(slug) {
     const event = (goodFeedEvents() ?? []).find((e) => e.slug === slug);
@@ -745,6 +802,7 @@
         ...state.feed, status: 'ready', events: result.user.events,
         error: result.error ?? null, fromCache: result.fromCache === true,
       };
+      cleanUpOrphans({ force });
       renderMain();
       await loadEventDetails(result.user.events, {
         fetchImpl: fetch.bind(window),
@@ -940,6 +998,7 @@
       ? `<div class="hint" style="margin:-6px 0 12px">${staleNote}
            <button type="button" class="btn sm" data-act="refresh-all" style="margin-left:6px">${te('configurator.tryAgain')}</button></div>`
       : '';
+    const cleanup = cleanupNoticeHtml(now);
     const cards = [...live, ...upcoming].map((e) => trainCardHtml(cardView(e, live.includes(e) ? 'live' : 'upcoming', now), t)).join('');
     const emptyNote = (live.length + upcoming.length) === 0
       ? `<div class="empty">${te('configurator.noTrains')}</div>` : '';
@@ -949,7 +1008,47 @@
          </button>
          <div class="past-list"${state.pastOpen ? '' : ' hidden'}>${past.map((e) => trainCardHtml(cardView(e, 'past', now), t)).join('')}</div>`
       : '';
-    return `${head}${stale}${cards}${emptyNote}${ended}`;
+    return `${head}${stale}${cleanup}${cards}${emptyNote}${ended}`;
+  }
+
+  /**
+   * The standing notice for a cleanup that happened (#41).
+   *
+   * Split by what we can honestly claim. A Config with a past `endsAt` DID end
+   * — the schedule ran out, whatever happened afterwards — so "ended" is a
+   * fact. Everything else only earns "no longer on your schedule", because
+   * CONTEXT.md is explicit that the store cannot tell a deleted train from a
+   * renamed one. In practice the second bucket is empty today: the prune's own
+   * guard requires a past `endsAt`, so nothing without one can reach here. The
+   * line is kept because that guard is the piece most likely to be relaxed, and
+   * a relaxation that silently started calling renamed trains "ended" is
+   * exactly the wrong-word-in-shipped-UI bug #38 just finished cleaning up.
+   *
+   * Sticky by design: no timer, dismiss only. A Configurator sitting in a
+   * background tab during a stream must still be able to report this when the
+   * streamer comes back to it, which a 2.2s toast cannot do.
+   */
+  function cleanupNoticeHtml(now) {
+    const removed = state.cleanup?.removed ?? [];
+    if (removed.length === 0) return '';
+    const ended = removed.filter((r) => typeof r.config?.endsAt === 'number' && r.config.endsAt < now).length;
+    const gone = removed.length - ended;
+    const counts = [
+      ended ? plural(ended, 'configurator.cleanupEndedOne', 'configurator.cleanupEndedMany', { n: `<b>${ended}</b>` }) : '',
+      gone ? plural(gone, 'configurator.cleanupGoneOne', 'configurator.cleanupGoneMany', { n: `<b>${gone}</b>` }) : '',
+    ].filter(Boolean).join(' · ');
+    const slugs = removed.map((r) => `<code>${esc(r.slug)}</code>`).join(' ');
+    return `<section class="card cleanup-note">
+      <div class="cleanup-body">
+        <div class="cleanup-head">${te('configurator.cleanupHead')}</div>
+        <div class="cleanup-counts">${counts}</div>
+        <div class="cleanup-slugs">${slugs}</div>
+      </div>
+      <div class="cleanup-actions">
+        <button type="button" class="btn sm" data-act="cleanup-keep">${te('configurator.cleanupKeep')}</button>
+        <button type="button" class="btn sm ghost" data-act="cleanup-dismiss">${te('configurator.cleanupDismiss')}</button>
+      </div>
+    </section>`;
   }
 
   // ── View: Raid Train Config editor ─────────────────────────────────────
@@ -1564,6 +1663,22 @@
     if (act === 'back-trains') { go('trains'); return; }
     if (act === 'back-presets') { go('presets'); return; }
     if (act === 'refresh-all') { loadFeed({ force: true }); return; }
+
+    if (act === 'cleanup-keep') {
+      const removed = state.cleanup?.removed ?? [];
+      if (removed.length === 0) return;
+      profiles = restoreTrainConfigs(profiles, me(), removed);
+      saveProfiles();
+      // Suppress for the session, or the next verified read deletes exactly
+      // what was just asked for — possibly before the toast has faded.
+      for (const { slug } of removed) state.kept.add(slug);
+      state.cleanup = null;
+      render();
+      toast(plural(removed.length, 'configurator.toastCleanupKeptOne', 'configurator.toastCleanupKeptMany', { n: removed.length }));
+      return;
+    }
+
+    if (act === 'cleanup-dismiss') { state.cleanup = null; render(); return; }
 
     if (act === 'toggle-past') {
       state.pastOpen = !state.pastOpen;
