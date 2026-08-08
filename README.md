@@ -108,22 +108,30 @@ The renderer's art is verified visually via the manual harness at
 ## Releasing
 
 [`CHANGELOG.md`](CHANGELOG.md) is the source of the release notes, so a release is a
-commit and a tag:
+commit, a tag, and one command:
 
 1. A `chore(release): vX.Y.Z` commit that bumps `package.json` and adds the CHANGELOG
    section.
-2. An annotated tag on **that commit** — its one-line message becomes the Release title:
+2. An annotated tag on **that commit** — not on the last feature commit. A tag one
+   commit early carries the *previous* version in `package.json` and no notes for
+   itself, which is how `v0.8.0` was first tagged.
    ```
    git tag -a vX.Y.Z -m "vX.Y.Z — what changed, in a line"
    git push origin vX.Y.Z
    ```
+3. Publish the Release from that CHANGELOG section:
+   ```
+   node scripts/release-notes.mjs vX.Y.Z --verify > /tmp/notes.md
+   gh release create vX.Y.Z --verify-tag \
+     --title "$(git tag -l --format='%(contents:subject)' vX.Y.Z)" \
+     --notes-file /tmp/notes.md
+   ```
 
-Pushing the tag runs [`.github/workflows/release.yml`](.github/workflows/release.yml),
-which publishes the GitHub Release from that CHANGELOG section. It refuses to publish a
-tag whose tree disagrees with it — a tag landed one commit early carries the *previous*
-version in `package.json` and no notes for itself, which is how `v0.8.0` was first
-tagged. Run the workflow manually with a tag name to publish a Release for a tag that
-was pushed before this existed.
+`--verify` holds `package.json` to the tag being released, so step 2 landing on the
+wrong commit fails loudly instead of shipping a release that doesn't contain its own
+notes. Drop it when publishing a Release for an older tag from a `main` checkout, where
+the mismatch is expected. `node --test` covers the same ground at PR time: a version
+bump with no CHANGELOG entry fails the build.
 
 ## License
 
