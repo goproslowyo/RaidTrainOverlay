@@ -63,6 +63,12 @@ export const BADGE_BUDGET = {
   'status.departed': 12,
   'status.lead': 10,
   'departures.header': 12,
+  // Not on a Car — the diagonal stamp across an Ended train's card in the
+  // Configurator. Budgeted anyway (#42): docs/i18n-review-notes.md tells
+  // reviewers it is length-constrained, and this is the machine-readable half
+  // of that — the number a translation platform carries as a max length, and
+  // the one the lint checks. Longest today is 10 (`Finalizado`, `Pasibaigęs`).
+  'configurator.stampEnded': 12,
 };
 
 /**
