@@ -105,6 +105,26 @@ node --test
 The renderer's art is verified visually via the manual harness at
 [`test/manual/harness.html`](test/manual/harness.html) (e.g. `#theme=tron&now=…&bg=checker`).
 
+## Releasing
+
+[`CHANGELOG.md`](CHANGELOG.md) is the source of the release notes, so a release is a
+commit and a tag:
+
+1. A `chore(release): vX.Y.Z` commit that bumps `package.json` and adds the CHANGELOG
+   section.
+2. An annotated tag on **that commit** — its one-line message becomes the Release title:
+   ```
+   git tag -a vX.Y.Z -m "vX.Y.Z — what changed, in a line"
+   git push origin vX.Y.Z
+   ```
+
+Pushing the tag runs [`.github/workflows/release.yml`](.github/workflows/release.yml),
+which publishes the GitHub Release from that CHANGELOG section. It refuses to publish a
+tag whose tree disagrees with it — a tag landed one commit early carries the *previous*
+version in `package.json` and no notes for itself, which is how `v0.8.0` was first
+tagged. Run the workflow manually with a tag name to publish a Release for a tag that
+was pushed before this existed.
+
 ## License
 
 [MIT](LICENSE) © goproslowyo. Not affiliated with RaidPal.
