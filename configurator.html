@@ -736,7 +736,9 @@
     if (fresh.length === 0) return;
     profiles = held.length ? restoreTrainConfigs(store, me(), held) : store;
     saveProfiles();
-    state.cleanup = { removed: fresh, at: Date.now() };
+    // `login` is what makes the notice safe to leave on screen: everything it
+    // offers to undo belongs to ONE Profile, and `me()` can change underneath it.
+    state.cleanup = { removed: fresh, login: me() };
   }
   /** When the feed says this train ends, as epoch ms — only from a good read. */
   function feedEndsAt(slug) {
@@ -1029,6 +1031,9 @@
    * streamer comes back to it, which a 2.2s toast cannot do.
    */
   function cleanupNoticeHtml(now) {
+    // Never show another Profile's notice: its undo would write THAT Profile's
+    // Configs into THIS one, and leave the originals gone.
+    if (state.cleanup && state.cleanup.login !== me()) return '';
     const removed = state.cleanup?.removed ?? [];
     if (removed.length === 0) return '';
     const ended = removed.filter((r) => typeof r.config?.endsAt === 'number' && r.config.endsAt < now).length;
@@ -1633,6 +1638,13 @@
     saveProfiles();
     ensureStarterPreset(login);
     state.pastOpen = false;
+    // All three cleanup fields are per-Profile: the notice belongs to the
+    // Profile it was raised for, `cleanupRan` would otherwise let only the
+    // session's FIRST Profile ever clean automatically, and `kept` is keyed by
+    // slug alone — two Profiles joined to the same train share one.
+    state.cleanup = null;
+    state.cleanupRan = false;
+    state.kept = new Set();
     go('trains');
     loadFeed();
   }
@@ -1666,7 +1678,7 @@
 
     if (act === 'cleanup-keep') {
       const removed = state.cleanup?.removed ?? [];
-      if (removed.length === 0) return;
+      if (removed.length === 0 || state.cleanup.login !== me()) return;
       profiles = restoreTrainConfigs(profiles, me(), removed);
       saveProfiles();
       // Suppress for the session, or the next verified read deletes exactly
