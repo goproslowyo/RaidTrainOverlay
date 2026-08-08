@@ -62,19 +62,29 @@
     .brand-train i:nth-child(3) { background: #5b2a78; }
 
     /* ── Profile switcher ─────────────────────────────────────────────── */
-    .profile-wrap { position: relative; margin-left: auto; }
+    /* min-width:0 is load-bearing, not tidiness. A flex item won't shrink below
+       its min-content width by default, and a Twitch login is one unbreakable
+       word — so a 25-char login made the pill an immovable 200px and shoved the
+       whole top bar off a phone screen. The pill gives way instead; the name
+       ellipsises and the avatar (which carries the initial) never shrinks.
+       The button's max-width:100% below is load-bearing too, and less obviously
+       so — it reads like a no-op next to min-width:0, but a button is
+       shrink-to-fit and will happily size past a flex-shrunk wrapper. Measured
+       48px of overflow at 375 (103px at 320) with that one line removed. */
+    .profile-wrap { position: relative; margin-left: auto; min-width: 0; }
     .profile-btn {
-      display: flex; align-items: center; gap: 9px;
+      display: flex; align-items: center; gap: 9px; max-width: 100%;
       background: var(--panel-2); border: 1px solid var(--line); border-radius: 999px;
       color: var(--ink); padding: 5px 13px 5px 6px; font-weight: 600; transition: border-color .15s;
     }
     .profile-btn:hover { border-color: var(--accent); }
+    .profile-btn .pb-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .avatar {
       width: 26px; height: 26px; border-radius: 50%; flex: none;
       display: inline-flex; align-items: center; justify-content: center;
       font-size: 13px; font-weight: 800; color: #0c1016; background: var(--accent);
     }
-    .profile-btn .chev { color: var(--muted); font-size: 11px; }
+    .profile-btn .chev { color: var(--muted); font-size: 11px; flex: none; }
     .profile-menu {
       position: absolute; right: 0; top: calc(100% + 8px); width: 320px; z-index: 60;
       background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
@@ -455,6 +465,27 @@
       .side hr, .side .side-note { display: none; }
       .nav-item { width: auto; border-left: 0; border-radius: 8px; }
     }
+    /* Phone and small-tablet widths. The brand alone wants 311px, so with the
+       28px gutters there is nothing left for the profile pill under ~455px —
+       and the pill can only ellipsise so far before it is just an avatar. So the
+       top bar sheds the part that says the least: "/ Configurator" is redundant
+       next to a nav whose items ARE the Configurator.
+       600px, not the 455px where it strictly has to: below ~643px a 25-char
+       login is already truncating, and a name clipped to "a…" tells you less
+       than the label costs. Above it, the pill has room for a readable name. */
+    @media (max-width: 600px) {
+      .top { padding: 12px 16px; gap: 12px; }
+      .brand .sep, .brand .app { display: none; }
+    }
+    /* Phones proper. The last 62px comes from the little train (50px of cars
+       plus the 12px .brand gap), and it goes last because it is the only thing
+       here already marked aria-hidden — decoration, by its own admission, while
+       the pill is a control. Buying those 62px is what turns "Add a p…" back
+       into "Add a profile" and shows a typical login whole at 375. The wordmark
+       still says whose product this is. */
+    @media (max-width: 420px) {
+      .brand-train { display: none; }
+    }
   </style>
 </head>
 <body>
@@ -469,7 +500,7 @@
   <div class="profile-wrap">
     <button type="button" class="profile-btn" id="profile-btn" aria-haspopup="true" aria-expanded="false">
       <span class="avatar" id="pb-avatar">+</span>
-      <span id="pb-name">Add a profile</span>
+      <span class="pb-label" id="pb-name">Add a profile</span>
       <span class="chev" aria-hidden="true">▾</span>
     </button>
     <div class="profile-menu" id="profile-menu">
@@ -806,7 +837,11 @@
   function renderTopbar() {
     const login = me();
     $('#pb-avatar').textContent = login ? login[0].toUpperCase() : '+';
+    // The label ellipsises on a narrow window, so hand the full login to the
+    // tooltip — a screen reader still reads the whole name out of the DOM, but
+    // a sighted phone user has no other way to see past the clip.
     $('#pb-name').textContent = login ?? t('configurator.addProfile');
+    $('#pb-name').title = login ?? '';
     const rows = listProfiles(profiles).map((name) => {
       const p = profiles.profiles[name];
       const trains = Object.keys(p.trains ?? {}).length;
