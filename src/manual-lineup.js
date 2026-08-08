@@ -151,7 +151,11 @@ export function makeManualEvent(model, now = new Date()) {
     slotDurationMins: base,
     organiser: {
       displayName: model?.o?.n || 'You',
-      image: model?.o?.i || '',
+      // No avatar, by design — a hand-built lineup paints initials. The wire
+      // format carried a URL here that only a crafted link could ever set, and
+      // it went straight into the Overlay's `<image href>`. Both ends drop it
+      // now; see isOrganiser in lineup-codec.js.
+      image: '',
       link: '',
       timezone: model?.z || 'UTC',
     },

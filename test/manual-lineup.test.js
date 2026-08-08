@@ -6,10 +6,14 @@ import { buildTrain } from '../src/lineup-engine.js';
 const CFG = { event: 'x' };
 
 test('makeManualEvent produces the normalized Event shape buildTrain consumes', () => {
-  const model = { t: 'My Train', o: { n: 'host', i: 'a.png' }, z: 'UTC', s: '2026-06-27T18:00:00.000Z', d: [{ h: 'alice', d: 60 }] };
+  // `o.i` is passed in deliberately: a crafted link can still carry it, and the
+  // organiser must come out with NO avatar regardless. It went into the
+  // Overlay's <image href> before, making a shared link a way to have someone
+  // else's machine fetch an attacker-chosen URL.
+  const model = { t: 'My Train', o: { n: 'host', i: 'http://198.51.100.7/beacon.png' }, z: 'UTC', s: '2026-06-27T18:00:00.000Z', d: [{ h: 'alice', d: 60 }] };
   const ev = makeManualEvent(model, new Date('2026-06-27T17:00:00Z'));
   assert.equal(ev.title, 'My Train');
-  assert.deepEqual(ev.organiser, { displayName: 'host', image: 'a.png', link: '', timezone: 'UTC' });
+  assert.deepEqual(ev.organiser, { displayName: 'host', image: '', link: '', timezone: 'UTC' });
   assert.equal(ev.slotDurationMins, 60);
   assert.equal(ev.slots.length, 1);
   assert.equal(ev.slots[0].occupied, true);

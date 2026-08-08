@@ -6,7 +6,7 @@ import { encodeLineup, decodeLineup } from '../src/lineup-codec.js';
 // codec stamps/validates the wire version internally).
 const MODEL = {
   t: 'Saturday Bass Train',
-  o: { n: 'djhost', i: 'https://example.test/avatars/host.png' },
+  o: { n: 'djhost' },
   z: 'America/New_York',
   s: '2026-06-27T00:00:00.000Z',
   d: [
@@ -75,3 +75,19 @@ function b64urlOf(str) {
   for (const b of bytes) bin += String.fromCharCode(b);
   return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
+
+test('decodeLineup strips an organiser avatar URL a crafted link tried to smuggle in', () => {
+  // The wire format once accepted `o.i` as any string, and the Overlay painted
+  // it into <image href> — so a shared "paste this into OBS" link could make
+  // someone else's machine fetch an attacker-chosen URL. Nothing in the product
+  // ever wrote the field, so dropping it costs nothing and closes that door.
+  const hostile = { ...MODEL, o: { n: 'DJ Someone', i: 'http://198.51.100.7/beacon.png' } };
+  const decoded = decodeLineup(encodeLineup(hostile));
+  assert.deepEqual(decoded.o, { n: 'DJ Someone' }, 'only the name survives');
+  assert.equal('i' in decoded.o, false, 'the URL must not ride through the rest-spread');
+});
+
+test('decodeLineup keeps accepting a well-formed organiser after the avatar drop', () => {
+  const decoded = decodeLineup(encodeLineup({ ...MODEL, o: { n: 'DJ Someone' } }));
+  assert.deepEqual(decoded.o, { n: 'DJ Someone' });
+});

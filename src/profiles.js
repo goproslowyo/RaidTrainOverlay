@@ -196,6 +196,66 @@ export function isEmptyTrainConfig(config, defaultPresetId = null) {
     && (config.presetId ?? null) === (defaultPresetId ?? null);
 }
 
+/**
+ * Drop the Raid Train Configs a Profile can no longer reach (#41).
+ *
+ * #31 settled that the URL filters and the store does not, because a bad
+ * RaidPal day makes every train look absent. That premise CHANGED with #39:
+ * "healthy read" is now detectable, so absence can be trusted under conditions
+ * #31 had no way to express. This is the deliberate overturn, not a regression
+ * — see CONTEXT.md. Every guard below exists because removing one makes some
+ * real day delete settings the streamer still needs:
+ *
+ *   - `verified`: a cache hit inside the 6h window is not evidence of anything.
+ *   - `events` a non-empty ARRAY: `normalizeUser` merges `wire.events ?? []`,
+ *     so a payload that arrives without the key is indistinguishable from a
+ *     streamer with nothing booked. An empty list must never mean "all gone" —
+ *     it costs a quiet streamer a delayed cleanup, which nobody can see.
+ *   - a PAST `endsAt`: the guard against a rename. RaidPal has no stable event
+ *     id, so renaming an upcoming train reads here exactly like deleting it,
+ *     and that train's settings are about to be needed. A Config we cannot date
+ *     (written before the field existed) is protected for the same reason.
+ *
+ * Absence alone never deletes: the slug must be gone AND the train must already
+ * be over. Returns the store unchanged plus `removed: []` when nothing
+ * qualifies, so callers can treat "nothing happened" as the common path.
+ *
+ * `removed` carries `{ slug, config }` — the config verbatim, so the caller can
+ * offer an undo without this function knowing anything about undo.
+ */
+export function pruneOrphanedConfigs(store, login, { events = null, verified = false, now = null } = {}) {
+  const at = now instanceof Date ? now.getTime() : now;
+  const profile = store.profiles?.[normalizeLogin(login)];
+  if (!profile || !verified || !Number.isFinite(at)) return { store, removed: [] };
+  if (!Array.isArray(events) || events.length === 0) return { store, removed: [] };
+
+  const listed = new Set(events.map((e) => e?.slug));
+  const removed = [];
+  for (const [slug, config] of Object.entries(profile.trains ?? {})) {
+    if (listed.has(slug)) continue;
+    const endsAt = config?.endsAt;
+    if (typeof endsAt !== 'number' || !Number.isFinite(endsAt) || endsAt >= at) continue;
+    removed.push({ slug, config });
+  }
+  if (removed.length === 0) return { store, removed: [] };
+
+  const trains = { ...profile.trains };
+  for (const { slug } of removed) delete trains[slug];
+  return { store: withProfile(store, login, (p) => ({ ...p, trains })), removed };
+}
+
+/** Put back Configs a prune removed, verbatim — the undo behind #41's notice. */
+export function restoreTrainConfigs(store, login, removed) {
+  if (!Array.isArray(removed) || removed.length === 0) return store;
+  return withProfile(store, login, (p) => {
+    const trains = { ...p.trains };
+    for (const { slug, config } of removed) {
+      if (typeof slug === 'string' && slug !== '' && config != null) trains[slug] = config;
+    }
+    return { ...p, trains };
+  });
+}
+
 /** Remove the Config for a slug. Missing slug is a silent no-op. */
 export function deleteTrainConfig(store, login, slug) {
   return withProfile(store, login, (p) => {

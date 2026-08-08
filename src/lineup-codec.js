@@ -5,7 +5,7 @@
  *
  * The wire model is compact and editor-friendly (per-DJ DURATIONS, not expanded
  * slots) and VERSIONED so a shareable OBS URL stays readable as the format evolves:
- *   { v, t:title, o:{n:name, i?:avatarUrl}, z:ianaZone, s:ISO-instant, d:[{h:handle, d:mins}] }
+ *   { v, t:title, o:{n:name}, z:ianaZone, s:ISO-instant, d:[{h:handle, d:mins}] }
  * `z` is the authoring zone (kept only so re-opening the lineup in the editor shows
  * the original zone); the Overlay itself needs only the absolute instant `s`.
  *
@@ -24,10 +24,21 @@ export function encodeLineup(model) {
   return encodeJsonBlob(wire);
 }
 
-/** A `{n, ...}` organiser, optional avatar. */
+/**
+ * A `{n}` organiser. Name only, and DELIBERATELY no avatar.
+ *
+ * The wire format used to accept `o.i` as an arbitrary URL string, which the
+ * Overlay painted straight into `<image href>`. Nothing in the product ever
+ * WROTE it — configurator.js emits `o: { n }` and the manual editor has no
+ * avatar field — so its only reachable producer was a hand-crafted link. That
+ * made every "paste this overlay URL into OBS" message a way to have someone
+ * else's machine fetch an attacker-chosen URL: an IP/liveness beacon, and a
+ * blind GET to anything on their LAN. Escaping stopped it being XSS; nothing
+ * stopped the request. Any avatar support added later must allowlist the
+ * origin, not accept a bare string.
+ */
 function isOrganiser(o) {
-  return o != null && typeof o === 'object' && typeof o.n === 'string'
-    && (o.i === undefined || typeof o.i === 'string');
+  return o != null && typeof o === 'object' && typeof o.n === 'string';
 }
 
 /** A `[{h, d}]` lineup of at least one DJ with a positive duration. */
@@ -50,5 +61,9 @@ export function decodeLineup(str) {
   if (!isOrganiser(wire.o) || !isLineup(wire.d)) return null;
   const { v, ...model } = wire; // strip the wire version → clean domain model
   void v;
-  return model;
+  // Rebuild `o` field-by-field rather than passing the decoded object through.
+  // The rest spread above would otherwise carry any extra key a hand-crafted
+  // blob invented — which is exactly how `o.i` reached `<image href>`. An
+  // allowlist here means a new wire field has to be added deliberately.
+  return { ...model, o: { n: wire.o.n } };
 }
