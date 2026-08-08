@@ -78,20 +78,18 @@ automatically — you can't accidentally break the build.
 3. Add an `<option>` to the language selector in `configurator.html`.
 4. `node --test` — the completeness test will tell you if you missed a key.
 
-## Using a translation platform (maintainers)
+## Don't want to touch code? Just tell us
 
-The catalogs are intentionally simple key→string modules, so they map cleanly to
-Crowdin/Weblate. A starter [`crowdin.yml`](crowdin.yml) is included. Two things
-make a volunteer pass actually succeed (the usual reason it stalls is neither the
-tool):
+You do not have to open a pull request. If a word reads wrong in your language,
+[**open an issue**](https://github.com/goproslowyo/RaidTrainOverlay/issues/new)
+and say so in your own words — which language, roughly where you saw it, and what
+it should say instead. That is enough. Screenshots help; a perfect bug report is
+not required.
 
-- **Seeds + context.** Upload `context.js` `DESCRIPTIONS` as per-string context so
-  translators see meaning, and import the existing drafts as translations to
-  *approve/correct* rather than author cold.
-- **Recruit where the users are.** The people using this overlay are multilingual
-  streamers — link this guide from your release notes / Discord and ask for a
-  one-language review. Small, bounded asks ("does the German overlay read right?")
-  get answered; "translate everything" does not.
+There is no translation platform to sign up for, no account, and no invite to
+wait on. The catalogs live in this repo in plain text, the site is served from
+this repo, and a one-line correction from someone who actually speaks the
+language is worth more than another round of machine translation.
 
 Thank you — every corrected word makes someone's stream feel like it was built for
 them.

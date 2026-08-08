@@ -78,7 +78,10 @@ choose a concrete language such as English to bake `lang=en` into the copied URL
 
 The non-English catalogs are machine translations hardened by an automated review pass but
 **not yet confirmed by native speakers** — corrections are very welcome and take ~2 minutes
-(you edit a draft, not a blank page). See **[TRANSLATING.md](TRANSLATING.md)**.
+(you edit a draft, not a blank page). See **[TRANSLATING.md](TRANSLATING.md)**. If a word
+reads wrong in your language and you'd rather not touch code, just
+[open an issue](https://github.com/goproslowyo/RaidTrainOverlay/issues/new) and say so —
+no account or translation platform to sign up for.
 
 ## Author a theme
 
