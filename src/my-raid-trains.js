@@ -11,9 +11,23 @@
  * never reads Configurator storage) and their freshness windows differ
  * (Overlay minutes, Configurator hours). Storage, fetch, clock, and sleep are
  * all injected; the page owns the real localStorage.
+ *
+ * Retries (#47): the two reads a streamer is actually waiting on — the user
+ * record, and the per-Event manual Refresh — re-attempt a *thrown* failure on
+ * backoff's retry curve before giving up to the cache. This matters more than
+ * ordinary flakiness insurance, because a good read that never reaches RaidPal
+ * is not a **Verified read** (CONTEXT.md), and #39 and #41 both hang real
+ * behaviour off that bar: one unlucky response and the Live Link stops pruning
+ * and the store stops cleaning up, silently, until the streamer intervenes.
+ *
+ * The sequential detail loop deliberately does NOT retry. It is N reads deep,
+ * and N × the retry ladder turns one bad RaidPal minute into a minutes-long
+ * spinner; each card already fails soft in isolation and carries its own
+ * Refresh button, which does retry.
  */
 
 import { fetchUserPayload, fetchEventPayload, normalizeUser, normalizeEvent } from './raidpal-client.js';
+import { retry, RETRY_ATTEMPTS } from './backoff.js';
 
 const CACHE_PREFIX = 'raidtrainoverlay.myraidtrains.v1.';
 
@@ -57,15 +71,20 @@ function isFresh(entry, clock, freshMs) {
  * Load a Profile's user record (profile + Event summaries), cache-first.
  *
  * Fresh cache → served with no network call. Stale/missing (or `force`, the
- * manual refresh) → fetch, re-cache. A live failure falls back to the stale
- * cache with `error` so the train list never blanks; with no cache it
- * rethrows. An unknown login is a definitive 204, not a failure: it returns
- * `{ user: null, notFound: true }` but leaves any last-good cache intact —
- * the undocumented API earns no trust, so the UI decides what to discard.
+ * manual refresh) → fetch, re-cache. A failed fetch is re-attempted on the
+ * retry curve (`attempts`, default 3) before the read is called lost; only then
+ * does it fall back to the stale cache with `error` so the train list never
+ * blanks, or rethrow when there is no cache. An unknown login is a definitive
+ * 204, not a failure: it returns `{ user: null, notFound: true }` — unretried,
+ * since RaidPal answered — but leaves any last-good cache intact, because the
+ * undocumented API earns no trust and the UI decides what to discard.
+ *
+ * `attempts`, `sleep` and `rand` exist for tests and for a caller that wants a
+ * different patience; `onRetry({ error, attempt, delayMs })` observes the waits.
  *
  * Returns `{ user, payload, fromCache, fresh?, error?, notFound? }`.
  */
-export async function loadMyRaidTrains(login, { fetchImpl, storage, clock = Date.now, freshMs = FRESH_MS, force = false }) {
+export async function loadMyRaidTrains(login, { fetchImpl, storage, clock = Date.now, freshMs = FRESH_MS, force = false, attempts = RETRY_ATTEMPTS, sleep, rand, onRetry }) {
   const key = userCacheKey(login);
   if (!force) {
     const cached = readEntry(storage, key);
@@ -75,7 +94,7 @@ export async function loadMyRaidTrains(login, { fetchImpl, storage, clock = Date
   }
   let payload;
   try {
-    payload = await fetchUserPayload(login, fetchImpl);
+    payload = await retry(() => fetchUserPayload(login, fetchImpl), { attempts, sleep, rand, onRetry });
   } catch (error) {
     const cached = readEntry(storage, key);
     if (cached == null) throw error;
@@ -92,8 +111,11 @@ export async function loadMyRaidTrains(login, { fetchImpl, storage, clock = Date
  * live failure serves the stale cache with `error`, or `event: null` when
  * there is nothing cached. `didFetch` on the result tells the sequential
  * loop whether the network was actually touched (pause pacing).
+ *
+ * `retryOpts` is null for the sequential loop (one attempt each, see the module
+ * note) and set for the manual per-Event Refresh.
  */
-async function loadOneEventDetail(slug, { fetchImpl, storage, clock, freshMs, force, onBeforeFetch = async () => {} }) {
+async function loadOneEventDetail(slug, { fetchImpl, storage, clock, freshMs, force, onBeforeFetch = async () => {}, retryOpts = null }) {
   const key = eventCacheKey(slug);
   if (!force) {
     const cached = readEntry(storage, key);
@@ -103,7 +125,8 @@ async function loadOneEventDetail(slug, { fetchImpl, storage, clock, freshMs, fo
   }
   await onBeforeFetch();
   try {
-    const payload = await fetchEventPayload(slug, fetchImpl);
+    const fetchOnce = () => fetchEventPayload(slug, fetchImpl);
+    const payload = retryOpts ? await retry(fetchOnce, retryOpts) : await fetchOnce();
     const event = normalizeEvent(payload);
     writeEntry(storage, key, payload, clock());
     return { slug, event, payload, fromCache: false, didFetch: true };
@@ -151,9 +174,13 @@ export async function loadEventDetails(summaries, deps) {
 
 /**
  * The per-Event manual refresh: force-fetch one Event past any fresh cache
- * and rewrite its entry. Fails soft like the sequential loop — stale cache +
- * `error` on a live failure, never a throw.
+ * and rewrite its entry. Retries a thrown failure — the streamer pressed the
+ * button and is watching it spin — then fails soft like the sequential loop:
+ * stale cache + `error` on a live failure, never a throw.
  */
-export async function refreshEventDetail(slug, { fetchImpl, storage, clock = Date.now }) {
-  return stripDidFetch(await loadOneEventDetail(slug, { fetchImpl, storage, clock, freshMs: FRESH_MS, force: true }));
+export async function refreshEventDetail(slug, { fetchImpl, storage, clock = Date.now, attempts = RETRY_ATTEMPTS, sleep, rand, onRetry }) {
+  return stripDidFetch(await loadOneEventDetail(slug, {
+    fetchImpl, storage, clock, freshMs: FRESH_MS, force: true,
+    retryOpts: { attempts, sleep, rand, onRetry },
+  }));
 }

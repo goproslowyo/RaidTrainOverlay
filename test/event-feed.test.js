@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  cacheKey, writeCache, readCache, loadEventResilient, nextPollDelayMs, startEventFeed,
+  cacheKey, writeCache, readCache, loadEventResilient, startEventFeed,
 } from '../src/event-feed.js';
 import { makeEventPayload } from './fixtures/event-payload.js';
 
@@ -113,30 +113,6 @@ test('loadEventResilient rethrows when the fetch fails and the cache is cold', a
     loadEventResilient('never-seen', { fetchImpl: deadFetch(), storage }),
     /network down/,
   );
-});
-
-test('nextPollDelayMs returns exactly the base interval at the jitter midpoint', () => {
-  // rand 0.5 is the jitter midpoint → no jitter, so the delay is the base.
-  assert.equal(nextPollDelayMs({ refreshMins: 15, consecutiveFailures: 0, rand: () => 0.5 }), 15 * MIN);
-  assert.equal(nextPollDelayMs({ refreshMins: 30, consecutiveFailures: 0, rand: () => 0.5 }), 30 * MIN);
-});
-
-test('nextPollDelayMs jitters within ±15% at the rand extremes', () => {
-  const base = 15 * MIN;
-  // Delays are rounded to whole ms, so round the expected band edges too
-  // (base * 1.15 isn't exactly representable in float).
-  assert.equal(nextPollDelayMs({ refreshMins: 15, consecutiveFailures: 0, rand: () => 0 }), Math.round(base * 0.85));
-  assert.equal(nextPollDelayMs({ refreshMins: 15, consecutiveFailures: 0, rand: () => 1 }), Math.round(base * 1.15));
-});
-
-test('nextPollDelayMs backs off as 2^failures, capped at 60 min', () => {
-  const mid = (consecutiveFailures) =>
-    nextPollDelayMs({ refreshMins: 15, consecutiveFailures, rand: () => 0.5 });
-  assert.equal(mid(0), 15 * MIN); // base
-  assert.equal(mid(1), 30 * MIN); // ×2
-  assert.equal(mid(2), 60 * MIN); // ×4 = 60, the cap
-  assert.equal(mid(3), 60 * MIN); // ×8 = 120 → capped
-  assert.equal(mid(10), 60 * MIN); // stays capped
 });
 
 test('startEventFeed with refresh off fetches exactly once and emits once', async () => {

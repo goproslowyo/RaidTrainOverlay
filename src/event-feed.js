@@ -5,10 +5,12 @@
  * API call; it only fetches when the cache is missing or stale, and on a live
  * failure falls back to the (stale) cache so a warm Train never blanks.
  * raidpal-client stays the pure fetch + normalize (the proxy swap
- * point); all caching, scheduling, jitter, and backoff live here.
+ * point); the caching lives here and the schedule comes from backoff, which
+ * owns the one delay curve all three feed readers share (#47).
  */
 
 import { fetchEventPayload, normalizeEvent } from './raidpal-client.js';
+import { nextPollDelayMs } from './backoff.js';
 
 const CACHE_PREFIX = 'raidtrainoverlay.cache.v2.'; // v2 entry shape: { payload, savedAt }
 const DEFAULT_FRESH_MIN = 15; // cache-first window when ?refresh is off (aligns with the refresh floor)
@@ -42,24 +44,6 @@ export function readCache(storage, slug) {
   } catch {
     return null;
   }
-}
-
-const JITTER = 0.3; // ±15% spread (rand 0..1 → factor 0.85..1.15)
-const BACKOFF_CAP_MS = 60 * 60_000; // never wait longer than 60 min between polls
-
-/**
- * Milliseconds until the next poll. Pure (rand injected for tests).
- *
- * Base is `refreshMins` minutes. Consecutive failures back off exponentially
- * (`base · 2^failures`) capped at 60 min, so a sustained RaidPal outage settles
- * into a gentle hourly retry. Every delay is then jittered ±15% to avoid a
- * thundering herd of Overlays polling in lockstep.
- */
-export function nextPollDelayMs({ refreshMins, consecutiveFailures = 0, rand = Math.random }) {
-  const base = refreshMins * 60_000;
-  const backedOff = Math.min(base * 2 ** consecutiveFailures, BACKOFF_CAP_MS);
-  const jitterFactor = 1 + (rand() - 0.5) * JITTER;
-  return Math.round(backedOff * jitterFactor);
 }
 
 /**
