@@ -4,6 +4,83 @@ All notable changes to RaidTrainOverlay are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and the project follows
 [Semantic Versioning](https://semver.org/).
 
+## [0.8.0] - 2026-08-08
+
+RaidPal now knows who you are. Instead of building an overlay URL per event, you
+save your Twitch username once and the Configurator shows **your** raid trains —
+with a **Live Link** you paste into OBS a single time and never touch again: it
+finds whichever train is running (or up next) and switches itself over. The rest
+of the tool was rebuilt around that, and the whole interface is translated.
+
+### Added
+- **Profiles.** Save your Twitch username and the Configurator becomes yours: your
+  raid trains, your settings, your spotlights. Stored in your browser — no account,
+  no login, nothing sent anywhere. Switch between several to manage someone else's
+  setup.
+- **My Raid Trains.** The Configurator's home is now a list of the trains you have
+  joined or organised, pulled from RaidPal, with the live one on top, upcoming ones
+  next, and finished ones tucked behind an expander.
+- **The Live Link.** One overlay URL, set in OBS once. It resolves the live-or-next
+  train by itself, carries your settings in the URL, and switches trains unattended
+  — including per-train tweaks, so one train can run a different theme without
+  touching OBS. Between trains it can show a card listing what's coming up, or
+  nothing at all.
+- **Raid Train Configs.** Per-train settings that start from a preset and override
+  only what you change, with a badge showing what differs. Each train also gets its
+  own copyable static link.
+- **Presets, reworked.** Presets are now settings only, shared across trains and
+  renameable, with duplicate and a per-profile default.
+- **Backup and restore.** Export everything you have saved as a single code, and
+  paste it into another browser or machine.
+- **Ten more languages.** The whole interface — Configurator, landing page and
+  overlay — is translated into Spanish (neutral, Spain, Mexico), Brazilian
+  Portuguese, Italian, German, Dutch, Danish, Lithuanian and French. Corrections
+  from native speakers are very welcome; see [TRANSLATING.md](TRANSLATING.md).
+
+### Changed
+- **The Configurator is an app, not a form.** Sidebar navigation over My Raid
+  Trains, a settings editor, a preset library and profile settings. Building a
+  single overlay URL by hand is still there as the **One-off link**, for someone
+  else's event or a lineup RaidPal has never heard of.
+- **The landing page** was rebuilt on the same shell, leading with a live cycling
+  example of the overlay instead of a wall of theme chips.
+- **Every theme now bottoms out in the same place.** `height` used to drop each
+  theme by its layout box rather than the ground its train stands on, so the same
+  setting sat differently in every theme — an 85px spread. Themes now declare where
+  their floor is, and the spread is under a pixel. You may want to re-check
+  `height` once if you had compensated for this by hand.
+- **Finished trains are "Ended", not "departed".** A train *departs* when it
+  starts. Calling a finished one departed said the opposite of what it meant.
+
+### Fixed
+- **The overlay no longer renders unshrunk in an inactive OBS scene.** The
+  post-layout pass waited for a frame that never arrives in a document nobody is
+  painting, so a source in a background scene came up with names wrapped and
+  cars unfitted.
+- **A too-large Live Link is now visible instead of silent.** An overlong link
+  used to quietly drop *every* per-train setting with no warning anywhere. The
+  Configurator now says so before you copy it, and the overlay says so in the
+  console. Links are never silently trimmed — that would drop some trains and
+  keep others.
+- **Old raid trains clean themselves up.** Settings for trains that have ended and
+  left your RaidPal schedule are removed, with a notice and a **Keep them** undo.
+  Several guards stop this touching a train that was merely renamed or a day
+  RaidPal was unreachable.
+- **A bad moment at RaidPal no longer looks like "you have no profile".** When
+  RaidPal is down and Cloudflare answers with an error page, the Configurator now
+  says it could not reach RaidPal and keeps showing your saved list, instead of
+  reporting that your account does not exist. Failed reads are also retried.
+- **The Configurator fits a phone.** The top bar no longer forces sideways
+  scrolling at 375px.
+- **The landing page's "build from a RaidPal event" button** pointed at a page that
+  had stopped meaning that, so the paste-an-event door had no link at all.
+- **Security: a hand-crafted overlay link can no longer beacon your IP.** The
+  by-hand lineup format accepted an organiser avatar URL that the overlay would
+  fetch. Nothing in the product ever wrote one, but "paste this URL into OBS" is
+  how everyone is onboarded, so a link from a stranger could have reported your IP
+  and go-live time, or probed devices on your home network. The field is gone from
+  both the reader and the writer.
+
 ## [0.7.2] - 2026-07-12
 
 ### Fixed
@@ -231,6 +308,11 @@ for an OBS browser source. Static hosting on GitHub Pages, no build step.
 - A cache-first RaidPal client resilient to transient fetch failures, and a GitHub
   Pages landing page with a live deployed-commit stamp in the footer.
 
+[0.8.0]: https://github.com/goproslowyo/RaidTrainOverlay/releases/tag/v0.8.0
+[0.7.2]: https://github.com/goproslowyo/RaidTrainOverlay/releases/tag/v0.7.2
+[0.7.1]: https://github.com/goproslowyo/RaidTrainOverlay/releases/tag/v0.7.1
+[0.7.0]: https://github.com/goproslowyo/RaidTrainOverlay/releases/tag/v0.7.0
+[0.6.0]: https://github.com/goproslowyo/RaidTrainOverlay/releases/tag/v0.6.0
 [0.5.0]: https://github.com/goproslowyo/RaidTrainOverlay/releases/tag/v0.5.0
 [0.4.0]: https://github.com/goproslowyo/RaidTrainOverlay/releases/tag/v0.4.0
 [0.3.0]: https://github.com/goproslowyo/RaidTrainOverlay/releases/tag/v0.3.0
