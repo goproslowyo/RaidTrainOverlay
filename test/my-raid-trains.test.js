@@ -331,6 +331,28 @@ test('loadMyRaidTrains does not retry a 204 — RaidPal answered', async () => {
   assert.equal(r.notFound, true);
 });
 
+test('a Cloudflare error page is retried and lands on the cache with an ERROR, not "no profile" (#49)', async () => {
+  // The end-to-end claim of #49, at the seam where it shows: RaidPal is down and
+  // Cloudflare answers 200 with an HTML page. Before, that read as notFound —
+  // "you have no RaidPal profile" over a list of 3 trains, and no Verified read.
+  const storage = fakeStorage({
+    [userCacheKey('goproflowyo')]: cacheEntry(makeUserPayload(), NOW - 30 * HOUR),
+  });
+  const log = [];
+  const cloudflare = async (url) => {
+    log.push(url);
+    return { ok: true, status: 200, text: async () => '<!DOCTYPE html><title>Error 522</title>' };
+  };
+  const r = await loadMyRaidTrains('goproflowyo', {
+    fetchImpl: cloudflare, storage, clock: () => NOW, ...noWait,
+  });
+  assert.equal(log.length, 3); // retried, not accepted as an answer
+  assert.equal(r.notFound, undefined);
+  assert.ok(r.error);
+  assert.equal(r.fromCache, true);
+  assert.equal(r.user.events.length, 3); // the list never blanks
+});
+
 test('loadMyRaidTrains never reaches the network on a fresh cache, retries or not', async () => {
   const storage = fakeStorage({
     [userCacheKey('goproflowyo')]: cacheEntry(makeUserPayload(), NOW - HOUR),

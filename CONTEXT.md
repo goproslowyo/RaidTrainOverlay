@@ -122,6 +122,8 @@ A Raid Train Config whose slug is absent from the Profile's current My Raid Trai
 **Good read / Verified read** _(two different bars)_:
 A **good** read is one nothing is visibly wrong with: it completed, it returned a `{ user: … }` payload, and no stale cache was substituted for it. A **verified** read is a good read that also actually *reached RaidPal* on this attempt rather than being served from the ~6h cache.
 
+Neither bar moved in #49; what changed is which wire responses are allowed to *clear* them. **An empty body is an answer** — a 204, or any status carrying nothing, is RaidPal saying *no such login*. **A non-empty body that isn't a profile is a failure** — a Cloudflare backend-down page, a truncated response — and it is now thrown, so it retries (#47) and, if it keeps failing, serves the last-good list with "RaidPal didn't answer just now". Previously both read as "no such user", which is not a failure, so a downed RaidPal could tell a streamer with 13 trains that they had no profile *and* silently withhold the verified read that pruning and Cleanup depend on.
+
 The distinction exists because the two things the feed is used for need different evidence. When a train **ends** is a fact RaidPal reported, and a fact does not decay — a good read is enough. That a train is **absent** is an inference, and it does decay: a cached feed can be six hours old, and one degraded-but-well-formed response poisons it for that whole window. So absence only prunes on a verified read (`configurator.html`'s `feedVerified`, `buildTrainMap`'s `verified` option); end times prune on any good read.
 _Avoid_: stale config, dead config, dangling train
 

@@ -25,14 +25,37 @@ export async function loadEvent(slug, { fetchImpl = globalThis.fetch.bind(global
   return normalizeEvent(await fetchEventPayload(slug, fetchImpl));
 }
 
+/** A short, safe hint at what came back instead of a profile — for the log, not the UI. */
+function describeBody(body) {
+  const head = body.trim().slice(0, 120).replace(/\s+/g, ' ');
+  if (/^<(?:!doctype|html)/i.test(head)) return `an HTML page: ${head}`;
+  return `${body.length} characters starting: ${head}`;
+}
+
 /**
  * Fetch a user's raw wire payload (profile + joined/organised Events), or null
- * when RaidPal doesn't know the login. The live API answers unknown AND
- * malformed logins with 204 No Content and an empty body — not 404, not JSON —
- * so the body is read as text and parsed defensively; anything that isn't a
- * `{ user: … }` payload is "not found". Throws only on indeterminate failures
- * (network error, non-ok status): per the fail-soft mandate, a failed read
- * must stay distinguishable from a definitive "no such user".
+ * when RaidPal doesn't know the login.
+ *
+ * Three outcomes, and keeping them apart is the whole point (#49):
+ *
+ * - **`{ user: … }`** → the answer.
+ * - **Nothing at all** → "no such login". The live API answers unknown *and*
+ *   malformed logins with `204 No Content` and an empty body — not 404, not
+ *   JSON (probed 2026-08-06, `docs/research/raidpal-user-endpoint-edge-cases.md`).
+ *   An empty body on a **200** is read the same way, deliberately: the API is
+ *   undocumented and unversioned, and this outcome should not hinge on which
+ *   status code it picks for "nobody here".
+ * - **Something we cannot read** → a **failed** read, so it throws. A body that
+ *   will not parse, or parses without a `user`, means RaidPal answered but not
+ *   with a profile — a Cloudflare backend-down page (observed), a truncated
+ *   response, a captive portal. It used to be folded into "not found", which
+ *   told a streamer with 13 trains that they had no RaidPal profile and, worse,
+ *   quietly withheld the **Verified read** that #39's pruning and #41's Cleanup
+ *   both require. Throwing puts it on #47's retry curve and, if that does not
+ *   help, on the honest "RaidPal didn't answer just now" path.
+ *
+ * The message stays plain because it reaches the Configurator's error card;
+ * the technical detail rides on `error.detail` for logs.
  */
 export async function fetchUserPayload(login, fetchImpl = globalThis.fetch.bind(globalThis)) {
   const response = await fetchImpl(USER_API_BASE + encodeURIComponent(login));
@@ -41,12 +64,20 @@ export async function fetchUserPayload(login, fetchImpl = globalThis.fetch.bind(
   }
   if (response.status === 204) return null;
   const body = await response.text();
+  if (body.trim() === '') return null;
+  const unreadable = (detail) => {
+    const error = new Error('RaidPal answered with something we could not read.');
+    error.detail = `user "${login}": ${detail}`;
+    return error;
+  };
+  let payload;
   try {
-    const payload = JSON.parse(body);
-    return payload?.user ? payload : null;
+    payload = JSON.parse(body);
   } catch {
-    return null;
+    throw unreadable(describeBody(body));
   }
+  if (!payload?.user) throw unreadable(`parsed, but carried no "user" — ${describeBody(body)}`);
+  return payload;
 }
 
 /** Load a user by Twitch login. Null for an unknown login; throws on failed reads. */
