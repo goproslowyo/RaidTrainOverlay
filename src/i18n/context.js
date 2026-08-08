@@ -3,8 +3,10 @@
  * whatever) translates a catalog has the context machine translation usually
  * lacks: what each string means, where it appears, its part of speech, and how
  * short it must stay. Consumed by the translation-QA tooling and surfaced to
- * contributors (see TRANSLATING.md); it is also the source for per-string
- * context in a translation platform (Crowdin/Weblate string descriptions).
+ * contributors (see TRANSLATING.md). There is deliberately no translation
+ * platform behind it (#42): every string is already translated, so what is
+ * wanted is a native speaker correcting one word — an issue, or a one-line PR
+ * against a public repo — not an account and an invite.
  *
  * Keep this in sync with src/i18n/locales/en.js (the key set is asserted by the
  * i18n test). When you add a key to en.js, add its description + any constraint.
