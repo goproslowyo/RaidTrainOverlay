@@ -36,6 +36,8 @@ const userUrl = (login) => `https://api.raidpal.com/rest/user/${login}`;
 const eventUrl = (slug) => `https://api.raidpal.com/rest/event/${slug}`;
 const okJson = (payload) => () => ({ ok: true, status: 200, text: async () => JSON.stringify(payload), json: async () => payload });
 const cacheEntry = (payload, savedAt) => JSON.stringify({ payload, savedAt });
+/** Retry deps that make the backoff waits instant and deterministic in tests. */
+const noWait = { sleep: async () => {}, rand: () => 0.5 };
 
 // ---- cache namespace ----
 
@@ -118,7 +120,7 @@ test('loadMyRaidTrains falls back to the stale cache on a live failure — the l
     [userCacheKey('goproflowyo')]: cacheEntry(makeUserPayload(), NOW - 30 * HOUR),
   });
   const r = await loadMyRaidTrains('goproflowyo', {
-    fetchImpl: routedFetch({}), storage, clock: () => NOW,
+    fetchImpl: routedFetch({}), storage, clock: () => NOW, ...noWait,
   });
   assert.equal(r.fromCache, true);
   assert.ok(r.error);
@@ -127,7 +129,7 @@ test('loadMyRaidTrains falls back to the stale cache on a live failure — the l
 
 test('loadMyRaidTrains rethrows a live failure when there is no cache to fall back on', async () => {
   await assert.rejects(
-    loadMyRaidTrains('goproflowyo', { fetchImpl: routedFetch({}), storage: fakeStorage(), clock: () => NOW }),
+    loadMyRaidTrains('goproflowyo', { fetchImpl: routedFetch({}), storage: fakeStorage(), clock: () => NOW, ...noWait }),
     /network down/,
   );
 });
@@ -261,9 +263,124 @@ test('refreshEventDetail fails soft: stale fallback + error when the live fetch 
     [eventCacheKey('luna-hao8')]: cacheEntry(makeEventPayload({ title: 'LUNA' }), NOW - 30 * HOUR),
   });
   const r = await refreshEventDetail('luna-hao8', {
-    fetchImpl: routedFetch({}), storage, clock: () => NOW,
+    fetchImpl: routedFetch({}), storage, clock: () => NOW, ...noWait,
   });
   assert.equal(r.fromCache, true);
   assert.equal(r.event.title, 'LUNA');
   assert.ok(r.error);
+});
+
+// ---- retries (#47) ----
+
+/**
+ * A fetchImpl that fails the first `failures` calls with a network error, then
+ * serves `routes`. The flaky RaidPal response this whole ticket is about.
+ */
+function flakyFetch(failures, routes, log = []) {
+  let seen = 0;
+  return async (url) => {
+    log.push(url);
+    seen += 1;
+    if (seen <= failures) throw new Error(`network down: ${url}`);
+    const respond = routes[url];
+    if (!respond) throw new Error(`network down: ${url}`);
+    return respond();
+  };
+}
+
+test('loadMyRaidTrains retries a flaky read and comes back VERIFIED, not cached', async () => {
+  // The point of #47. Before it, one bad response left `fromCache: true` with
+  // an error, which goodFeedEvents() rejects — so the Live Link stopped pruning
+  // (#39) and the store stopped cleaning up (#41) until the streamer noticed.
+  const storage = fakeStorage({
+    [userCacheKey('goproflowyo')]: cacheEntry(makeUserPayload(), NOW - 30 * HOUR),
+  });
+  const log = [];
+  const r = await loadMyRaidTrains('goproflowyo', {
+    fetchImpl: flakyFetch(2, { [userUrl('goproflowyo')]: okJson(makeUserPayload()) }, log),
+    storage, clock: () => NOW, ...noWait,
+  });
+  assert.equal(log.length, 3); // two failures, then the good one
+  assert.equal(r.fromCache, false); // ← a verified read
+  assert.equal(r.error, undefined);
+  assert.equal(r.user.displayName, 'GoProFlowYo');
+  // And it re-cached, at the injected clock.
+  assert.equal(JSON.parse(storage.getItem(userCacheKey('goproflowyo'))).savedAt, NOW);
+});
+
+test('loadMyRaidTrains stops at the attempt ceiling — a real outage must not hang the Configurator', async () => {
+  const storage = fakeStorage({
+    [userCacheKey('goproflowyo')]: cacheEntry(makeUserPayload(), NOW - 30 * HOUR),
+  });
+  const log = [];
+  const r = await loadMyRaidTrains('goproflowyo', {
+    fetchImpl: routedFetch({}, log), storage, clock: () => NOW, ...noWait,
+  });
+  assert.equal(log.length, 3); // RETRY_ATTEMPTS, then give up to the cache
+  assert.equal(r.fromCache, true);
+  assert.ok(r.error);
+});
+
+test('loadMyRaidTrains does not retry a 204 — RaidPal answered', async () => {
+  const log = [];
+  const r = await loadMyRaidTrains('nosuchuser', {
+    fetchImpl: routedFetch({ [userUrl('nosuchuser')]: () => ({ ok: true, status: 204, text: async () => '' }) }, log),
+    storage: fakeStorage(), clock: () => NOW, ...noWait,
+  });
+  assert.equal(log.length, 1);
+  assert.equal(r.notFound, true);
+});
+
+test('a Cloudflare error page is retried and lands on the cache with an ERROR, not "no profile" (#49)', async () => {
+  // The end-to-end claim of #49, at the seam where it shows: RaidPal is down and
+  // Cloudflare answers 200 with an HTML page. Before, that read as notFound —
+  // "you have no RaidPal profile" over a list of 3 trains, and no Verified read.
+  const storage = fakeStorage({
+    [userCacheKey('goproflowyo')]: cacheEntry(makeUserPayload(), NOW - 30 * HOUR),
+  });
+  const log = [];
+  const cloudflare = async (url) => {
+    log.push(url);
+    return { ok: true, status: 200, text: async () => '<!DOCTYPE html><title>Error 522</title>' };
+  };
+  const r = await loadMyRaidTrains('goproflowyo', {
+    fetchImpl: cloudflare, storage, clock: () => NOW, ...noWait,
+  });
+  assert.equal(log.length, 3); // retried, not accepted as an answer
+  assert.equal(r.notFound, undefined);
+  assert.ok(r.error);
+  assert.equal(r.fromCache, true);
+  assert.equal(r.user.events.length, 3); // the list never blanks
+});
+
+test('loadMyRaidTrains never reaches the network on a fresh cache, retries or not', async () => {
+  const storage = fakeStorage({
+    [userCacheKey('goproflowyo')]: cacheEntry(makeUserPayload(), NOW - HOUR),
+  });
+  const log = [];
+  await loadMyRaidTrains('goproflowyo', { fetchImpl: routedFetch({}, log), storage, clock: () => NOW, ...noWait });
+  assert.equal(log.length, 0);
+});
+
+test('refreshEventDetail retries the button the streamer is watching spin', async () => {
+  const storage = fakeStorage();
+  const log = [];
+  const r = await refreshEventDetail('luna-hao8', {
+    fetchImpl: flakyFetch(1, { [eventUrl('luna-hao8')]: okJson(makeEventPayload({ title: 'LUNA' })) }, log),
+    storage, clock: () => NOW, ...noWait,
+  });
+  assert.equal(log.length, 2);
+  assert.equal(r.fromCache, false);
+  assert.equal(r.event.title, 'LUNA');
+});
+
+test('the sequential detail loop does NOT retry — N events must not multiply into a long spinner', async () => {
+  // Deliberate asymmetry (see the module note): each card fails soft on its own
+  // and carries its own Refresh, which does retry.
+  const log = [];
+  const results = await loadEventDetails(SUMMARIES, {
+    fetchImpl: routedFetch({}, log), storage: fakeStorage(), clock: () => NOW, sleep: async () => {},
+  });
+  assert.equal(log.length, SUMMARIES.length); // one attempt each, not three
+  assert.ok(results.every((r) => r.error && r.event === null));
 });

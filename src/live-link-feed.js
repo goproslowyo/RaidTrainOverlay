@@ -15,7 +15,8 @@
 
 import { MAX_BLOB_CHARS } from './blob-codec.js';
 import { fetchUserPayload, normalizeUser } from './raidpal-client.js';
-import { startEventFeed, nextPollDelayMs } from './event-feed.js';
+import { startEventFeed } from './event-feed.js';
+import { nextPollDelayMs } from './backoff.js';
 import { decodeTrainMap, resolveLiveTrain, effectiveQuery } from './live-link.js';
 import { parseConfig } from './config.js';
 

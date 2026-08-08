@@ -89,13 +89,53 @@ test('fetchUserPayload returns null on 204 — unknown user, not an error', asyn
   assert.equal(await fetchUserPayload('thisuserdoesnotexist12345', fakeFetch), null);
 });
 
-test('fetchUserPayload returns null on a 200 whose body is empty or not a user payload', async () => {
+test('an EMPTY body is "no such user" whatever status carries it (#49)', async () => {
+  // The probe saw a 204, but this outcome must not hinge on which code an
+  // undocumented, unversioned API picks for "nobody here".
   const empty = async () => ({ ok: true, status: 200, text: async () => '' });
   assert.equal(await fetchUserPayload('someone', empty), null);
-  const garbage = async () => ({ ok: true, status: 200, text: async () => 'not json' });
-  assert.equal(await fetchUserPayload('someone', garbage), null);
+  const blank = async () => ({ ok: true, status: 200, text: async () => '  \n ' });
+  assert.equal(await fetchUserPayload('someone', blank), null);
+});
+
+test('an UNREADABLE body is a failed read, not "no such user" (#49)', async () => {
+  // This used to return null, which told a streamer with 13 trains that they
+  // had no RaidPal profile — and, because "not found" is not a failure, it also
+  // withheld the Verified read that #39's pruning and #41's Cleanup require.
+  // Throwing puts it on #47's retry curve and the honest "didn't answer" path.
+  const cloudflare = async () => ({
+    ok: true, status: 200,
+    text: async () => '<!DOCTYPE html><html><head><title>Error 522</title></head><body>Connection timed out</body></html>',
+  });
+  await assert.rejects(fetchUserPayload('goproflowyo', cloudflare), /could not read/);
+  const truncated = async () => ({ ok: true, status: 200, text: async () => '{"user":{"display_nam' });
+  await assert.rejects(fetchUserPayload('goproflowyo', truncated), /could not read/);
   const noUser = async () => ({ ok: true, status: 200, text: async () => '{"ok":true}' });
-  assert.equal(await fetchUserPayload('someone', noUser), null);
+  await assert.rejects(fetchUserPayload('goproflowyo', noUser), /could not read/);
+});
+
+test('the unreadable error stays plain for the UI and keeps its detail for the log', async () => {
+  // configurator.html renders error.message straight into the error card, so it
+  // must read like a sentence, not like a stack trace.
+  const cloudflare = async () => ({
+    ok: true, status: 200, text: async () => '<!doctype html><title>Error 522</title>',
+  });
+  const error = await fetchUserPayload('goproflowyo', cloudflare).catch((e) => e);
+  assert.equal(error.message, 'RaidPal answered with something we could not read.');
+  assert.match(error.detail, /goproflowyo/);
+  assert.match(error.detail, /an HTML page/);
+});
+
+test('a real user with NO raid trains is a success, not garbage (#49)', async () => {
+  // The case most easily confused with an empty/odd response: the payload is
+  // perfectly valid, there is simply nothing on the schedule. It must not throw.
+  const noTrains = async () => ({
+    ok: true, status: 200,
+    text: async () => JSON.stringify({ user: { display_name: 'Quiet', events_joined: [] } }),
+  });
+  const raw = await fetchUserPayload('quiet', noTrains);
+  assert.equal(raw.user.display_name, 'Quiet');
+  assert.deepEqual(normalizeUser(raw).events, []);
 });
 
 test('fetchUserPayload throws on a non-ok response, carrying the status', async () => {
