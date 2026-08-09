@@ -25,8 +25,9 @@
  * ULTRA MODE — lava is the ONE theme that deliberately keeps per-frame filters:
  *  the metaball #goo (its colour-blend) AND the hue-rotate cycle, defined ONCE and
  *  applied to the SINGLE field layer (one raster for the whole train, not N). Every
- *  other theme is filter-free; this exception MUST be OBS-tested (see
- *  docs/adr/0001-lava-per-frame-filter-exception.md).
+ *  other theme is filter-free (hard OBS-perf mandate); this exception stands only
+ *  as long as it stays a single shared layer, and any change to the filter chain
+ *  MUST be re-verified inside an actual OBS browser source before shipping.
  *
  * Transparent only — no full-bleed background.
  */
@@ -79,21 +80,22 @@ export function ensureStyles() {
     /* ULTRA MODE — the psychedelic full-spectrum cycle over the WHOLE river. One of
        the two deliberate per-frame filters (the other is #goo). It rides the single
        .lava-field layer only (kept out of any drop-shadow group). */
-    .rt-theme-lava .lava-field{ animation: lv-hue 18s linear infinite; }
+    .rt-theme-lava .lava-field{ animation: lv-hue 34s linear infinite; }
     @keyframes lv-hue{ to{ filter: hue-rotate(360deg); } }
 
     /* A glob = nested groups: OUTER drifts in X (gx), INNER rises/falls in Y with a
        faint scale breath (gy). Different X vs Y periods (and per glob) weave each
        path into a slow loop, so neighbours coincide (fuse) then part (split) at
        ever-changing moments — the churn. Compositor-only; will-change hints. */
-    .rt-theme-lava .gx{ animation: lv-gx var(--px,18s) ease-in-out infinite; animation-delay: var(--dx,0s); will-change: transform; }
+    .rt-theme-lava .gx{ animation: lv-gx calc(var(--px,18s) * 1.9) ease-in-out infinite; animation-delay: var(--dx,0s); will-change: transform; }
     @keyframes lv-gx{ 0%,100%{ transform: translateX(calc(var(--ax,20px) * -1)); } 50%{ transform: translateX(var(--ax,20px)); } }
-    .rt-theme-lava .gy{ transform-box: fill-box; transform-origin: center; animation: lv-gy var(--py,13s) ease-in-out infinite; animation-delay: var(--dy,0s); will-change: transform; }
+    .rt-theme-lava .gy{ transform-box: fill-box; transform-origin: center; animation: lv-gy calc(var(--py,13s) * 1.9) ease-in-out infinite; animation-delay: var(--dy,0s); will-change: transform; }
     @keyframes lv-gy{ 0%{ transform: translateY(var(--ay,40px)) scale(1); } 50%{ transform: translateY(calc(var(--ay,40px) * -1)) scale(var(--s,1.06)); } 100%{ transform: translateY(var(--ay,40px)) scale(1); } }
 
-    /* the floating bead's gentle bob (faster when live) */
-    .rt-theme-lava .riderY{ transform-box: fill-box; transform-origin: center; animation: lv-bobY var(--p,7s) ease-in-out infinite; animation-delay: var(--d,0s); }
-    .rt-theme-lava .riderY.now{ animation: lv-bobYn calc(var(--p,7s)*.8) ease-in-out infinite; }
+    /* the floating bead's gentle bob (faster when live). Slowed with the globs
+       (review: "slowwww the lava") — drift ×1.9 above, bob ×1.6, hue 18→34s. */
+    .rt-theme-lava .riderY{ transform-box: fill-box; transform-origin: center; animation: lv-bobY calc(var(--p,7s) * 1.6) ease-in-out infinite; animation-delay: var(--d,0s); }
+    .rt-theme-lava .riderY.now{ animation: lv-bobYn calc(var(--p,7s) * 1.28) ease-in-out infinite; }
     @keyframes lv-bobY{ 0%{ transform: translateY(8px); } 50%{ transform: translateY(-10px); } 100%{ transform: translateY(8px); } }
     @keyframes lv-bobYn{ 0%{ transform: translateY(7px); } 50%{ transform: translateY(-14px); } 100%{ transform: translateY(7px); } }
 
@@ -126,12 +128,13 @@ export function ensureStyles() {
 export function buildTrack() {
   const el = document.createElement('div');
   el.className = 'rt-rails rt-rails-lava';
-  // the band backs the river's vertical extent: its top sits near the lava-band top
-  // and its height is ~0.96×--rt-th (a LOWER band — the top of frame stays see-through).
+  // the band backs the river's vertical extent: its top sits near the lava-band top.
+  // Height 0.72×th (review): at 0.96 its violet floor line sat a fifth of a
+  // train-height BELOW the wax pool ("off the rails") — 0.72 meets the river's base.
   const topFrac = ((VES_TOP - 8) / VIEW_H).toFixed(4);      // ~0.078 — just above the tube
   el.style.cssText =
     'top: calc(var(--rt-th) * ' + topFrac + ');' +
-    ' height: calc(var(--rt-th) * 0.96);' +
+    ' height: calc(var(--rt-th) * 0.72);' +
     // TRANSLUCENT theme-tinted dark band (~0.4 alpha peak) — the stream shows THROUGH
     // it dimly so it's a backing, never opaque. A soft top fade keeps it from reading
     // as a hard slab; a warm floor uplight pools at the bottom so the lamp reads
@@ -384,9 +387,9 @@ export function build(train, opts = {}) {
  *
  *  INTENTIONAL OFFSET: lava takes its floor from the TRACK, not the Train. There
  *  are no wheels — the lamp stands on the lounge floor, and that floor is the thin
- *  violet line buildTrack insets at the bottom of its band. Aligning on the Train's
- *  own art (the time line, ~0.95) would push that floor line off the canvas, so the
- *  band's bottom edge is the baseline: the same top fraction + 0.96 height it uses. */
-export const foot = (VES_TOP - 8) / VIEW_H + 0.96;
+ *  violet line buildTrack insets at the bottom of its band. With the band shrunk to
+ *  0.72×th (review fix) the old band-bottom baseline would leave a quarter
+ *  train-height of dead air — the floor is the time-caption ink instead. */
+export const foot = 0.97;
 
 export default { key: 'lava', ensureStyles, build, buildTrack, foot };

@@ -167,8 +167,16 @@ compositor-only and disables under `prefers-reduced-motion`.
 
 **Ride character (`--rt-ride`)** — a per-Theme convention (not a contract field): declare
 `--rt-ride: <n>` on your Theme's root to scale how loosely it rides. `1` is the default;
-`tron`/`departures` ride tight (`~0.6–0.7`), `wood`/`comic` ride loose (`~1.25–1.35`).
-`undulate()` reads it automatically.
+`tron`/`bullet` ride tight (`0.35`/`0.45`), `comic`/`departures` ride loose
+(`1.25`/`1.2`), and `pixel` declares `0` (its motion is a deliberately stepped bob
+instead). `undulate()` reads it automatically.
+
+**Skipping undulate is allowed — for a reason.** `highvibes` deliberately never calls
+`undulate()`: its per-plant art is dense enough that the per-Car sway forced a
+main-thread SVG re-raster, so it ships its own compositor-only leaf drift instead
+(the module's comments explain the trade). If your Theme's ambient motion replaces
+the sway rather than adding to it, that is fine — but keep it compositor-only and
+say why in a comment.
 
 ### Sizing — three media, three strategies
 
@@ -177,9 +185,9 @@ The renderer sizes your Theme to the train height (`--rt-th`, which already fold
 
 | Medium | How it scales | Reference Theme |
 |---|---|---|
-| **SVG** (golden path) | A `viewBox` scales for free — no unit math. | [`classic`](../src/themes/classic.js), the [starter](../src/themes/starter/index.js) |
-| **HTML/CSS** | No intrinsic ratio — size via the **`--u` token**: `--u: calc(var(--rt-th) / <design-height>)`, then every length is `calc(N * var(--u))` (don't use `em` or `transform: scale`). Reuse `shared-html.js`. | [`synthwave`](../src/themes/synthwave.js) |
-| **canvas** | A `<canvas>` has an intrinsic ratio (its backing store), so it scales like SVG; draw the ambient motion in a redraw loop that self-terminates on `canvas.isConnected`. | [`pixel`](../src/themes/pixel.js) |
+| **SVG** (golden path) | A `viewBox` scales for free — no unit math. | [`classic`](../src/themes/classic.js), the [starter](../src/themes/starter/index.js) — and most of the roster |
+| **HTML/CSS** | No intrinsic ratio — size via the **`--u` token**: `--u: calc(var(--rt-th) / <design-height>)`, then every length is `calc(N * var(--u))` (don't use `em` or `transform: scale`). Reuse `shared-html.js`. | [`wood`](../src/themes/wood.js); also [`departures`](../src/themes/departures.js), [`ticket`](../src/themes/ticket.js) |
+| **canvas** | A `<canvas>` has an intrinsic ratio (its backing store), so it scales like SVG; draw the ambient motion in a redraw loop that self-terminates on `canvas.isConnected`. | none shipped — the pre-redesign `pixel` was canvas; today's [`pixel`](../src/themes/pixel.js) is SVG |
 
 **Start with SVG** unless you specifically need HTML layout or a pixel buffer.
 
@@ -209,25 +217,31 @@ compensation. Rules of thumb:
   right when you move the art. HTML Themes express it in the same design units as
   `--u` (`export const foot = (DESIGN_H - 3) / DESIGN_H`).
 - **Measure the lowest *resting* art** — wheels, a ground shadow, or a name/time line
-  that hangs below them. It may exceed `1` if your art overhangs its box (departures'
-  bogies are slung under the board); that is fine and is the point.
+  that hangs below them. It may exceed `1` if your art overhangs its box; that is fine
+  and is the point (the pre-redesign departures board slung its bogies below the box —
+  today's roster happens to top out at exactly `1`, but the contract test sanity-bounds
+  it at `1.5`).
 - **Ignore effects that bleed on purpose**: smoke, glows, the NOW marker, a departed
   stamp, a live-only burst. They come and go with state, and a baseline that moved
   with the live car would be worse than no baseline at all.
 - **If your box height is content-driven, declare a function, not a constant.** A
   fixed-`viewBox` SVG Theme always has the same floor, but an HTML Theme whose card
-  grows with its content does not: `synthwave` stacks one time line per `tz` zone
-  *inside* the card, so three zones push its floor 40px further down. Those Themes
-  export `foot` as `({ maxTimeLines }) => …` and the renderer evaluates it per render.
-  Pin any line box the formula counts (`line-height` in `--u`) so the arithmetic is
-  exact rather than a platform font metric.
+  grows with its content does not: such a Theme exports `foot` as
+  `({ maxTimeLines }) => …` and the renderer evaluates it per render. No roster Theme
+  currently needs this (the pre-redesign synthwave stacked one time line per `tz` zone
+  inside its card, so three zones pushed its floor 40px further down; its outrun
+  redesign is fixed-height SVG) — but the renderer still resolves both forms and the
+  contract test in [`test/train-renderer.test.js`](../test/train-renderer.test.js)
+  keeps the function path exercised. If you use it, pin any line box the formula
+  counts (`line-height` in `--u`) so the arithmetic is exact rather than a platform
+  font metric.
 - **Usually the Train, occasionally the Track.** Take the floor from the train's own
   art. Take it from `buildTrack` only when the track paints the physical ground the
   train *rests on* and that ground reads as the floor — `jazz` (the wood console the
-  records sit on) and `lava` (the lounge floor line the lamp stands on) are the two
-  Themes that do, and both say so in a comment. Decorative bands that merely run
-  downward — tie strips, receding grids, translucent backing — are scenery and are
-  allowed to bleed off the bottom edge.
+  records sit on) is the Theme that does, and says so in a comment. (`lava` used to;
+  its river redesign has no lamp furniture, so its floor is now its own time-caption
+  ink.) Decorative bands that merely run downward — tie strips, receding grids,
+  translucent backing — are scenery and are allowed to bleed off the bottom edge.
 
 ---
 
@@ -319,7 +333,12 @@ than blanking the Overlay.
   Never a full-canvas backdrop. The stream is transparent.
 - **Glow over a *static* group** — put Now/Spotlight glows (CSS `drop-shadow`) on a static
   element, with wheels/smoke in a sibling layer. A filter over an animating subtree
-  re-rasterises every frame and tanks performance.
+  re-rasterises every frame and tanks performance. The one deliberate exception is
+  `lava`: its metaball `#goo` and hue-rotate cycle are two per-frame filters over a
+  *single* shared field layer (one raster for the whole train, not one per Car), and
+  the module's header documents the trade and the OBS-test obligation. Every other
+  Theme is filter-free at rest; don't add a second exception without the same
+  justification.
 - **Undulate is sway + rock, not a bob** — and it's free via `undulate()`. Keep added
   motion compositor-only and reduced-motion-safe.
 - **Declare your baseline** — `foot`, the fraction of the train height at which your
@@ -331,6 +350,6 @@ than blanking the Overlay.
 - **The loco is the organiser** — it has no slot, so no NOW/departed/spotlight; dim only post-event.
 
 Reference Themes: [`classic`](../src/themes/classic.js) (SVG, the bar),
-[`synthwave`](../src/themes/synthwave.js) (HTML/`--u`), [`pixel`](../src/themes/pixel.js)
-(canvas), and the [starter](../src/themes/starter/index.js) (golden path + a bundled
-asset). The glossary and core concepts live in [`CONTEXT.md`](../CONTEXT.md).
+[`wood`](../src/themes/wood.js) (HTML/`--u`), and the
+[starter](../src/themes/starter/index.js) (golden path + a bundled asset). The glossary
+and core concepts live in [`CONTEXT.md`](../CONTEXT.md).

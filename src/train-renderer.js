@@ -376,9 +376,10 @@ export function renderTrain(train, container, config) {
   // bottoms out identically. A Theme with no declared baseline falls back to 1.
   //
   // A Theme whose box is content-driven declares `foot` as a FUNCTION of the render
-  // context instead of a constant, because its floor moves with the content: synthwave
-  // stacks one time line per tz zone inside the card, so three zones push its floor
-  // 40px further down. That is why this is stamped after maxTimeLines is known.
+  // context instead of a constant, because its floor moves with the content (the
+  // pre-redesign synthwave stacked one time line per tz zone inside its card; no
+  // roster Theme currently does). That is why this is stamped after maxTimeLines
+  // is known.
   const declaredFoot = typeof theme.foot === 'function' ? theme.foot({ maxTimeLines }) : theme.foot;
   stage.style.setProperty('--rt-foot', String(Number.isFinite(declaredFoot) ? declaredFoot : 1));
   // Every built copy (the first, plus any marquee duplicates) is collected so a

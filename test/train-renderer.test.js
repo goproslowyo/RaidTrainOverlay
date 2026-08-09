@@ -103,17 +103,15 @@ test('every registered Theme satisfies the renderer contract', () => {
   }
 });
 
-test('a content-height Theme grows its baseline with the tz time block', () => {
-  // synthwave stacks one .sw-time line per zone INSIDE the card, so its box — and
-  // therefore its floor — grows with tz. A constant here left tz=PT,ET,GMT hanging
-  // 40.8px off the bottom edge at height=100 (measured at 1920x1080, scale 1).
-  assert.equal(typeof synthwave.foot, 'function', 'synthwave declares a context-dependent baseline');
-  const one = synthwave.foot({ maxTimeLines: 1 });
-  const three = synthwave.foot({ maxTimeLines: 3 });
-  // Two extra pinned 14u lines in a 210u-tall design box.
-  assert.ok(Math.abs((three - one) - (2 * 14) / 210) < 1e-9, 'two extra zones add exactly two line boxes');
-  // Called bare (no context) it must still answer for the single-line case.
-  assert.equal(synthwave.foot(), one);
+test('synthwave (outrun redesign) pins a constant baseline', () => {
+  // The original synthwave stacked one .sw-time line per zone INSIDE the card, so
+  // its floor had to grow with the tz block (a function foot). The outrun redesign
+  // shows a single time line in a fixed HUD tag over each car, so its box no longer
+  // varies with context — the baseline is the tyre bottom, a constant. (A Theme MAY
+  // still declare foot as a function of { maxTimeLines }; the renderer resolves both
+  // forms — see the contract test above.)
+  assert.equal(typeof synthwave.foot, 'number', 'the outrun card is fixed-height');
+  assert.ok(synthwave.foot > 0.5 && synthwave.foot <= 1.5, 'a plausible fraction of --rt-th');
 });
 
 test('classic contributes a stationary Track via buildTrack', () => {

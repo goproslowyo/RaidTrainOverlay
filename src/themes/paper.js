@@ -1,207 +1,245 @@
 /**
- * paper — Construction-paper cut-out Theme. A handmade paper-craft
- * diorama: cut-paper Cars in warm construction-paper tints, each lifted off the
- * canvas with a soft drop-shadow (the layered look), polaroid photos held on with
- * washi tape, a cut-paper steam locomotive, and handwritten labels. Rebuilt as an
- * SVG Theme (like classic/flat/comic) so the cut-paper shapes + shadows stay crisp.
- *
- *  - viewBox only (no width/height) so CSS --train-height sizes it.
- *  - The locomotive shows the FIRST streamer; it stays bright after their
- *    slot (eternal leader), dims only post-event. The Organiser rides the tender; a
- *    departed Slot is lightly dimmed and stamped PLAYED.
- *  - State rides the shared rt-car--current/--departed/--spotlit classes; the soft
- *    paper shadow + the Now/Spotlight glow are CSS drop-shadows over the static
- *    .pp-art group, wheels/smoke in a sibling layer (memory `theme-rendering-constraints`).
- *
- * Transparent only — no full-bleed background.
+ * paper2 — Origami. Workshop direction per user: each vehicle is a different
+ * folded-paper piece — the engine is a paper airplane, coaches cycle through
+ * crane / sailboat / pinwheel — in classic origami paper colours with white
+ * undersides and hard facet shading (no gradients on folds, just two tones +
+ * white). Avatar rides as a round sticker; names on little paper tags below.
+ * SVG medium, same contract as the roster themes.
  */
-import { esc, wheel, smokeSVG, pointerSVG, avatarSVG, fitAll, undulate, toVehicles, themeT } from './shared-svg.js';
+import { esc, avatarSVG, fitAll, undulate, toVehicles, themeT } from './shared-svg.js';
 
-// The translator the builders paint with — rebound to the active locale at the
-// top of build(); persists for the in-place update() ticks (English until then).
 let L = themeT();
 
-const ENGINE_W = 206;
-const CAR_W = 172;
-const TENDER_W = 142;
-const GAP = 12;
-const railY = 178;
-const VIEW_TOP = -14;
-const VIEW_BOTTOM = 200;
+const ENGINE_W = 190;
+const CAR_W = 170;
+const GAP = 14;
+const railY = 148;               // desk line the pieces rest on
+const VIEW_TOP = -26;
+const VIEW_BOTTOM = 196;
 const VIEW_H = VIEW_BOTTOM - VIEW_TOP;
-const COL = { now: '#fbbf24', spot: '#22d3ee', open: '#2f9e44' };
-const TINTS = ['#ef7d57', '#f4b942', '#3fa7a0', '#e0566f', '#6d7fd6', '#9c6ade'];
-const ENG_TINT = '#ef7d57';
-const INK = '#5a4632';            // handwritten ink / paper-edge brown
-const STYLE_ID = 'rt-theme-paper-style';
-const FONT = "'Baloo 2', 'Comic Sans MS', system-ui, sans-serif";
-const centerX = (x, w) => x + w / 2;
+// paper colours: [main, shade, deep]
+const PAPERS = [
+  ['#e2566e', '#c43f57', '#9e2f44'],   // red
+  ['#3fa7a0', '#2f8a84', '#1f6a66'],   // teal
+  ['#e8b13d', '#cc9426', '#a87518'],   // mustard
+  ['#8f7bc4', '#7561ab', '#5a4a8a'],   // lilac
+];
+const WHITE = '#f6f1e7', WHITE_SH = '#ddd5c4';
+const INKTAG = '#4a4436';
+const COL = { now: '#fbbf24', spot: '#22d3ee', open: '#3d9e57' };
+const STYLE_ID = 'rt-theme-paper2-style';
+const mid = (x, w) => x + w / 2;
 
 export function ensureStyles() {
   if (document.getElementById(STYLE_ID)) return;
   const style = document.createElement('style');
   style.id = STYLE_ID;
   style.textContent = `
-    /* Every paper Car floats with a soft drop-shadow (the cut-paper lift). */
-    .rt-theme-paper .pp-art { filter: drop-shadow(0 3px 2px #00000040); }
-    .rt-theme-paper .rt-car--departed { opacity: 0.84; }
-    .rt-theme-paper .rt-car--departed image { filter: saturate(0.5); }
-    .rt-theme-paper .pp-stamp { visibility: hidden; }
-    .rt-theme-paper .rt-car--departed .pp-stamp { visibility: visible; }
-    .rt-theme-paper .rt-car--current .pp-art { filter: drop-shadow(0 3px 2px #00000040) drop-shadow(0 0 5px ${COL.now}) drop-shadow(0 0 9px ${COL.now}); }
-    .rt-theme-paper .rt-car--spotlit .pp-art { filter: drop-shadow(0 3px 2px #00000040) drop-shadow(0 0 5px ${COL.spot}) drop-shadow(0 0 9px ${COL.spot}); }
-    .rt-theme-paper .rt-car--current.rt-car--spotlit .pp-art { filter: drop-shadow(0 3px 2px #00000040) drop-shadow(0 0 5px ${COL.now}) drop-shadow(0 0 8px ${COL.spot}); }
-    /* Soft paper-strip Track. */
-    .rt-rails-paper { top: var(--rt-rail-top); height: calc(var(--rt-th) * 0.05); }
-    .rt-rails-paper::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: calc(var(--rt-th) * 0.03);
-      background: #caa06a; border-radius: calc(var(--rt-th) * 0.015); box-shadow: 0 calc(var(--rt-th) * 0.02) 0 calc(var(--rt-th) * -0.006) #00000022; }
+    .rt-theme-paper2 .rt-car--departed { opacity: 0.85; }
+    .rt-theme-paper2 .rt-car--departed .pp2-art { filter: saturate(0.4); }
+    .rt-theme-paper2 .pp2-stamp { visibility: hidden; }
+    .rt-theme-paper2 .rt-car--departed .pp2-stamp { visibility: visible; }
+    .rt-theme-paper2 .rt-car--current .pp2-art { filter: drop-shadow(0 0 4px ${COL.now}) drop-shadow(0 0 9px ${COL.now}); }
+    .rt-theme-paper2 .rt-car--spotlit .pp2-art { filter: drop-shadow(0 0 4px ${COL.spot}) drop-shadow(0 0 9px ${COL.spot}); }
+    .rt-theme-paper2 .rt-car--current.rt-car--spotlit .pp2-art { filter: drop-shadow(0 0 4px ${COL.now}) drop-shadow(0 0 8px ${COL.spot}); }
+    .rt-rails-paper2 { top: var(--rt-rail-top); height: calc(var(--rt-th) * 0.018);
+      background: #b9a98c; border-radius: 999px; box-shadow: 0 calc(var(--rt-th) * 0.006) calc(var(--rt-th) * 0.01) #00000030; }
   `;
   document.head.appendChild(style);
 }
 
 export function buildTrack() {
   const el = document.createElement('div');
-  el.className = 'rt-rails rt-rails-paper';
+  el.className = 'rt-rails rt-rails-paper2';
   el.style.setProperty('--rt-rail-top', `calc(var(--rt-th) * ${((railY + 2 - VIEW_TOP) / VIEW_H).toFixed(4)})`);
   return el;
 }
 
-/** A cut-paper rounded rect with a subtly torn (deckled) top edge — paper, not a box. */
-function paperPiece(x, y, w, h, fill) {
-  const steps = Math.max(4, Math.round(w / 16));
-  let d = `M ${x} ${y + 5}`;
-  for (let k = 1; k <= steps; k++) {
-    const px = x + (w * k) / steps;
-    d += ` Q ${(px - w / steps / 2).toFixed(1)} ${y + (k % 2 ? 0 : 6)} ${px.toFixed(1)} ${y + (k % 2 ? 5 : 2)}`;
+const P = (pts, f) => `<polygon points="${pts}" fill="${f}"/>`;
+/** soft contact shadow under a piece */
+const shadow = (cx, rx) => `<ellipse cx="${cx}" cy="${railY + 4}" rx="${rx}" ry="5" fill="#00000022"/>`;
+/** avatar sticker with a white rim */
+function sticker(id, cx, cy, r, v) {
+  return `<circle cx="${cx}" cy="${cy}" r="${r + 4}" fill="${WHITE}"/><circle cx="${cx}" cy="${cy}" r="${r + 4}" fill="none" stroke="#00000018" stroke-width="1"/>` +
+    avatarSVG(id, cx, cy, r, v.image, v.name, '#8a8070');
+}
+/** name tag: a little folded paper label below the piece */
+function tag(cx, v, maxw) {
+  const t = v.timeLines?.[0] ?? '';
+  return `<path d="M ${cx - 52} ${railY + 12} L ${cx + 52} ${railY + 12} L ${cx + 52} ${railY + 40} L ${cx - 52} ${railY + 40} Z" fill="${WHITE}"/>` +
+    `<path d="M ${cx - 52} ${railY + 12} L ${cx - 44} ${railY + 20} L ${cx - 52} ${railY + 20} Z" fill="${WHITE_SH}"/>` +
+    `<text class="rt-fit pp2-name" data-maxw="${maxw}" x="${cx}" y="${railY + 26}" text-anchor="middle" font-weight="700" font-size="12.5" fill="${INKTAG}" font-family="'Public Sans', system-ui, sans-serif">${esc(v.name)}</text>` +
+    `<text class="pp2-time" x="${cx}" y="${railY + 37}" text-anchor="middle" font-weight="600" font-size="9" fill="#8a8070" font-family="'DM Mono', monospace">${esc(t)}</text>`;
+}
+function nowFlag(cx) {
+  return `<g class="rt-pointer rt-now-bob"><path d="M ${cx - 26} ${-18} L ${cx + 26} ${-18} L ${cx + 26} ${0} L ${cx} ${-6} L ${cx - 26} ${0} Z" fill="${COL.now}"/><text x="${cx}" y="${-5}" text-anchor="middle" font-weight="800" font-size="11" fill="#4a3110" font-family="'Public Sans', sans-serif">${esc(L('overlay.now'))}</text></g>`;
+}
+function stamp(cx, cy) {
+  return `<g class="pp2-stamp" transform="rotate(-8 ${cx} ${cy})"><rect x="${cx - 38}" y="${cy - 13}" width="76" height="26" rx="2" fill="#f2e9b8ee" stroke="#c9b25a" stroke-width="1.5"/><text x="${cx}" y="${cy + 5}" text-anchor="middle" font-weight="800" font-size="13" fill="#8a7326" letter-spacing="2" font-family="'Public Sans', sans-serif">${esc(L('overlay.played'))}</text></g>`;
+}
+
+/** ENGINE — paper airplane (dart) pointing left, nose slightly up. */
+function oriPlane(x, v, i) {
+  const nx = x + 6, ny = 96;               // nose
+  const tx = x + 176, tTop = 58, tBot = 132;
+  const [m, sh, dp] = PAPERS[1];
+  let s = shadow(x + 96, 74);
+  // under-wing (deep), body fold (white), top wing (main + shade facets)
+  s += P(`${nx},${ny} ${tx},${tBot} ${x + 120},${tBot + 6}`, dp);
+  s += P(`${nx},${ny} ${tx},${tTop} ${tx},${tBot}`, m);
+  s += P(`${nx},${ny} ${tx},${tTop} ${x + 140},${ny + 8}`, sh);
+  s += P(`${nx},${ny} ${x + 140},${ny + 8} ${tx},${tBot}`, WHITE);
+  s += P(`${nx},${ny} ${x + 108},${ny + 4} ${x + 112},${tBot - 6}`, WHITE_SH);
+  // centre crease
+  s += `<line x1="${nx}" y1="${ny}" x2="${tx}" y2="${tBot}" stroke="#00000022" stroke-width="1.5"/>`;
+  s += sticker(`pp2-av-${i}`, x + 128, 96, 19, v);
+  s += tag(x + 96, v, 92);
+  return { body: s, nowX: x + 96 };
+}
+
+/** Crane: body diamond, tall folded wing, zigzag neck + head, tail. */
+function oriCrane(x, w, v, i, [m, sh, dp]) {
+  const cx = mid(x, w), by = 118;          // body centre
+  let s = shadow(cx, 60);
+  // tail (right, points up-back)
+  s += P(`${cx + 18},${by - 4} ${cx + 62},${by - 40} ${cx + 30},${by + 10}`, sh);
+  // neck + head (left)
+  s += P(`${cx - 18},${by - 4} ${cx - 56},${by - 46} ${cx - 26},${by + 8}`, m);
+  s += P(`${cx - 56},${by - 46} ${cx - 72},${by - 34} ${cx - 52},${by - 32}`, dp);   // head
+  // body diamond
+  s += P(`${cx - 30},${by} ${cx},${by - 26} ${cx + 30},${by} ${cx},${railY - 2}`, m);
+  s += P(`${cx - 30},${by} ${cx},${by - 26} ${cx},${railY - 2}`, WHITE);
+  // big wing fold rising from the body
+  s += P(`${cx - 14},${by - 10} ${cx + 8},${by - 66} ${cx + 34},${by - 8}`, sh);
+  s += P(`${cx - 14},${by - 10} ${cx + 8},${by - 66} ${cx - 2},${by - 8}`, dp);
+  s += `<line x1="${cx}" y1="${by - 26}" x2="${cx}" y2="${railY - 2}" stroke="#00000022" stroke-width="1.2"/>`;
+  s += sticker(`pp2-av-${i}`, cx + 34, by - 34, 17, v);
+  s += tag(cx, v, w - 84);
+  s += stamp(cx, by - 4);
+  return { body: s, nowX: cx };
+}
+
+/** Sailboat: hull trapezoid + two sails. */
+function oriBoat(x, w, v, i, [m, sh, dp]) {
+  const cx = mid(x, w), hy = railY - 26;
+  let s = shadow(cx, 62);
+  s += P(`${cx - 56},${hy} ${cx + 56},${hy} ${cx + 38},${railY - 2} ${cx - 38},${railY - 2}`, m);
+  s += P(`${cx - 56},${hy} ${cx - 38},${railY - 2} ${cx - 30},${hy}`, dp);
+  s += P(`${cx - 4},${hy - 4} ${cx - 4},${hy - 62} ${cx - 46},${hy - 4}`, WHITE);   // main sail
+  s += P(`${cx - 4},${hy - 4} ${cx - 4},${hy - 62} ${cx - 16},${hy - 4}`, WHITE_SH);
+  s += P(`${cx + 6},${hy - 4} ${cx + 6},${hy - 48} ${cx + 42},${hy - 4}`, sh);       // jib
+  s += sticker(`pp2-av-${i}`, cx + 34, hy - 34, 17, v);
+  s += tag(cx, v, w - 84);
+  s += stamp(cx, hy - 8);
+  return { body: s, nowX: cx };
+}
+
+/** Pinwheel on a stick. */
+function oriPinwheel(x, w, v, i, [m, sh, dp]) {
+  const cx = mid(x, w), py = 92, r = 40;
+  let s = shadow(cx, 40);
+  s += `<line x1="${cx}" y1="${py}" x2="${cx}" y2="${railY - 2}" stroke="#b9a98c" stroke-width="5" stroke-linecap="round"/>`;
+  for (let k = 0; k < 4; k++) {
+    const a = k * 90;
+    s += `<g transform="rotate(${a} ${cx} ${py})">` +
+      P(`${cx},${py} ${cx + r},${py - r * 0.35} ${cx + r * 0.62},${py - r * 0.9}`, k % 2 ? m : sh) +
+      P(`${cx},${py} ${cx + r * 0.62},${py - r * 0.9} ${cx + r * 0.2},${py - r * 0.55}`, WHITE) +
+      `</g>`;
   }
-  d += ` L ${x + w} ${y + h - 6} Q ${x + w} ${y + h} ${x + w - 6} ${y + h} L ${x + 6} ${y + h} Q ${x} ${y + h} ${x} ${y + h - 6} Z`;
-  return `<path d="${d}" fill="${fill}"/>`;
+  s += `<circle cx="${cx}" cy="${py}" r="5" fill="${dp}"/>`;
+  s += sticker(`pp2-av-${i}`, cx + 44, py + 18, 17, v);
+  s += tag(cx, v, w - 84);
+  s += stamp(cx, py + 4);
+  return { body: s, nowX: cx };
 }
 
-/** A polaroid: a white paper frame (slightly tilted) around the circular photo, with
- *  a strip of washi tape over the top. */
-function polaroid(id, cx, cy, r, image, name, tilt, tape) {
-  const fw = r + 7;
-  return `<g transform="rotate(${tilt} ${cx} ${cy})">` +
-    `<rect x="${cx - fw}" y="${cy - fw}" width="${fw * 2}" height="${fw * 2 + 7}" rx="3" fill="#fff"/>` +
-    avatarSVG(id, cx, cy, r, image, name, '#fff') +
-    `<rect x="${cx - 14}" y="${cy - fw - 5}" width="28" height="11" rx="1" fill="${tape}" opacity="0.9" transform="rotate(-6 ${cx} ${cy - fw})"/>` +
-    `</g>`;
+/** Open slot: a flat unfolded square with dashed crease lines. */
+function oriOpen(x, w, v) {
+  const cx = mid(x, w), sz = 74, ty = railY - 6 - sz;
+  let s = `<rect x="${cx - sz / 2}" y="${ty}" width="${sz}" height="${sz}" fill="#eef3ec" stroke="${COL.open}" stroke-width="2.5" stroke-dasharray="8 6" transform="rotate(-4 ${cx} ${ty + sz / 2})"/>`;
+  s += `<line x1="${cx - sz / 2}" y1="${ty + sz / 2}" x2="${cx + sz / 2}" y2="${ty + sz / 2}" stroke="#3d9e5766" stroke-width="1.5" stroke-dasharray="5 5" transform="rotate(-4 ${cx} ${ty + sz / 2})"/>`;
+  s += `<line x1="${cx}" y1="${ty}" x2="${cx}" y2="${ty + sz}" stroke="#3d9e5766" stroke-width="1.5" stroke-dasharray="5 5" transform="rotate(-4 ${cx} ${ty + sz / 2})"/>`;
+  s += `<text x="${cx}" y="${ty + sz / 2 + 8}" text-anchor="middle" font-weight="800" font-size="22" fill="${COL.open}" font-family="'Public Sans', sans-serif">+</text>`;
+  const t = v.timeLines?.[0] ? `${L('overlay.signUp')} · ${v.timeLines[0]}` : L('overlay.signUp');
+  return { body: s + tag(cx, { name: L('overlay.open'), timeLines: [t] }, w - 84), nowX: cx };
 }
 
-const handLabel = (x, y, w, name, maxw, size = 15) =>
-  `<rect x="${x}" y="${y}" width="${w}" height="${size + 8}" rx="3" fill="#fffdf5"/>` +
-  `<text class="rt-fit" data-maxw="${maxw}" x="${x + w / 2}" y="${y + size + 1}" text-anchor="middle" font-family="${FONT}" font-weight="800" font-size="${size}" fill="${INK}">${esc(name)}</text>`;
-
-// Each builder returns { body, front }: static cut-paper art + animating wheel/smoke.
-
-function paperEngine(x, v, i) {
-  const by = 108, bh = 50;
-  let s = `<path d="M ${x + 2} ${railY - 4} L ${x + 26} ${railY - 26} L ${x + 26} ${railY - 4} Z" fill="${INK}"/>`; // paper cowcatcher
-  s += paperPiece(x + 148, by - 22, 52, bh + 26, ENG_TINT);                                                       // cab
-  s += `<rect x="${x + 158}" y="${by - 4}" width="32" height="26" rx="3" fill="#fff7e8"/>`;                       // cab window (paper)
-  s += paperPiece(x + 14, by, 142, bh, ENG_TINT);                                                                 // boiler
-  s += `<path d="M ${x + 66} ${by + 2} L ${x + 90} ${by + 2} L ${x + 94} ${by - 26} L ${x + 62} ${by - 26} Z" fill="${INK}"/><rect x="${x + 58}" y="${by - 32}" width="40" height="8" rx="3" fill="${INK}"/>`; // funnel
-  s += `<path d="M ${x + 106} ${by + 1} A 13 12 0 0 1 ${x + 132} ${by + 1} Z" fill="#fde9c8"/>`;                  // dome
-  // Polaroid of the streamer in the cab window — the driver.
-  s += polaroid(`pp-av-${i}`, x + 174, by + 8, 16, v.image, v.name, -3, '#86d9d3cc');
-  s += handLabel(x + 74, by + 16, 70, v.name, 60, 14);
-  const timeBaseY = railY - 28;
-  s += `<text class="pp-time" data-base-y="${timeBaseY}" x="${x + 109}" y="${timeBaseY}" text-anchor="middle" font-family="${FONT}" font-weight="700" font-size="11" fill="${INK}">${(v.timeLines ?? [''])[0] ?? ''}</text>`;
-  const front = smokeSVG(x + 78, by - 38, 1.1)
-    + paperWheel(x + 34, railY, 11) + paperWheel(x + 70, railY, 17) + paperWheel(x + 116, railY, 17) + paperWheel(x + 170, railY, 13);
-  return { body: s, front };
+/** Butterfly: thin body diamond, two big upper wings, two smaller lower. */
+function oriButterfly(x, w, v, i, [m, sh, dp]) {
+  const cx = mid(x, w), by = 108;
+  let s = shadow(cx, 52);
+  s += P(`${cx - 6},${by - 8} ${cx - 58},${by - 44} ${cx - 44},${by + 4}`, m);       // upper L
+  s += P(`${cx + 6},${by - 8} ${cx + 58},${by - 44} ${cx + 44},${by + 4}`, sh);      // upper R
+  s += P(`${cx - 5},${by + 4} ${cx - 44},${by + 30} ${cx - 12},${by + 34}`, WHITE);  // lower L
+  s += P(`${cx + 5},${by + 4} ${cx + 44},${by + 30} ${cx + 12},${by + 34}`, WHITE_SH); // lower R
+  s += P(`${cx - 6},${by - 12} ${cx + 6},${by - 12} ${cx + 3},${by + 36} ${cx - 3},${by + 36}`, dp); // body
+  s += `<line x1="${cx - 4}" y1="${by - 12}" x2="${cx - 12}" y2="${by - 24}" stroke="${dp}" stroke-width="1.5"/><line x1="${cx + 4}" y1="${by - 12}" x2="${cx + 12}" y2="${by - 24}" stroke="${dp}" stroke-width="1.5"/>`;
+  s += sticker(`pp2-av-${i}`, cx + 40, by - 30, 17, v);
+  s += tag(cx, v, w - 84);
+  s += stamp(cx, by + 6);
+  return { body: s, nowX: cx };
 }
 
-function paperWheel(cx, cy, r) {
-  return `<circle cx="${cx}" cy="${cy + 1}" r="${r}" fill="#00000018"/>` + wheel(cx, cy, r, '#6b4a22', 6, '#caa06a');
+/** Fish: faceted body pointing left, split tail folds, dot eye. */
+function oriFish(x, w, v, i, [m, sh, dp]) {
+  const cx = mid(x, w), fy = 116;
+  let s = shadow(cx, 56);
+  s += P(`${cx - 54},${fy} ${cx + 16},${fy - 34} ${cx + 16},${fy + 30}`, m);         // body
+  s += P(`${cx - 54},${fy} ${cx + 16},${fy - 34} ${cx - 8},${fy}`, WHITE);           // top facet
+  s += P(`${cx + 16},${fy - 34} ${cx + 52},${fy - 44} ${cx + 30},${fy - 2}`, sh);    // tail up
+  s += P(`${cx + 16},${fy + 30} ${cx + 52},${fy + 36} ${cx + 30},${fy - 2}`, dp);    // tail down
+  s += `<circle cx="${cx - 38}" cy="${fy - 4}" r="3" fill="#3a3428"/>`;
+  s += sticker(`pp2-av-${i}`, cx + 2, fy - 2, 17, v);
+  s += tag(cx, v, w - 84);
+  s += stamp(cx, fy - 6);
+  return { body: s, nowX: cx };
 }
 
-function paperCoach(x, w, v, i, caboose) {
-  const tilt = i % 2 ? 1.4 : -1.4;
-  const tint = caboose ? TINTS[(i + 2) % TINTS.length] : TINTS[i % TINTS.length];
-  const tape = ['#86d9d3cc', '#f4b09acc', '#a6c8f0cc'][i % 3];
-  let s = i > 0 ? `<rect x="${x - GAP - 2}" y="${railY - 40}" width="${GAP + 6}" height="8" rx="4" fill="#caa06a"/>` : '';
-  s += `<g transform="rotate(${tilt} ${centerX(x, w)} 132)">`;
-  s += paperPiece(x + 8, 90, w - 16, 84, tint);
-  s += polaroid(`pp-av-${i}`, x + 42, 126, 27, v.image, v.name, i % 2 ? 3 : -2, tape);
-  s += handLabel(x + 80, 110, w - 92, v.name, w - 104, 15);
-  const timeBaseY = 158;
-  s += `<text class="pp-time" data-base-y="${timeBaseY}" x="${x + 80 + (w - 92) / 2}" y="${timeBaseY}" text-anchor="middle" font-family="${FONT}" font-weight="700" font-size="12" fill="${INK}">${(v.timeLines ?? [''])[0] ?? ''}</text>`;
-  const sx = centerX(x, w), sy = 150;
-  s += `<g class="pp-stamp" transform="rotate(-8 ${sx} ${sy})"><rect x="${sx - 38}" y="${sy - 14}" width="76" height="28" rx="3" fill="#fff7ec" stroke="#b23a2a" stroke-width="2.5"/><text x="${sx}" y="${sy + 6}" text-anchor="middle" font-family="${FONT}" font-weight="800" font-size="15" fill="#b23a2a" letter-spacing="2">${esc(L('overlay.played'))}</text></g>`;
-  s += `</g>`;
-  const front = paperWheel(x + 44, railY, 15) + paperWheel(x + w - 44, railY, 15);
-  return { body: s, front };
+/** Tulip: three-point blossom on a green stem with one folded leaf. */
+function oriTulip(x, w, v, i, [m, sh, dp]) {
+  const cx = mid(x, w), ty = 78;
+  let s = shadow(cx, 34);
+  s += `<line x1="${cx}" y1="${ty + 26}" x2="${cx}" y2="${railY - 2}" stroke="#5e9a56" stroke-width="5" stroke-linecap="round"/>`;
+  s += P(`${cx},${railY - 26} ${cx + 34},${railY - 46} ${cx + 6},${railY - 12}`, '#79b56e');  // leaf
+  s += P(`${cx - 30},${ty + 26} ${cx - 30},${ty - 6} ${cx - 8},${ty + 12}`, sh);     // left petal
+  s += P(`${cx + 30},${ty + 26} ${cx + 30},${ty - 6} ${cx + 8},${ty + 12}`, dp);     // right petal
+  s += P(`${cx - 30},${ty + 26} ${cx},${ty - 18} ${cx + 30},${ty + 26}`, m);         // centre petal
+  s += P(`${cx - 30},${ty + 26} ${cx},${ty - 18} ${cx},${ty + 26}`, WHITE);
+  s += sticker(`pp2-av-${i}`, cx + 38, ty + 34, 17, v);
+  s += tag(cx, v, w - 84);
+  s += stamp(cx, ty + 18);
+  return { body: s, nowX: cx };
 }
 
-function paperTender(x, w, org) {
-  const cx = centerX(x, w);
-  let s = `<rect x="${x - GAP - 2}" y="${railY - 40}" width="${GAP + 6}" height="8" rx="4" fill="#caa06a"/>`;
-  s += `<g transform="rotate(-1 ${cx} 132)">`;
-  s += paperPiece(x + 8, 98, w - 16, 76, '#d8b98a');
-  s += polaroid('pp-org', x + 38, 132, 20, org.image, org.name, -3, '#f4b09acc');
-  s += `<text x="${x + 66}" y="124" font-family="${FONT}" font-weight="800" font-size="10" fill="#6b4a22" letter-spacing="1">${esc(L('overlay.organisedBy'))}</text>`;
-  s += handLabel(x + 64, 134, w - 78, org.name, w - 92, 15);
-  s += `</g>`;
-  const front = paperWheel(x + 40, railY, 14) + paperWheel(x + w - 40, railY, 14);
-  return { body: s, front };
-}
-
-function paperOpen(x, w, v, i) {
-  const cx = centerX(x, w);
-  let s = i > 0 ? `<rect x="${x - GAP - 2}" y="${railY - 40}" width="${GAP + 6}" height="8" rx="4" fill="#caa06a"/>` : '';
-  s += `<rect x="${x + 10}" y="92" width="${w - 20}" height="80" rx="8" fill="#eafff0" stroke="${COL.open}" stroke-width="3" stroke-dasharray="9 7"/>`;
-  s += `<text x="${cx}" y="130" text-anchor="middle" font-family="${FONT}" font-weight="800" font-size="30" fill="${COL.open}">${esc(L('overlay.open'))}</text>`;
-  const signUp = L('overlay.signUp');
-  const openTime = v.timeLines[0] ? `${signUp} · ${esc(v.timeLines[0])}` : signUp;
-  s += `<text class="pp-time" data-base-y="152" x="${cx}" y="152" text-anchor="middle" font-family="${FONT}" font-weight="700" font-size="12" fill="${COL.open}">${openTime}</text>`;
-  const front = paperWheel(x + 46, railY, 15) + paperWheel(x + w - 46, railY, 15);
-  return { body: s, front };
-}
+const SHAPES = [oriCrane, oriBoat, oriPinwheel, oriButterfly, oriFish, oriTulip];
 
 function renderUnit(unit, x, w, i) {
   const v = unit.v;
-  let parts, stateClasses, pointer = '', dataAttr;
+  let parts, state, dataAttr;
   if (unit.type === 'engine') {
-    parts = paperEngine(x, v, i);
-    stateClasses = (v.isCurrent ? ' rt-car--current' : '') + (v.isSpotlit ? ' rt-car--spotlit' : '') + (v.isDimmed ? ' rt-car--departed' : '');
-    pointer = `<g class="rt-pointer rt-now-bob">${pointerSVG(x + 42, 56, COL.now, L('overlay.now'))}</g>`;
+    parts = oriPlane(x, v, i);
+    state = (v.isCurrent ? ' rt-car--current' : '') + (v.isSpotlit ? ' rt-car--spotlit' : '') + (v.isDimmed ? ' rt-car--departed' : '');
     dataAttr = ' data-engine="1"';
-  } else if (unit.type === 'tender') {
-    parts = paperTender(x, w, v);
-    stateClasses = '';
-    dataAttr = ' data-tender="1"';
   } else if (v.isOpen) {
-    parts = paperOpen(x, w, v, i);
-    stateClasses = (v.isCurrent ? ' rt-car--current' : '') + (v.isDeparted ? ' rt-car--departed' : '');
-    pointer = `<g class="rt-pointer rt-now-bob">${pointerSVG(centerX(x, w), 56, COL.now, L('overlay.now'))}</g>`;
+    parts = oriOpen(x, w, v);
+    state = (v.isCurrent ? ' rt-car--current' : '') + (v.isDeparted ? ' rt-car--departed' : '');
     dataAttr = ` data-slot="${v.slotOrder}"`;
   } else {
-    parts = paperCoach(x, w, v, i, unit.type === 'caboose');
-    stateClasses = (v.isCurrent ? ' rt-car--current' : '') + (v.isDeparted ? ' rt-car--departed' : '') + (v.isSpotlit ? ' rt-car--spotlit' : '');
-    pointer = `<g class="rt-pointer rt-now-bob">${pointerSVG(x + 42, 54, COL.now, L('overlay.now'))}</g>`;
+    parts = SHAPES[i % SHAPES.length](x, w, v, i, PAPERS[i % PAPERS.length]);
+    state = (v.isCurrent ? ' rt-car--current' : '') + (v.isDeparted ? ' rt-car--departed' : '') + (v.isSpotlit ? ' rt-car--spotlit' : '');
     dataAttr = ` data-slot="${v.slotOrder}"`;
   }
-  return `<g class="rt-car${stateClasses}"${dataAttr}><g class="pp-art">${parts.body}</g><g class="pp-front">${parts.front}</g>${pointer}</g>`;
+  return `<g class="rt-car${state}"${dataAttr}><g class="pp2-art">${parts.body}</g>${nowFlag(parts.nowX)}</g>`;
 }
 
 export function build(train, opts = {}) {
   L = themeT(opts);
   const vehicles = toVehicles(train);
   const units = [];
-  // The Engine is the view-model's engine vehicle, NOT just vehicles[0]: post-event
-  // (enginedim=finished + hidefinished) toVehicles DROPS the Engine, so vehicles[0] is
-  // then a real Car and must render as a Car, not the loco.
   const hasEngine = vehicles[0]?.kind === 'engine';
-  if (hasEngine) {
-    const engine = vehicles[0];
-    units.push({ type: 'engine', v: engine });
-    if (engine?.organiser) units.push({ type: 'tender', v: engine.organiser });
-  }
-  for (const car of vehicles.slice(hasEngine ? 1 : 0)) units.push({ type: car.kind === 'open' ? 'open' : car.kind === 'caboose' ? 'caboose' : 'car', v: car });
-
-  const widthFor = (u) => (u.type === 'engine' ? ENGINE_W : u.type === 'tender' ? TENDER_W : CAR_W);
+  if (hasEngine) units.push({ type: 'engine', v: vehicles[0] });
+  for (const car of vehicles.slice(hasEngine ? 1 : 0)) units.push({ type: car.kind === 'open' ? 'open' : 'car', v: car });
+  const widthFor = (u) => (u.type === 'engine' ? ENGINE_W : CAR_W);
   const xs = [];
   let acc = 0;
   for (const u of units) { xs.push(acc); acc += widthFor(u) + GAP; }
@@ -211,21 +249,18 @@ export function build(train, opts = {}) {
   units.forEach((u, i) => { body += renderUnit(u, xs[i], widthFor(u), i); });
 
   const holder = document.createElement('div');
-  holder.innerHTML = `<svg class="rt-theme-paper" viewBox="0 ${VIEW_TOP} ${totalW} ${VIEW_H}" role="img">${body}</svg>`;
+  holder.innerHTML = `<svg class="rt-theme-paper2" viewBox="0 ${VIEW_TOP} ${totalW} ${VIEW_H}" role="img" style="--rt-ride:0.9">${body}</svg>`;
   const svg = holder.firstElementChild;
 
   const carRefs = new Map();
   let engineRef = null;
-  const tenderEls = [];
   svg.querySelectorAll('.rt-car').forEach((group) => {
-    if (group.dataset.engine) { engineRef = { group, timeText: group.querySelector('.pp-time') }; return; }
-    if (group.dataset.tender) { tenderEls.push(group); return; }
+    if (group.dataset.engine) { engineRef = { group, timeText: group.querySelector('.pp2-time') }; return; }
     const key = Number(group.getAttribute('data-slot'));
     if (!carRefs.has(key)) carRefs.set(key, []);
-    carRefs.get(key).push({ group, timeText: group.querySelector('.pp-time') });
+    carRefs.get(key).push({ group, timeText: group.querySelector('.pp2-time') });
   });
 
-  const setTime = (el, lines) => { if (el) el.textContent = (lines ?? [''])[0] ?? ''; };
   return {
     node: svg,
     update(nextTrain) {
@@ -234,7 +269,7 @@ export function build(train, opts = {}) {
           ref.group.classList.toggle('rt-car--current', car.isCurrent);
           ref.group.classList.toggle('rt-car--departed', car.isDeparted);
           ref.group.classList.toggle('rt-car--spotlit', car.isSpotlit);
-          if (!car.isOpen) setTime(ref.timeText, car.timeLines ?? [car.relativeTime]);
+          if (ref.timeText && !car.isOpen) ref.timeText.textContent = (car.timeLines ?? [car.relativeTime])[0] ?? '';
         }
       }
       const eng = nextTrain.engine;
@@ -242,19 +277,14 @@ export function build(train, opts = {}) {
         engineRef.group.classList.toggle('rt-car--current', Boolean(eng.isCurrent));
         engineRef.group.classList.toggle('rt-car--spotlit', Boolean(eng.isSpotlit));
         engineRef.group.classList.toggle('rt-car--departed', Boolean(eng.isDimmed));
-        setTime(engineRef.timeText, eng.timeLines ?? [eng.relativeTime ?? '']);
+        if (engineRef.timeText) engineRef.timeText.textContent = (eng.timeLines ?? [eng.relativeTime ?? ''])[0] ?? '';
       }
-      for (const el of tenderEls) el.classList.toggle('rt-car--departed', Boolean(eng.isDimmed));
     },
     afterAttach() { fitAll(svg); undulate(svg); },
   };
 }
 
-/** Baseline (`foot`) — this Theme's FLOOR as a fraction of --rt-th, measured down
- *  from the top of the Train's box; the renderer drops the Train until this line
- *  reaches the bottom edge at height=100 (see --rt-foot in train-renderer.js).
- *  Floor here = the engine wheel's drop shadow (paperWheel offsets it to cy + 1;
- *  the largest wheel is r = 17 at y = railY). */
-export const foot = (railY + 18 - VIEW_TOP) / VIEW_H;
+/** Floor = the name-tag bottom (railY + 40). */
+export const foot = (railY + 40 - VIEW_TOP) / VIEW_H;
 
 export default { key: 'paper', ensureStyles, build, buildTrack, foot };

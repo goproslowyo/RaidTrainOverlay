@@ -34,17 +34,19 @@ const GAP = 0;            // plants are self-contained; the train scrolls them a
 const VIEW_H = 400;       // viewBox height — all the art lives inside this box
 const baseY = 300;        // the soil/ground line (the pot foot sits near here)
 const cy = 176;           // the plant emblem's vertical centre
-const STYLE_ID = 'rt-theme-highvibes-style';
+const STYLE_ID = 'rt-theme-highvibes2-style';
 
 /* Stable per-key pseudo-random in [0,1) — deterministic so a re-render (and every
  * marquee copy) keeps each plant's frost/pistil/soil scatter identical. */
 const rng = (s) => { const x = Math.sin(s * 99.13) * 43758.5; return x - Math.floor(x); };
 
 /* 1) ensureStyles() — inject the Theme's CSS once (keyed by an id). The Now /
- *    Spotlight GLOW is a CSS drop-shadow over the STATIC .hv-art group (the
- *    drifting leaves ride a sibling .hv-front layer), so a lit plant's filter
- *    bitmap caches across frames instead of re-rasterising the moving leaves
- *    (memory theme-rendering-constraints). Departed = a LIGHT opacity dim + a
+ *    Spotlight GLOW is a CSS drop-shadow over the INTERNALLY STATIC .hv2-art
+ *    group (the drifting leaves ride a sibling .hv2-front layer), so a lit
+ *    plant's filter bitmap caches across frames instead of re-rasterising the
+ *    moving leaves (memory theme-rendering-constraints). The float wrappers
+ *    ABOVE .hv2-art (hv2-floatX/Y) only translate the cached raster — nothing
+ *    animates inside the filtered subtree. Departed = a LIGHT opacity dim + a
  *    revealed PLAYED stamp, never heavy shade (viewer feedback). All ambient
  *    motion is compositor transform/opacity and disabled under reduced-motion. */
 export function ensureStyles() {
@@ -52,15 +54,15 @@ export function ensureStyles() {
   const style = document.createElement('style');
   style.id = STYLE_ID;
   style.textContent = `
-    .rt-theme-highvibes .rt-car--current .hv-art { filter: drop-shadow(0 0 4px #7fff9f) drop-shadow(0 0 10px #5fc54f); }
-    .rt-theme-highvibes .rt-car--spotlit .hv-art { filter: drop-shadow(0 0 4px #c9a8ef) drop-shadow(0 0 10px #a78bfa); }
-    .rt-theme-highvibes .rt-car--current.rt-car--spotlit .hv-art { filter: drop-shadow(0 0 4px #7fff9f) drop-shadow(0 0 9px #a78bfa); }
+    .rt-theme-highvibes2 .rt-car--current .hv2-art { filter: drop-shadow(0 0 4px #7fff9f) drop-shadow(0 0 10px #5fc54f); }
+    .rt-theme-highvibes2 .rt-car--spotlit .hv2-art { filter: drop-shadow(0 0 4px #c9a8ef) drop-shadow(0 0 10px #a78bfa); }
+    .rt-theme-highvibes2 .rt-car--current.rt-car--spotlit .hv2-art { filter: drop-shadow(0 0 4px #7fff9f) drop-shadow(0 0 9px #a78bfa); }
 
     /* A handed-off Slot stays readable — a LIGHT dim + a PLAYED stamp, not heavy shade. */
-    .rt-theme-highvibes .rt-car--departed { opacity: 0.84; }
-    .rt-theme-highvibes .rt-car--departed image { filter: saturate(0.55); }
-    .rt-theme-highvibes .hv-stamp { visibility: hidden; }
-    .rt-theme-highvibes .rt-car--departed .hv-stamp { visibility: visible; }
+    .rt-theme-highvibes2 .rt-car--departed { opacity: 0.84; }
+    .rt-theme-highvibes2 .rt-car--departed image { filter: saturate(0.55); }
+    .rt-theme-highvibes2 .hv2-stamp { visibility: hidden; }
+    .rt-theme-highvibes2 .rt-car--departed .hv2-stamp { visibility: visible; }
 
     /* ── OPT OUT of the shared per-Car undulation (base .rt-car sway/rock). ──
        The base rt-undulate keyframe transform-animates each .rt-car <g>. Blink
@@ -75,7 +77,7 @@ export function ensureStyles() {
        comes from the drifting leaves, swaying leaf-bed, rolling hills and rising
        spores below, which each repaint only their own small region. build() also
        skips undulate() for this Theme. */
-    .rt-theme-highvibes .rt-car { animation: none; }
+    .rt-theme-highvibes2 .rt-car { animation: none; }
 
     /* ── Ambient motion (compositor-only, reduced-motion-safe) ── */
     /* No will-change here: these animate per-car (×every car), and a transform
@@ -83,45 +85,69 @@ export function ensureStyles() {
        will-change on hundreds of leaves just reserves backing stores up front and
        starves the GPU (the documented over-use anti-pattern, and the stutter the
        leaf-forward plant was hitting in OBS/CEF as a Train rolls by). */
-    .rt-theme-highvibes .hv-leaf { transform-box: fill-box; transform-origin: center; animation-timing-function: linear; animation-iteration-count: infinite; }
+    .rt-theme-highvibes2 .hv2-leaf { transform-box: fill-box; transform-origin: center; animation-timing-function: linear; animation-iteration-count: infinite; }
     /* Bigger, RIGHTWARD-biased tumble loops: the train rolls forward (LEFT), so the
        leaves waft up and trail backwards to the RIGHT (mostly +x), then settle. Larger
        amplitude than before = more movement. Closed loops so leaves never fly off. */
-    @keyframes hv-driftA { 0%{transform:translate(0,0) rotate(0)} 25%{transform:translate(76px,-32px) rotate(95deg)} 50%{transform:translate(108px,-66px) rotate(185deg)} 75%{transform:translate(54px,-24px) rotate(280deg)} 100%{transform:translate(0,0) rotate(360deg)} }
-    @keyframes hv-driftB { 0%{transform:translate(0,0) rotate(0)} 30%{transform:translate(48px,-44px) rotate(-130deg)} 64%{transform:translate(98px,-20px) rotate(-250deg)} 100%{transform:translate(0,0) rotate(-360deg)} }
-    @keyframes hv-driftC { 0%{transform:translate(0,0) rotate(0)} 22%{transform:translate(52px,-18px) rotate(70deg)} 55%{transform:translate(92px,-58px) rotate(190deg)} 84%{transform:translate(42px,-12px) rotate(305deg)} 100%{transform:translate(0,0) rotate(360deg)} }
+    @keyframes hv2-driftA { 0%{transform:translate(0,0) rotate(0)} 25%{transform:translate(76px,-32px) rotate(95deg)} 50%{transform:translate(108px,-66px) rotate(185deg)} 75%{transform:translate(54px,-24px) rotate(280deg)} 100%{transform:translate(0,0) rotate(360deg)} }
+    @keyframes hv2-driftB { 0%{transform:translate(0,0) rotate(0)} 30%{transform:translate(48px,-44px) rotate(-130deg)} 64%{transform:translate(98px,-20px) rotate(-250deg)} 100%{transform:translate(0,0) rotate(-360deg)} }
+    @keyframes hv2-driftC { 0%{transform:translate(0,0) rotate(0)} 22%{transform:translate(52px,-18px) rotate(70deg)} 55%{transform:translate(92px,-58px) rotate(190deg)} 84%{transform:translate(42px,-12px) rotate(305deg)} 100%{transform:translate(0,0) rotate(360deg)} }
+    /* Gentle whole-crown sway: the hero fan leaf rocks about its stem base. Small
+       subtree (~60 paths/car, not the full ~500-path plant), so the re-raster cost
+       stays far below the sway-everything budget that caused the OBS stutter. */
+    .rt-theme-highvibes2 .hv2-hero { transform-box: fill-box; transform-origin: center 82%; animation: hv2-herosway var(--hp, 7s) ease-in-out infinite alternate; }
+    @keyframes hv2-herosway { 0% { transform: rotate(-1.5deg) translateY(0); } 100% { transform: rotate(1.5deg) translateY(-2px); } }
+    /* 420 haze: two soft translucent bands drifting through the scene (HTML divs,
+       compositor translate only — no blur filters). */
+    .rt-theme-highvibes2-haze { position: absolute; inset: auto 0 0 0; height: 72%; pointer-events: none;
+      background: radial-gradient(42% 58% at 18% 62%, #cfeec855 0%, #cfeec800 70%), radial-gradient(36% 52% at 55% 74%, #b8e6c04a 0%, #b8e6c000 70%), radial-gradient(46% 60% at 86% 58%, #d8f2d055 0%, #d8f2d000 70%);
+      width: 200%; will-change: transform; animation: hv2-haze var(--hz, 52s) linear infinite; opacity: .34; }
+    @keyframes hv2-haze { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
     /* The soil leaf-bed gently sways about its rooted base (compositor transform). */
-    .rt-theme-highvibes .hv-bedleaf { transform-box: fill-box; transform-origin: center bottom; animation: hv-bedsway var(--bp,6s) ease-in-out infinite; }
-    @keyframes hv-bedsway { 0%,100%{transform:rotate(-2deg)} 50%{transform:rotate(2deg)} }
+    .rt-theme-highvibes2 .hv2-bedleaf { transform-box: fill-box; transform-origin: center bottom; animation: hv2-bedsway var(--bp,6s) ease-in-out infinite; }
+    @keyframes hv2-bedsway { 0%,100%{transform:rotate(-2deg)} 50%{transform:rotate(2deg)} }
+    /* The whole plant gently FLOATS (user request — it's High Vibes, it's floaty):
+       a slow lissajous wander from two nested wrappers (X drift outer, Y bob
+       inner — the lava gx/gy trick) with per-car periods/phases so each pot
+       drifts its own lazy path. Translate-only compositor transforms; the
+       glow-filtered .hv2-art inside stays internally static so a lit plant's
+       filter raster is reused, and the soil leaf-bed stays rooted below. */
+    .rt-theme-highvibes2 .hv2-floatX { animation: hv2-floatX var(--fxp,12s) ease-in-out infinite; animation-delay: var(--fxd,0s); will-change: transform; }
+    .rt-theme-highvibes2 .hv2-floatY { animation: hv2-floatY var(--fyp,8s) ease-in-out infinite; animation-delay: var(--fyd,0s); will-change: transform; }
+    @keyframes hv2-floatX { 0%,100%{transform:translateX(-4px)} 50%{transform:translateX(4px)} }
+    @keyframes hv2-floatY { 0%,100%{transform:translateY(2.5px)} 50%{transform:translateY(-3.5px)} }
     /* Drifting spores rise + fade (opacity + transform only, never a filter/bloom). */
-    .rt-theme-highvibes .hv-spore { transform-box: fill-box; transform-origin: center; animation: hv-rise linear infinite; }
-    @keyframes hv-rise { 0%{opacity:0; transform:translateY(8px) scale(.6)} 25%{opacity:.85} 100%{opacity:0; transform:translate(12px,-66px) scale(1.1)} }
+    .rt-theme-highvibes2 .hv2-spore { transform-box: fill-box; transform-origin: center; animation: hv2-rise linear infinite; }
+    @keyframes hv2-rise { 0%{opacity:0; transform:translateY(8px) scale(.6)} 25%{opacity:.85} 100%{opacity:0; transform:translate(12px,-66px) scale(1.1)} }
 
     /* ── The stationary SCENE BAND (buildTrack) — a translucent backing + a
        rolling-hill landscape. The whole band is ONE element the renderer pins
        full-width behind the train and fades under track=periodic. Its hill
        layers drift sideways in place (compositor translate only), the resin
        ground glow breathes (opacity), and a few ambient motes rise — NO filters. */
-    .rt-theme-highvibes .hv-scene { position: absolute; inset: 0; overflow: hidden; }
-    .rt-theme-highvibes .hv-scene-svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
-    .rt-theme-highvibes .hv-hill { will-change: transform; animation: var(--hd, hv-hillA) var(--ht, 26s) ease-in-out infinite; }
-    @keyframes hv-hillA { 0%,100%{transform:translateX(0)} 50%{transform:translateX(22px)} }
-    @keyframes hv-hillB { 0%,100%{transform:translateX(0)} 50%{transform:translateX(-30px)} }
-    @keyframes hv-hillC { 0%,100%{transform:translateX(0)} 50%{transform:translateX(16px)} }
-    .rt-theme-highvibes .hv-groundglow { will-change: opacity; animation: hv-glowpulse 9s ease-in-out infinite; }
-    @keyframes hv-glowpulse { 0%,100%{opacity:.5} 50%{opacity:.95} }
-    .rt-theme-highvibes .hv-mote { will-change: transform, opacity; animation: hv-moterise linear infinite; }
-    @keyframes hv-moterise { 0%{opacity:0; transform:translateY(10px) scale(.6)} 30%{opacity:.7} 100%{opacity:0; transform:translate(8px,-60px) scale(1.05)} }
-    .rt-theme-highvibes .hv-scene-leaf { will-change: transform; animation: var(--sd, hv-driftA) var(--st, 30s) linear infinite; transform-box: fill-box; transform-origin: center; }
+    .rt-theme-highvibes2.hv2-scene { overflow: hidden; }
+    .rt-theme-highvibes2 .hv2-scene-svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+    .rt-theme-highvibes2 .hv2-hill { will-change: transform; animation: var(--hd, hv2-hillA) var(--ht, 26s) ease-in-out infinite; }
+    @keyframes hv2-hillA { 0%,100%{transform:translateX(0)} 50%{transform:translateX(22px)} }
+    @keyframes hv2-hillB { 0%,100%{transform:translateX(0)} 50%{transform:translateX(-30px)} }
+    @keyframes hv2-hillC { 0%,100%{transform:translateX(0)} 50%{transform:translateX(16px)} }
+    .rt-theme-highvibes2 .hv2-groundglow { will-change: opacity; animation: hv2-glowpulse 9s ease-in-out infinite; }
+    @keyframes hv2-glowpulse { 0%,100%{opacity:.5} 50%{opacity:.95} }
+    .rt-theme-highvibes2 .hv2-mote { will-change: transform, opacity; animation: hv2-moterise linear infinite; }
+    @keyframes hv2-moterise { 0%{opacity:0; transform:translateY(10px) scale(.6)} 30%{opacity:.7} 100%{opacity:0; transform:translate(8px,-60px) scale(1.05)} }
+    .rt-theme-highvibes2 .hv2-scene-leaf { will-change: transform; animation: var(--sd, hv2-driftA) var(--st, 30s) linear infinite; transform-box: fill-box; transform-origin: center; }
 
     @media (prefers-reduced-motion: reduce) {
-      .rt-theme-highvibes .hv-leaf,
-      .rt-theme-highvibes .hv-bedleaf,
-      .rt-theme-highvibes .hv-spore,
-      .rt-theme-highvibes .hv-hill,
-      .rt-theme-highvibes .hv-groundglow,
-      .rt-theme-highvibes .hv-mote,
-      .rt-theme-highvibes .hv-scene-leaf { animation: none; }
+      .rt-theme-highvibes2 .hv2-leaf,
+      .rt-theme-highvibes2 .hv2-bedleaf,
+      .rt-theme-highvibes2 .hv2-spore,
+      .rt-theme-highvibes2 .hv2-hill,
+      .rt-theme-highvibes2 .hv2-groundglow,
+      .rt-theme-highvibes2 .hv2-mote,
+      .rt-theme-highvibes2 .hv2-scene-leaf { animation: none; }
+      .rt-theme-highvibes2 .hv2-hero { animation: none; }
+      .rt-theme-highvibes2 .hv2-floatX, .rt-theme-highvibes2 .hv2-floatY { animation: none; }
+      .rt-theme-highvibes2-haze { animation: none; }
     }
   `;
   document.head.appendChild(style);
@@ -131,37 +157,37 @@ export function ensureStyles() {
  * once at the top of the single root <svg>, so all plants reference the same ids. */
 function defs() {
   return `<defs>
-  <linearGradient id="hv-resin" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3f9a3a"/><stop offset=".5" stop-color="#1f6e2a"/><stop offset="1" stop-color="#0d3e16"/></linearGradient>
-  <linearGradient id="hv-stem" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#1d5226"/><stop offset=".45" stop-color="#4aa343"/><stop offset="1" stop-color="#1d5226"/></linearGradient>
-  <linearGradient id="hv-leafG" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#1f5e2a"/><stop offset=".6" stop-color="#3f9a3a"/><stop offset="1" stop-color="#7fe06c"/></linearGradient>
-  <linearGradient id="hv-leafP" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#46286f"/><stop offset=".6" stop-color="#7a4fb0"/><stop offset="1" stop-color="#c79bf0"/></linearGradient>
-  <linearGradient id="hv-leafD" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#17451a"/><stop offset="1" stop-color="#2c6e2e"/></linearGradient>
+  <linearGradient id="hv2-resin" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3f9a3a"/><stop offset=".5" stop-color="#1f6e2a"/><stop offset="1" stop-color="#0d3e16"/></linearGradient>
+  <linearGradient id="hv2-stem" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#1d5226"/><stop offset=".45" stop-color="#4aa343"/><stop offset="1" stop-color="#1d5226"/></linearGradient>
+  <linearGradient id="hv2-leafG" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#1f5e2a"/><stop offset=".6" stop-color="#3f9a3a"/><stop offset="1" stop-color="#7fe06c"/></linearGradient>
+  <linearGradient id="hv2-leafP" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#46286f"/><stop offset=".6" stop-color="#7a4fb0"/><stop offset="1" stop-color="#c79bf0"/></linearGradient>
+  <linearGradient id="hv2-leafD" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#17451a"/><stop offset="1" stop-color="#2c6e2e"/></linearGradient>
   <!-- HERO fan-leaf gradients: deep base → vivid mid → frosted tip -->
-  <linearGradient id="hv-heroG" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#0f4a18"/><stop offset=".32" stop-color="#2e7d2e"/><stop offset=".68" stop-color="#5cc34a"/><stop offset="1" stop-color="#b6f29a"/></linearGradient>
-  <linearGradient id="hv-heroP" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#3a1d63"/><stop offset=".34" stop-color="#6a3fa6"/><stop offset=".7" stop-color="#a274dd"/><stop offset="1" stop-color="#e6cffb"/></linearGradient>
-  <linearGradient id="hv-heroD" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#26352a"/><stop offset=".6" stop-color="#46584a"/><stop offset="1" stop-color="#717f6f"/></linearGradient>
-  <linearGradient id="hv-sideG" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#0c3e15"/><stop offset=".55" stop-color="#2c7a2c"/><stop offset="1" stop-color="#74d35e"/></linearGradient>
-  <linearGradient id="hv-sideP" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#2c1850"/><stop offset=".55" stop-color="#5e379a"/><stop offset="1" stop-color="#b48fe0"/></linearGradient>
-  <linearGradient id="hv-sideD" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#1d2a20"/><stop offset="1" stop-color="#566255"/></linearGradient>
+  <linearGradient id="hv2-heroG" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#0f4a18"/><stop offset=".32" stop-color="#2e7d2e"/><stop offset=".68" stop-color="#5cc34a"/><stop offset="1" stop-color="#b6f29a"/></linearGradient>
+  <linearGradient id="hv2-heroP" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#3a1d63"/><stop offset=".34" stop-color="#6a3fa6"/><stop offset=".7" stop-color="#a274dd"/><stop offset="1" stop-color="#e6cffb"/></linearGradient>
+  <linearGradient id="hv2-heroD" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#26352a"/><stop offset=".6" stop-color="#46584a"/><stop offset="1" stop-color="#717f6f"/></linearGradient>
+  <linearGradient id="hv2-sideG" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#0c3e15"/><stop offset=".55" stop-color="#2c7a2c"/><stop offset="1" stop-color="#74d35e"/></linearGradient>
+  <linearGradient id="hv2-sideP" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#2c1850"/><stop offset=".55" stop-color="#5e379a"/><stop offset="1" stop-color="#b48fe0"/></linearGradient>
+  <linearGradient id="hv2-sideD" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#1d2a20"/><stop offset="1" stop-color="#566255"/></linearGradient>
   <!-- avatar disc: dark frosted glass so white initials read -->
-  <radialGradient id="hv-disc" cx=".38" cy=".3" r=".85"><stop offset="0" stop-color="#1c3a24"/><stop offset=".5" stop-color="#0e2414"/><stop offset="1" stop-color="#06120a"/></radialGradient>
-  <radialGradient id="hv-discN" cx=".38" cy=".3" r=".85"><stop offset="0" stop-color="#2a5a36"/><stop offset=".5" stop-color="#143a20"/><stop offset="1" stop-color="#08200f"/></radialGradient>
-  <radialGradient id="hv-haloG" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#caffd8" stop-opacity=".55"/><stop offset=".4" stop-color="#6cff93" stop-opacity=".22"/><stop offset="1" stop-color="#6cff93" stop-opacity="0"/></radialGradient>
-  <radialGradient id="hv-haloP" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#e7d4ff" stop-opacity=".6"/><stop offset=".4" stop-color="#b98cff" stop-opacity=".26"/><stop offset="1" stop-color="#b98cff" stop-opacity="0"/></radialGradient>
-  <radialGradient id="hv-nowglow" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#eafff0" stop-opacity=".85"/><stop offset=".45" stop-color="#7fff9f" stop-opacity=".4"/><stop offset="1" stop-color="#7fff9f" stop-opacity="0"/></radialGradient>
+  <radialGradient id="hv2-disc" cx=".38" cy=".3" r=".85"><stop offset="0" stop-color="#1c3a24"/><stop offset=".5" stop-color="#0e2414"/><stop offset="1" stop-color="#06120a"/></radialGradient>
+  <radialGradient id="hv2-discN" cx=".38" cy=".3" r=".85"><stop offset="0" stop-color="#2a5a36"/><stop offset=".5" stop-color="#143a20"/><stop offset="1" stop-color="#08200f"/></radialGradient>
+  <radialGradient id="hv2-haloG" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#caffd8" stop-opacity=".55"/><stop offset=".4" stop-color="#6cff93" stop-opacity=".22"/><stop offset="1" stop-color="#6cff93" stop-opacity="0"/></radialGradient>
+  <radialGradient id="hv2-haloP" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#e7d4ff" stop-opacity=".6"/><stop offset=".4" stop-color="#b98cff" stop-opacity=".26"/><stop offset="1" stop-color="#b98cff" stop-opacity="0"/></radialGradient>
+  <radialGradient id="hv2-nowglow" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#eafff0" stop-opacity=".85"/><stop offset=".45" stop-color="#7fff9f" stop-opacity=".4"/><stop offset="1" stop-color="#7fff9f" stop-opacity="0"/></radialGradient>
   <!-- GLOSSY mini-cola gradients: volumetric body + glossy lobes + sheen -->
-  <radialGradient id="hv-bodyG" cx=".36" cy=".26" r=".95"><stop offset="0" stop-color="#d6f6b4"/><stop offset=".26" stop-color="#86cf66"/><stop offset=".58" stop-color="#3f9636"/><stop offset=".82" stop-color="#206428"/><stop offset="1" stop-color="#103a17"/></radialGradient>
-  <radialGradient id="hv-bodyP" cx=".36" cy=".26" r=".95"><stop offset="0" stop-color="#f0e0ff"/><stop offset=".24" stop-color="#c4a0ee"/><stop offset=".55" stop-color="#8a5cc4"/><stop offset=".82" stop-color="#4d2c80"/><stop offset="1" stop-color="#2a1750"/></radialGradient>
-  <radialGradient id="hv-bodyD" cx=".36" cy=".26" r=".95"><stop offset="0" stop-color="#cfcabb"/><stop offset=".4" stop-color="#8f8b7c"/><stop offset=".8" stop-color="#54514a"/><stop offset="1" stop-color="#34322c"/></radialGradient>
-  <radialGradient id="hv-lobeG" cx=".34" cy=".24" r=".82"><stop offset="0" stop-color="#e6ffc4"/><stop offset=".22" stop-color="#a6e07f"/><stop offset=".58" stop-color="#4ea53f"/><stop offset="1" stop-color="#1c5b23"/></radialGradient>
-  <radialGradient id="hv-lobeP" cx=".34" cy=".24" r=".82"><stop offset="0" stop-color="#f7ecff"/><stop offset=".22" stop-color="#d2b4f4"/><stop offset=".58" stop-color="#8c5ec6"/><stop offset="1" stop-color="#3c2468"/></radialGradient>
-  <radialGradient id="hv-lobeD" cx=".34" cy=".24" r=".82"><stop offset="0" stop-color="#dad6c8"/><stop offset=".5" stop-color="#928d7e"/><stop offset="1" stop-color="#413f38"/></radialGradient>
-  <radialGradient id="hv-specC" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#ffffff" stop-opacity=".95"/><stop offset=".55" stop-color="#ffffff" stop-opacity=".4"/><stop offset="1" stop-color="#ffffff" stop-opacity="0"/></radialGradient>
-  <radialGradient id="hv-frostC" cx=".42" cy=".3" r=".7"><stop offset="0" stop-color="#ffffff" stop-opacity=".5"/><stop offset=".4" stop-color="#e8fff0" stop-opacity=".22"/><stop offset="1" stop-color="#e8fff0" stop-opacity="0"/></radialGradient>
-  <radialGradient id="hv-dewC" cx=".4" cy=".34" r=".7"><stop offset="0" stop-color="#ffffff" stop-opacity=".9"/><stop offset=".5" stop-color="#eafff6" stop-opacity=".45"/><stop offset="1" stop-color="#eafff6" stop-opacity="0"/></radialGradient>
+  <radialGradient id="hv2-bodyG" cx=".36" cy=".26" r=".95"><stop offset="0" stop-color="#d6f6b4"/><stop offset=".26" stop-color="#86cf66"/><stop offset=".58" stop-color="#3f9636"/><stop offset=".82" stop-color="#206428"/><stop offset="1" stop-color="#103a17"/></radialGradient>
+  <radialGradient id="hv2-bodyP" cx=".36" cy=".26" r=".95"><stop offset="0" stop-color="#f0e0ff"/><stop offset=".24" stop-color="#c4a0ee"/><stop offset=".55" stop-color="#8a5cc4"/><stop offset=".82" stop-color="#4d2c80"/><stop offset="1" stop-color="#2a1750"/></radialGradient>
+  <radialGradient id="hv2-bodyD" cx=".36" cy=".26" r=".95"><stop offset="0" stop-color="#cfcabb"/><stop offset=".4" stop-color="#8f8b7c"/><stop offset=".8" stop-color="#54514a"/><stop offset="1" stop-color="#34322c"/></radialGradient>
+  <radialGradient id="hv2-lobeG" cx=".34" cy=".24" r=".82"><stop offset="0" stop-color="#e6ffc4"/><stop offset=".22" stop-color="#a6e07f"/><stop offset=".58" stop-color="#4ea53f"/><stop offset="1" stop-color="#1c5b23"/></radialGradient>
+  <radialGradient id="hv2-lobeP" cx=".34" cy=".24" r=".82"><stop offset="0" stop-color="#f7ecff"/><stop offset=".22" stop-color="#d2b4f4"/><stop offset=".58" stop-color="#8c5ec6"/><stop offset="1" stop-color="#3c2468"/></radialGradient>
+  <radialGradient id="hv2-lobeD" cx=".34" cy=".24" r=".82"><stop offset="0" stop-color="#dad6c8"/><stop offset=".5" stop-color="#928d7e"/><stop offset="1" stop-color="#413f38"/></radialGradient>
+  <radialGradient id="hv2-specC" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#ffffff" stop-opacity=".95"/><stop offset=".55" stop-color="#ffffff" stop-opacity=".4"/><stop offset="1" stop-color="#ffffff" stop-opacity="0"/></radialGradient>
+  <radialGradient id="hv2-frostC" cx=".42" cy=".3" r=".7"><stop offset="0" stop-color="#ffffff" stop-opacity=".5"/><stop offset=".4" stop-color="#e8fff0" stop-opacity=".22"/><stop offset="1" stop-color="#e8fff0" stop-opacity="0"/></radialGradient>
+  <radialGradient id="hv2-dewC" cx=".4" cy=".34" r=".7"><stop offset="0" stop-color="#ffffff" stop-opacity=".9"/><stop offset=".5" stop-color="#eafff6" stop-opacity=".45"/><stop offset="1" stop-color="#eafff6" stop-opacity="0"/></radialGradient>
   <!-- terracotta pot -->
-  <radialGradient id="hv-potG" cx=".5" cy=".2" r="1"><stop offset="0" stop-color="#d9742f"/><stop offset=".6" stop-color="#b85522"/><stop offset="1" stop-color="#7e3413"/></radialGradient>
-  <radialGradient id="hv-potD" cx=".5" cy=".2" r="1"><stop offset="0" stop-color="#9a7860"/><stop offset=".6" stop-color="#6f5848"/><stop offset="1" stop-color="#473730"/></radialGradient>
+  <radialGradient id="hv2-potG" cx=".5" cy=".2" r="1"><stop offset="0" stop-color="#d9742f"/><stop offset=".6" stop-color="#b85522"/><stop offset="1" stop-color="#7e3413"/></radialGradient>
+  <radialGradient id="hv2-potD" cx=".5" cy=".2" r="1"><stop offset="0" stop-color="#9a7860"/><stop offset=".6" stop-color="#6f5848"/><stop offset="1" stop-color="#473730"/></radialGradient>
 </defs>`;
 }
 
@@ -178,10 +204,11 @@ function leaflet(L, Wd, t = 5) {
   return 'M ' + [...p, ...l].map((q) => `${q[0].toFixed(1)} ${q[1].toFixed(1)}`).join(' L ') + ' Z';
 }
 function richLeaf(scale, gid, frost) {
-  const cfg = [[-82, 34, 8], [-55, 50, 11], [-28, 62, 13], [0, 72, 14], [28, 62, 13], [55, 50, 11], [82, 34, 8]];
+  // real palmate cannabis leaf: 7 long slender serrated leaflets, wide spread
+  const cfg = [[-96, 36, 6, 6], [-58, 56, 8, 8], [-27, 68, 9, 9], [0, 76, 9, 10], [27, 68, 9, 9], [58, 56, 8, 8], [96, 36, 6, 6]];
   let s = '<g>';
-  for (const [a, L, Wd] of cfg) {
-    s += `<g transform="rotate(${a})"><path d="${leaflet(L * scale, Wd * scale)}" fill="url(#${gid})" stroke="#13420f" stroke-width="1"/><line x1="0" y1="0" x2="0" y2="${(-L * scale * 0.86).toFixed(1)}" stroke="#a9e89a" stroke-width="1" opacity=".5"/></g>`;
+  for (const [a, L, Wd, teeth] of cfg) {
+    s += `<g transform="rotate(${a})"><path d="${fanLeaflet(L * scale, Wd * scale, teeth)}" fill="url(#${gid})" stroke="#13420f" stroke-width=".8"/><line x1="0" y1="0" x2="0" y2="${(-L * scale * 0.86).toFixed(1)}" stroke="#a9e89a" stroke-width="1" opacity=".5"/></g>`;
   }
   if (frost) for (let k = 0; k < 6; k++) { const a = rng(k + 1) * 6.28, r = rng(k + 4) * 20 * scale; s += `<circle cx="${(Math.cos(a) * r).toFixed(1)}" cy="${(-10 * scale + Math.sin(a) * r).toFixed(1)}" r="${(0.7 + rng(k) * 0.7).toFixed(1)}" fill="#eafff0" opacity=".85"/>`; }
   return s + '</g>';
@@ -194,7 +221,7 @@ function fanLeaflet(L, Wd, teeth) {
   const prof = (u) => {
     if (u < 0.08) return Wd * (u / 0.08) * 0.50;
     const t = (u - 0.08) / 0.92;
-    return Wd * Math.pow(Math.sin(Math.PI * Math.pow(t, 0.62)), 0.85);
+    return Wd * 0.82 * Math.pow(Math.sin(Math.PI * Math.pow(t, 0.58)), 1.05);
   };
   const pts = [];
   for (let i = 0; i <= teeth; i++) {
@@ -214,13 +241,15 @@ function fanLeaflet(L, Wd, teeth) {
 /* A full 7-point fan leaf grown from the origin, pointing up. Verbatim. */
 function fanLeaf(R, grad, vein, frost) {
   const blades = [
-    [-78, 0.52, 0.150, 9],
-    [-50, 0.76, 0.176, 12],
-    [-24, 0.94, 0.190, 14],
-    [0, 1.05, 0.180, 15],
-    [24, 0.94, 0.190, 14],
-    [50, 0.76, 0.176, 12],
-    [78, 0.52, 0.150, 9],
+    [-122, 0.30, 0.120, 6],
+    [-92, 0.55, 0.145, 9],
+    [-58, 0.80, 0.165, 12],
+    [-28, 0.96, 0.175, 14],
+    [0, 1.05, 0.165, 15],
+    [28, 0.96, 0.175, 14],
+    [58, 0.80, 0.165, 12],
+    [92, 0.55, 0.145, 9],
+    [122, 0.30, 0.120, 6],
   ];
   let s = '<g>';
   for (const [a, lf, wf, teeth] of blades) {
@@ -249,11 +278,11 @@ function fanLeaf(R, grad, vein, frost) {
 /* ── A MINIMAL GLOSSY COLA — a small volumetric teardrop bud with a few organic
  *    glossy lobes, a soft body specular, light frost, and soft curling
  *    brown/red/purple/amber pistil hairs. Tucked UNDER the leaf emblem. Lifted
- *    verbatim from the prototype (gradient ids prefixed hv-). ── */
+ *    verbatim from the prototype (gradient ids prefixed hv2-). ── */
 function miniCola(bx, by, br, dep, spot, seed) {
   let s = '';
-  const body = dep ? 'hv-bodyD' : (spot ? 'hv-bodyP' : 'hv-bodyG');
-  const lobe = dep ? 'hv-lobeD' : (spot ? 'hv-lobeP' : 'hv-lobeG');
+  const body = dep ? 'hv2-bodyD' : (spot ? 'hv2-bodyP' : 'hv2-bodyG');
+  const lobe = dep ? 'hv2-lobeD' : (spot ? 'hv2-lobeP' : 'hv2-lobeG');
   const top = by - br * 1.9, bot = by + br * 0.42, hm = br * 0.72;
   const body_d = `M ${bx} ${top.toFixed(1)}`
     + ` C ${(bx + hm * 0.5).toFixed(1)} ${(top + br * 0.34).toFixed(1)} ${(bx + hm * 0.92).toFixed(1)} ${(by - br * 0.66).toFixed(1)} ${(bx + hm).toFixed(1)} ${(by - br * 0.14).toFixed(1)}`
@@ -281,11 +310,11 @@ function miniCola(bx, by, br, dep, spot, seed) {
       + ` C ${(lx - lr).toFixed(1)} ${(ly + lr * 0.55).toFixed(1)} ${(lx - lr * 1.02).toFixed(1)} ${(ly - eggH * 0.5).toFixed(1)} ${(lx + tilt).toFixed(1)} ${(ly - eggH).toFixed(1)} Z`;
     s += `<path d="${egg}" fill="url(#${lobe})" stroke="#103a16" stroke-width=".6" stroke-opacity=".6"/>`;
     if (depth < 0.32) s += `<path d="${egg}" fill="#0c2e12" opacity="${(0.16 * (1 - depth / 0.32)).toFixed(2)}"/>`;
-    if (!dep && depth > 0.55) s += `<ellipse cx="${(lx - lr * 0.26).toFixed(1)}" cy="${(ly - eggH * 0.42).toFixed(1)}" rx="${(lr * 0.26).toFixed(1)}" ry="${(lr * 0.32).toFixed(1)}" fill="url(#hv-specC)" opacity=".5"/>`;
+    if (!dep && depth > 0.55) s += `<ellipse cx="${(lx - lr * 0.26).toFixed(1)}" cy="${(ly - eggH * 0.42).toFixed(1)}" rx="${(lr * 0.26).toFixed(1)}" ry="${(lr * 0.32).toFixed(1)}" fill="url(#hv2-specC)" opacity=".5"/>`;
   });
-  s += `<ellipse cx="${(bx - br * 0.28).toFixed(1)}" cy="${(by - br * 0.9).toFixed(1)}" rx="${(br * 0.42).toFixed(1)}" ry="${(br * 0.6).toFixed(1)}" fill="url(#hv-specC)" opacity="${dep ? '.22' : '.62'}"/>`;
+  s += `<ellipse cx="${(bx - br * 0.28).toFixed(1)}" cy="${(by - br * 0.9).toFixed(1)}" rx="${(br * 0.42).toFixed(1)}" ry="${(br * 0.6).toFixed(1)}" fill="url(#hv2-specC)" opacity="${dep ? '.22' : '.62'}"/>`;
   if (!dep) s += `<ellipse cx="${(bx - br * 0.34).toFixed(1)}" cy="${(by - br * 1.0).toFixed(1)}" rx="${(br * 0.1).toFixed(1)}" ry="${(br * 0.14).toFixed(1)}" fill="#ffffff" opacity=".82"/>`;
-  if (!dep) s += `<ellipse cx="${bx}" cy="${(by - br * 0.7).toFixed(1)}" rx="${(br * 0.8).toFixed(1)}" ry="${(br * 1.1).toFixed(1)}" fill="url(#hv-frostC)"/>`;
+  if (!dep) s += `<ellipse cx="${bx}" cy="${(by - br * 0.7).toFixed(1)}" rx="${(br * 0.8).toFixed(1)}" ry="${(br * 1.1).toFixed(1)}" fill="url(#hv2-frostC)"/>`;
   if (!dep) for (let k = 0; k < 16; k++) {
     const dir = rng(k + seed) < 0.5 ? -1 : 1;
     const px = bx + (rng(k + 3) - 0.5) * br * 0.8;
@@ -294,7 +323,7 @@ function miniCola(bx, by, br, dep, spot, seed) {
     const tx = px + dir * len * curl, ty = py - len * (0.6 + rng(k + 4) * 0.3);
     const col = ['#caa46a', '#c9743a', '#b8472a', '#8a5cc4', '#d4632a', '#e09a4e'][k % 6];
     s += `<path d="M ${px.toFixed(1)} ${py.toFixed(1)} q ${(dir * len * 0.3).toFixed(1)} ${(-len * 0.45).toFixed(1)} ${(tx - px).toFixed(1)} ${(ty - py).toFixed(1)}" stroke="${col}" stroke-width="${(br * 0.05).toFixed(1)}" fill="none" stroke-linecap="round" opacity=".92"/>`;
-    if (k % 4 === 0) s += `<circle cx="${tx.toFixed(1)}" cy="${ty.toFixed(1)}" r="${(br * 0.05).toFixed(1)}" fill="url(#hv-dewC)"/>`;
+    if (k % 4 === 0) s += `<circle cx="${tx.toFixed(1)}" cy="${ty.toFixed(1)}" r="${(br * 0.05).toFixed(1)}" fill="url(#hv2-dewC)"/>`;
   }
   const tn = dep ? 10 : 30;
   for (let k = 0; k < tn; k++) {
@@ -315,8 +344,8 @@ function miniCola(bx, by, br, dep, spot, seed) {
  *    `lead` = the engine (organiser); `now` = current; `spot` = spotlit;
  *    `dep` = departed (booked only). `R` is the plant scale; (x, y) its centre. */
 function plantArt(x, y, R, v, i, { lead, now, spot, dep }) {
-  const heroG = dep ? 'hv-heroD' : (spot ? 'hv-heroP' : 'hv-heroG');
-  const sideG = dep ? 'hv-sideD' : (spot ? 'hv-sideP' : 'hv-sideG');
+  const heroG = dep ? 'hv2-heroD' : (spot ? 'hv2-heroP' : 'hv2-heroG');
+  const sideG = dep ? 'hv2-sideD' : (spot ? 'hv2-sideP' : 'hv2-sideG');
   const vein = dep ? '#9aa89a' : (spot ? '#e6cffb' : '#cfffb8');
   const seed = i + 1;
   const HR = R * 1.92;            // hero leaf reach
@@ -326,7 +355,7 @@ function plantArt(x, y, R, v, i, { lead, now, spot, dep }) {
 
   // ── OPEN slot: a simple frosted ring + OPEN / sign up!, no avatar, no cola.
   if (v.isOpen) {
-    s += `<path d="M ${x} ${cyL.toFixed(1)} L ${x} ${(potTop - R * 0.05).toFixed(1)}" stroke="url(#hv-stem)" stroke-width="${(R * 0.12).toFixed(1)}" stroke-linecap="round"/>`;
+    s += `<path d="M ${x} ${cyL.toFixed(1)} L ${x} ${(potTop - R * 0.05).toFixed(1)}" stroke="url(#hv2-stem)" stroke-width="${(R * 0.12).toFixed(1)}" stroke-linecap="round"/>`;
     s += potSVG(x, R, potTop, seed, false);
     const my = y + R * 0.2, ar = R * 0.6;
     s += `<circle cx="${x}" cy="${my.toFixed(1)}" r="${(ar + 5).toFixed(1)}" fill="#06120a"/>`;
@@ -338,7 +367,7 @@ function plantArt(x, y, R, v, i, { lead, now, spot, dep }) {
 
   // static halo glow behind the whole emblem (radial gradient, NOT a filter)
   if (!dep) {
-    const halo = spot ? 'hv-haloP' : 'hv-haloG';
+    const halo = spot ? 'hv2-haloP' : 'hv2-haloG';
     s += `<ellipse cx="${x}" cy="${(cyL - R * 0.5).toFixed(1)}" rx="${(R * 1.7).toFixed(1)}" ry="${(R * 1.85).toFixed(1)}" fill="url(#${halo})"/>`;
   }
 
@@ -348,10 +377,10 @@ function plantArt(x, y, R, v, i, { lead, now, spot, dep }) {
     s += `<g transform="translate(${(x + R * ox).toFixed(1)},${(cyL + R * oy).toFixed(1)}) rotate(${a})" opacity="${dep ? '.5' : '.9'}">${fanLeaf(HR * sc, sideG, vein, false)}</g>`;
 
   // ── soft dark crest shadow behind the hero leaf for depth
-  s += `<g transform="translate(${x},${(cyL + 2).toFixed(1)})" opacity=".4">${fanLeaf(HR * 1.015, 'hv-heroD', '#0a2e10', false)}</g>`;
+  s += `<g transform="translate(${x},${(cyL + 2).toFixed(1)})" opacity=".4">${fanLeaf(HR * 1.015, 'hv2-heroD', '#0a2e10', false)}</g>`;
 
   // ── THE HERO 7-POINT FAN LEAF — the star, dead-centre behind the avatar.
-  s += `<g transform="translate(${x},${cyL.toFixed(1)})">${fanLeaf(HR, heroG, vein, !dep)}</g>`;
+  s += `<g transform="translate(${x},${cyL.toFixed(1)})"><g class="hv2-hero" style="--hp:${(6 + rng(seed) * 3).toFixed(1)}s;animation-delay:-${(rng(seed + 2) * 5).toFixed(1)}s">${fanLeaf(HR, heroG, vein, !dep)}</g></g>`;
 
   // ── THE MINIMAL GLOSSY COLAS — small frosted buds peeking from UNDER the hero
   //    leaf, in the wedges flanking the medallion + one tucked centre-low.
@@ -362,7 +391,7 @@ function plantArt(x, y, R, v, i, { lead, now, spot, dep }) {
   }
 
   // little petiole/stem stub anchoring the leaf down toward the pot soil
-  s += `<path d="M ${x} ${cyL.toFixed(1)} L ${x} ${(potTop - R * 0.05).toFixed(1)}" stroke="url(#hv-stem)" stroke-width="${(R * 0.12).toFixed(1)}" stroke-linecap="round"/>`;
+  s += `<path d="M ${x} ${cyL.toFixed(1)} L ${x} ${(potTop - R * 0.05).toFixed(1)}" stroke="url(#hv2-stem)" stroke-width="${(R * 0.12).toFixed(1)}" stroke-linecap="round"/>`;
 
   // ── TERRACOTTA POT — grounds the composition.
   s += potSVG(x, R, potTop, seed, dep);
@@ -372,14 +401,14 @@ function plantArt(x, y, R, v, i, { lead, now, spot, dep }) {
   const ring = lead ? '#f6cf6e' : spot ? '#c9a8ef' : now ? '#eafff0' : dep ? '#7d8a7a' : '#bfe6a0';
   s += `<circle cx="${x}" cy="${my.toFixed(1)}" r="${(ar + 5).toFixed(1)}" fill="#06120a"/>`;
   s += `<circle cx="${x}" cy="${my.toFixed(1)}" r="${(ar + 2.5).toFixed(1)}" fill="none" stroke="${ring}" stroke-width="${now ? 3 : 2}" opacity="${dep ? '.5' : '1'}"/>`;
-  s += `<circle cx="${x}" cy="${my.toFixed(1)}" r="${ar.toFixed(1)}" fill="url(#${now ? 'hv-discN' : 'hv-disc'})"/>`;
+  s += `<circle cx="${x}" cy="${my.toFixed(1)}" r="${ar.toFixed(1)}" fill="url(#${now ? 'hv2-discN' : 'hv2-disc'})"/>`;
   // avatarSVG-style fallback: initials first (over the disc sheen), then the
   // clipped image over them — a 404 on the flaky CDN still shows initials.
   s += `<ellipse cx="${(x - ar * 0.3).toFixed(1)}" cy="${(my - ar * 0.4).toFixed(1)}" rx="${(ar * 0.46).toFixed(1)}" ry="${(ar * 0.28).toFixed(1)}" fill="#eafff0" opacity="${dep ? '.18' : '.42'}"/>`;
   s += `<text x="${x}" y="${(my + ar * 0.36).toFixed(1)}" text-anchor="middle" font-weight="900" font-size="${Math.round(ar * 0.95)}" fill="${dep ? '#cdd8cb' : '#ffffff'}" font-family="ui-rounded,system-ui,sans-serif" letter-spacing="-0.5" paint-order="stroke" stroke="#06160c" stroke-width="${(ar * 0.06).toFixed(1)}">${esc(initials(v.name))}</text>`;
   if (v.image) {
-    s += `<clipPath id="hv-av-${i}"><circle cx="${x}" cy="${my.toFixed(1)}" r="${ar.toFixed(1)}"/></clipPath>`;
-    s += `<image href="${esc(v.image)}" x="${(x - ar).toFixed(1)}" y="${(my - ar).toFixed(1)}" width="${(ar * 2).toFixed(1)}" height="${(ar * 2).toFixed(1)}" clip-path="url(#hv-av-${i})" preserveAspectRatio="xMidYMid slice"/>`;
+    s += `<clipPath id="hv2-av-${i}"><circle cx="${x}" cy="${my.toFixed(1)}" r="${ar.toFixed(1)}"/></clipPath>`;
+    s += `<image href="${esc(v.image)}" x="${(x - ar).toFixed(1)}" y="${(my - ar).toFixed(1)}" width="${(ar * 2).toFixed(1)}" height="${(ar * 2).toFixed(1)}" clip-path="url(#hv2-av-${i})" preserveAspectRatio="xMidYMid slice"/>`;
   }
   // tiny frost crystals dusting the medallion rim (ties it to the leaf)
   if (!dep) for (let k = 0; k < 9; k++) {
@@ -390,10 +419,10 @@ function plantArt(x, y, R, v, i, { lead, now, spot, dep }) {
   return s + `</g>`;
 }
 
-/* The terracotta pot — lifted verbatim from the prototype (pot ids prefixed hv-). */
+/* The terracotta pot — lifted verbatim from the prototype (pot ids prefixed hv2-). */
 function potSVG(x, R, potTop, seed, dep) {
   const potW = R * 0.82, potH = R * 1.12, rimH = R * 0.2, rimOver = R * 0.16, botHalf = R * 0.6;
-  const topY = potTop, botY = potTop + potH, rimY = potTop - rimH, rimHalf = potW + rimOver, pg = dep ? 'hv-potD' : 'hv-potG';
+  const topY = potTop, botY = potTop + potH, rimY = potTop - rimH, rimHalf = potW + rimOver, pg = dep ? 'hv2-potD' : 'hv2-potG';
   let s = '';
   s += `<ellipse cx="${x}" cy="${(botY + R * 0.02).toFixed(1)}" rx="${(botHalf * 1.3).toFixed(1)}" ry="${(R * 0.1).toFixed(1)}" fill="#000" opacity=".34"/>`;
   s += `<path d="M ${(x - potW).toFixed(1)} ${topY.toFixed(1)} L ${(x + potW).toFixed(1)} ${topY.toFixed(1)} L ${(x + botHalf).toFixed(1)} ${(botY - R * 0.07).toFixed(1)} Q ${(x + botHalf).toFixed(1)} ${botY.toFixed(1)} ${(x + botHalf - R * 0.09).toFixed(1)} ${botY.toFixed(1)} L ${(x - botHalf + R * 0.09).toFixed(1)} ${botY.toFixed(1)} Q ${(x - botHalf).toFixed(1)} ${botY.toFixed(1)} ${(x - botHalf).toFixed(1)} ${(botY - R * 0.07).toFixed(1)} Z" fill="url(#${pg})" stroke="#5e260f" stroke-width="1.3"/>`;
@@ -409,7 +438,7 @@ function potSVG(x, R, potTop, seed, dep) {
 }
 
 /* The ambient FRONT layer above/around one plant — kept OUT of the filtered
- * .hv-art group so the lit-plant glow bitmap caches across frames. Three families,
+ * .hv2-art group so the lit-plant glow bitmap caches across frames. Three families,
  * ALL bounded per car for perf (≈12 animating nodes/car, the prototype's own
  * per-unit density) and ALL compositor-only (drift/sway/opacity, no SVG filter):
  *   • drifting pot-leaves (the leaf-forward hero motion),
@@ -420,7 +449,7 @@ function leafCloud(x, w, i) {
   // ── drifting pot-leaves above the plant — the leaf-FORWARD hero motion. Bumped
   //    toward the prototype's lush density (≈9/car) but still BOUNDED so 20+ cars ×
   //    marquee copies stay sane. A spread of sizes/depths reads richer. ──
-  const N = 6;   // drifting leaves per car. Each is its own compositing layer ×
+  const N = 3;   // drifting leaves per car (perf: halved again). Each is its own compositing layer ×
                  // every car, so this is the dominant per-frame cost as a Train
                  // rolls by; trimmed from 13 → 6 to kill the OBS/CEF stutter while
                  // staying lush. (Was bumped to 13 for density; the perf cost won.)
@@ -431,15 +460,15 @@ function leafCloud(x, w, i) {
     const sc = 0.28 + rng(seed + 2) * 0.46;
     const du = 12 + rng(seed) * 12;   // a touch faster = livelier
     const pur = (i + k) % 4 === 0;
-    const drift = ['hv-driftA', 'hv-driftB', 'hv-driftC'][k % 3];
+    const drift = ['hv2-driftA', 'hv2-driftB', 'hv2-driftC'][k % 3];
     const op = (0.46 + rng(seed + 4) * 0.28).toFixed(2); // depth via opacity, not blur
-    s += `<g transform="translate(${lx.toFixed(0)},${ly.toFixed(0)})" opacity="${op}"><g class="hv-leaf" style="animation-name:${drift};animation-duration:${du.toFixed(0)}s;animation-delay:-${(k * 1.6).toFixed(1)}s">${richLeaf(sc, pur ? 'hv-leafP' : 'hv-leafG', sc > 0.52)}</g></g>`;
+    s += `<g transform="translate(${lx.toFixed(0)},${ly.toFixed(0)})" opacity="${op}"><g class="hv2-leaf" style="animation-name:${drift};animation-duration:${du.toFixed(0)}s;animation-delay:-${(k * 1.6).toFixed(1)}s">${richLeaf(sc, pur ? 'hv2-leafP' : 'hv2-leafG', sc > 0.52)}</g></g>`;
   }
   // ── soil leaf-bed: a few small leaflets rooted at the ground line, swaying
   //    about their base (frames the pots like the prototype's leaf bed) ──
   //    Varied COUNT (5-7/car), scattered positions, strong SIZE variation, a per-leaflet
   //    LEAN, and mixed green/purple — so the bed reads organic, not as uniform groups of 3.
-  const B = 2 + Math.round(rng(i * 23 + 50) * 1);  // 2-3 per car (trimmed from 5-7 for OBS perf)
+  const B = 1 + Math.round(rng(i * 23 + 50) * 1);  // 1-2 per car
   for (let k = 0; k < B; k++) {
     const seed = i * 23 + k + 100;
     const bx = x + (0.08 + rng(seed) * 0.84) * w;            // scattered, not even thirds
@@ -449,15 +478,15 @@ function leafCloud(x, w, i) {
     const pur = (i * 3 + k) % 4 === 0;                       // mix purple in
     const op = (0.78 + rng(seed + 6) * 0.22).toFixed(2);
     const per = (4.5 + rng(seed + 1) * 4).toFixed(1);
-    s += `<g transform="translate(${bx.toFixed(0)},${by.toFixed(0)}) rotate(${rot})" opacity="${op}"><g class="hv-bedleaf" style="--bp:${per}s;animation-delay:-${(k * 0.37).toFixed(1)}s">${richLeaf(sc, pur ? 'hv-leafP' : 'hv-leafG', false)}</g></g>`;
+    s += `<g transform="translate(${bx.toFixed(0)},${by.toFixed(0)}) rotate(${rot})" opacity="${op}"><g class="hv2-bedleaf" style="--bp:${per}s;animation-delay:-${(k * 0.37).toFixed(1)}s">${richLeaf(sc, pur ? 'hv2-leafP' : 'hv2-leafG', false)}</g></g>`;
   }
   // ── a few rising frost spores (gradient dots, no bloom) ──
-  const SP = 2;  // rising spores, capped per car (trimmed from 3 for OBS perf)
+  const SP = 1;  // one rising spore per car
   for (let k = 0; k < SP; k++) {
     const seed = i * 31 + k + 200;
     const sx = x + (0.2 + rng(seed + 1) * 0.6) * w;
     const du = (5 + rng(seed) * 5).toFixed(1);
-    s += `<circle class="hv-spore" cx="${sx.toFixed(0)}" cy="${(baseY - 6).toFixed(0)}" r="${(1.3 + rng(seed + 5) * 1.3).toFixed(1)}" fill="${k % 3 ? '#cdffd0' : '#ffe79a'}" style="animation-duration:${du}s;animation-delay:-${(k * 0.8).toFixed(1)}s"/>`;
+    s += `<circle class="hv2-spore" cx="${sx.toFixed(0)}" cy="${(baseY - 6).toFixed(0)}" r="${(1.3 + rng(seed + 5) * 1.3).toFixed(1)}" fill="${k % 3 ? '#cdffd0' : '#ffe79a'}" style="animation-duration:${du}s;animation-delay:-${(k * 0.8).toFixed(1)}s"/>`;
   }
   return s;
 }
@@ -466,13 +495,16 @@ function leafCloud(x, w, i) {
  * Light ink on a translucent backing so it reads over the leaves; angled low. */
 function playedStamp(x, R, y) {
   const sx = x, sy = y + R * 0.9;
-  return `<g class="hv-stamp" transform="rotate(-9 ${sx} ${sy.toFixed(1)})"><rect x="${(sx - 46).toFixed(1)}" y="${(sy - 16).toFixed(1)}" width="92" height="30" rx="5" fill="#10160f" opacity=".72" stroke="#cfe6c8" stroke-width="2.5"/><text x="${sx}" y="${(sy + 6).toFixed(1)}" text-anchor="middle" font-weight="900" font-size="15" fill="#cfe6c8" letter-spacing="2" font-family="system-ui">${esc(L('overlay.played'))}</text></g>`;
+  return `<g class="hv2-stamp" transform="rotate(-9 ${sx} ${sy.toFixed(1)})"><rect x="${(sx - 46).toFixed(1)}" y="${(sy - 16).toFixed(1)}" width="92" height="30" rx="5" fill="#10160f" opacity=".72" stroke="#cfe6c8" stroke-width="2.5"/><text x="${sx}" y="${(sy + 6).toFixed(1)}" text-anchor="middle" font-weight="900" font-size="15" fill="#cfe6c8" letter-spacing="2" font-family="system-ui">${esc(L('overlay.played'))}</text></g>`;
 }
 
-/* Bottom-anchored broadcaster name line (.rt-fit so it never truncates). */
-function nameSVG(x, w, v) {
-  const nameY = baseY + 108;
-  return `<text class="rt-fit" data-maxw="${w - 24}" x="${x}" y="${nameY}" text-anchor="middle" font-weight="900" font-size="17" fill="#eafbe6" font-family="ui-rounded,system-ui,sans-serif">${esc(v.name)}</text>`;
+/* Broadcaster name, centred ON the terracotta pot face (user request). rt-fit
+ * shrinks long names to the pot's width. Time line sits on the soil below. */
+function nameSVG(x, w, v, R, potTop) {
+  const nameY = potTop + R * 0.62;
+  const t = v.timeLines?.[0] ?? '';
+  return `<text class="rt-fit" data-maxw="${(R * 1.9).toFixed(0)}" x="${x}" y="${nameY.toFixed(1)}" text-anchor="middle" font-weight="900" font-size="14" fill="#ffe9d2" font-family="ui-rounded,system-ui,sans-serif" paint-order="stroke" stroke="#4a1e0a" stroke-width="2.6">${esc(v.name)}</text>` +
+    `<text class="hv2-time" x="${x}" y="${baseY - 8}" text-anchor="middle" font-weight="700" font-size="11" letter-spacing="1" fill="#bfe6a0" font-family="ui-monospace,monospace">${esc(t)}</text>`;
 }
 
 /* ── ONE rolling-hill layer — a smooth chain of sinusoidal mounds spanning the
@@ -503,14 +535,22 @@ function hillPath(baseY, amp, lumps, seed) {
  *    connected resin ground glow + ambient drifting leaves and rising motes.
  *    ONE element, full canvas width, behind the train, fades under track=periodic.
  *    Everything is sized in fractions of --rt-th; the band's top aligns near the
- *    plant band and its height is ~1.05×--rt-th (a LOWER band — the top of the
- *    frame stays see-through). Filter-free; all motion is compositor-only. */
+ *    plant band and its bottom sits flush with the holder floor (1.0×--rt-th) —
+ *    a LOWER band; the top of the frame stays see-through. Filter-free; all
+ *    motion is compositor-only. */
 export function buildTrack() {
   const el = document.createElement('div');
-  el.className = 'rt-rails hv-scene';
-  // Lower band: top just above the leaf crowns, height ~1.05×--rt-th so the
-  // backing covers the train's vertical extent without ever filling the frame.
-  el.style.cssText = `top: calc(var(--rt-th) * 0.30); height: calc(var(--rt-th) * 1.05);`;
+  // The theme class must ride the band element itself: the .hv2-scene /
+  // .hv2-scene-svg rules are scoped under .rt-theme-highvibes2, and the track
+  // slot has no themed ancestor — without it the svg falls back to its
+  // intrinsic 1200:100 aspect (half the band) and the lower band shows bare
+  // backing gradient as a detached apron.
+  el.className = 'rt-rails hv2-scene rt-theme-highvibes2';
+  // Lower band: top just above the leaf crowns, bottom flush with the holder
+  // floor. It used to run to 1.35×th — the extra 0.35×th below the floor
+  // rendered as a detached dark apron whenever the train isn't pinned to the
+  // canvas bottom (the configurator preview), clipped mid-gradient.
+  el.style.cssText = `top: calc(var(--rt-th) * 0.30); height: calc(var(--rt-th) * 0.70);`;
 
   // (a) TRANSLUCENT backing — a theme-tinted vertical gradient at ~0.4 alpha so
   //     bright stream content reads dimly through it. NEVER opaque, NEVER the
@@ -530,20 +570,24 @@ export function buildTrack() {
   //     pot-leaves and a few rising motes. preserveAspectRatio="none" lets the
   //     band stretch to any canvas width; smooth mounds tolerate the stretch.
   const VB = 100; // scene viewBox height
-  // Crest baselines (lower number = higher on the band). The train ground line
-  // sits near band-y 43, so the hills roll UP from there into the plant band:
-  // far hills crest high & pale, the near ridge banks low & dark under the pots.
-  const farY = 40, midY = 54, nearY = 70;
+  // Crest baselines (lower number = higher on the band). The band shrank from
+  // 1.05×th to 0.70×th (the apron fix), so every band-y scales ×1.5 to keep the
+  // SAME on-screen landscape: the train ground line sits near band-y 64
+  // (= 0.30 + 0.645×0.70 ≈ the 0.765 foot), the hills roll UP from there into
+  // the plant band, and the near ridge banks below the ground clear to the
+  // band's bottom edge — flush with the holder floor, no detached apron.
+  const GROUND = 64.5;
+  const farY = 60, midY = 81, nearY = 105;
 
   // far range (palest, smallest amplitude) → near range (darkest, tallest)
   const hills =
-    `<path class="hv-hill" style="--hd:hv-hillC;--ht:34s" d="${hillPath(farY, 26, 5, 11)}" fill="url(#hv-hillFar)" opacity=".68"/>` +
-    `<path class="hv-hill" style="--hd:hv-hillA;--ht:28s" d="${hillPath(midY, 32, 6, 23)}" fill="url(#hv-hillMid)" opacity=".88"/>` +
-    `<path class="hv-hill" style="--hd:hv-hillB;--ht:22s" d="${hillPath(nearY, 38, 7, 37)}" fill="url(#hv-hillNear)"/>`;
+    `<path class="hv2-hill" style="--hd:hv2-hillC;--ht:34s" d="${hillPath(farY, 39, 5, 11)}" fill="url(#hv2-hillFar)" opacity=".68"/>` +
+    `<path class="hv2-hill" style="--hd:hv2-hillA;--ht:28s" d="${hillPath(midY, 48, 6, 23)}" fill="url(#hv2-hillMid)" opacity=".88"/>` +
+    `<path class="hv2-hill" style="--hd:hv2-hillB;--ht:22s" d="${hillPath(nearY, 57, 7, 37)}" fill="url(#hv2-hillNear)"/>`;
 
-  // a connected resin ground glow hugging the near ridge (static radial, pulsing
-  // opacity only — no filter)
-  const groundGlow = `<rect class="hv-groundglow" x="-60" y="${(nearY - 6).toFixed(0)}" width="1320" height="${(VB - nearY + 12).toFixed(0)}" fill="url(#hv-resinGlow)"/>`;
+  // a connected resin ground glow pooling at the soil line (static radial,
+  // pulsing opacity only — no filter)
+  const groundGlow = `<rect class="hv2-groundglow" x="-60" y="${(GROUND - 8).toFixed(0)}" width="1320" height="${(VB - GROUND + 20).toFixed(0)}" fill="url(#hv2-resinGlow)"/>`;
 
   // ambient drifting pot-leaves scattered across the far/mid band (bounded count;
   // these belong to the scene, separate from the per-car leaf clouds). Seeded.
@@ -553,10 +597,10 @@ export function buildTrack() {
     const lx = 60 + rng(k * 7 + 1) * 1080;
     const ly = 14 + rng(k * 7 + 3) * 44;
     const sc = 1.4 + rng(k * 7 + 5) * 1.6;          // scaled up: scene units are big
-    const drift = ['hv-driftA', 'hv-driftB', 'hv-driftC'][k % 3];
+    const drift = ['hv2-driftA', 'hv2-driftB', 'hv2-driftC'][k % 3];
     const du = (40 + rng(k * 7 + 2) * 26).toFixed(0);
     const pur = k % 4 === 0;
-    sceneLeaves += `<g transform="translate(${lx.toFixed(0)},${ly.toFixed(0)}) scale(${(sc * 0.12).toFixed(3)})" opacity=".5"><g class="hv-scene-leaf" style="--sd:${drift};--st:${du}s;animation-delay:-${(k * 3.1).toFixed(1)}s">${richLeaf(1, pur ? 'hv-leafP' : 'hv-leafG', false)}</g></g>`;
+    sceneLeaves += `<g transform="translate(${lx.toFixed(0)},${ly.toFixed(0)}) scale(${(sc * 0.12).toFixed(3)})" opacity=".5"><g class="hv2-scene-leaf" style="--sd:${drift};--st:${du}s;animation-delay:-${(k * 3.1).toFixed(1)}s">${richLeaf(1, pur ? 'hv2-leafP' : 'hv2-leafG', false)}</g></g>`;
   }
 
   // a few rising motes off the ground glow (gradient dots; opacity+transform only)
@@ -566,20 +610,27 @@ export function buildTrack() {
     const mx = 80 + rng(k * 11 + 1) * 1040;
     const r = (0.5 + rng(k * 11 + 4) * 0.7).toFixed(2);
     const du = (6 + rng(k * 11 + 2) * 6).toFixed(1);
-    motes += `<circle class="hv-mote" cx="${mx.toFixed(0)}" cy="${(nearY + 4).toFixed(0)}" r="${r}" fill="${k % 3 ? '#cdffd0' : '#ffe79a'}" style="animation-duration:${du}s;animation-delay:-${(k * 0.9).toFixed(1)}s"/>`;
+    motes += `<circle class="hv2-mote" cx="${mx.toFixed(0)}" cy="${(GROUND + 4).toFixed(0)}" r="${r}" fill="${k % 3 ? '#cdffd0' : '#ffe79a'}" style="animation-duration:${du}s;animation-delay:-${(k * 0.9).toFixed(1)}s"/>`;
   }
 
   const sceneDefs =
     `<defs>` +
-    `<linearGradient id="hv-hillFar" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1f5a28"/><stop offset="1" stop-color="#123e1b"/></linearGradient>` +
-    `<linearGradient id="hv-hillMid" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1a5022"/><stop offset="1" stop-color="#0c3214"/></linearGradient>` +
-    `<linearGradient id="hv-hillNear" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#15461d"/><stop offset="1" stop-color="#07270f"/></linearGradient>` +
-    `<radialGradient id="hv-resinGlow" cx=".5" cy=".1" r=".9"><stop offset="0" stop-color="#7fff9f" stop-opacity=".42"/><stop offset=".4" stop-color="#3f9a3a" stop-opacity=".2"/><stop offset="1" stop-color="#0d3e16" stop-opacity="0"/></radialGradient>` +
+    `<linearGradient id="hv2-hillFar" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1f5a28"/><stop offset="1" stop-color="#123e1b"/></linearGradient>` +
+    `<linearGradient id="hv2-hillMid" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1a5022"/><stop offset="1" stop-color="#0c3214"/></linearGradient>` +
+    `<linearGradient id="hv2-hillNear" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#15461d"/><stop offset="1" stop-color="#07270f"/></linearGradient>` +
+    `<radialGradient id="hv2-resinGlow" cx=".5" cy=".1" r=".9"><stop offset="0" stop-color="#7fff9f" stop-opacity=".42"/><stop offset=".4" stop-color="#3f9a3a" stop-opacity=".2"/><stop offset="1" stop-color="#0d3e16" stop-opacity="0"/></radialGradient>` +
     `</defs>`;
 
   const holder = document.createElement('div');
-  holder.innerHTML = `<svg class="hv-scene-svg rt-theme-highvibes" viewBox="0 0 1200 ${VB}" preserveAspectRatio="none" aria-hidden="true">${sceneDefs}${hills}${groundGlow}${sceneLeaves}${motes}</svg>`;
+  holder.innerHTML = `<svg class="hv2-scene-svg rt-theme-highvibes2" viewBox="0 0 1200 ${VB}" preserveAspectRatio="none" aria-hidden="true">${sceneDefs}${hills}${groundGlow}${sceneLeaves}${motes}</svg>`;
   el.appendChild(holder.firstElementChild);
+  // drifting haze bands over the hills (two, offset, different speeds)
+  for (const [hz, op, dl] of [['52s', '.34', '0s'], ['74s', '.22', '-30s']]) {
+    const haze = document.createElement('div');
+    haze.className = 'rt-theme-highvibes2-haze';
+    haze.style.cssText = `--hz:${hz}; opacity:${op}; animation-delay:${dl};`;
+    el.appendChild(haze);
+  }
   return el;
 }
 
@@ -611,25 +662,30 @@ export function build(train, opts = {}) {
     const flags = { lead, now, spot, dep: departed };
 
     // static green NOW glow behind the current plant (radial gradient, not a filter)
-    const nowGlow = now ? `<ellipse cx="${cx}" cy="${cy}" rx="120" ry="104" fill="url(#hv-nowglow)"/>` : '';
+    const nowGlow = now ? `<ellipse cx="${cx}" cy="${cy}" rx="120" ry="104" fill="url(#hv2-nowglow)"/>` : '';
 
     const art = plantArt(cx, cy, R, v, i, flags);
     const stamp = v.isOpen ? '' : playedStamp(cx, R, cy);
-    const name = nameSVG(cx, w, v);
+    const name = v.isOpen ? '' : nameSVG(cx, w, v, R, cy + R * 1.18);
 
     const state = (now ? ' rt-car--current' : '') + (spot ? ' rt-car--spotlit' : '') + (departed ? ' rt-car--departed' : '');
     const slot = isEngine ? ' data-engine="1"' : ` data-slot="${v.slotOrder}"`;
-    // The Now Marker is always in the DOM; base CSS reveals it on .rt-car--current.
-    // Omit it for the engine (no per-slot state) and for open slots.
-    const pointer = (isEngine || v.isOpen) ? '' : `<g class="rt-pointer rt-now-bob">${nowMarkerSVG(cx, baseY + 64)}</g>`;
+    // NOW marker hangs ABOVE the plant, arrow pointing down at the crown (it used
+    // to sit below the soil line, pointing at nothing).
+    const pointer = (isEngine || v.isOpen) ? '' : `<g class="rt-pointer rt-now-bob">${nowMarkerSVG(cx, cy - R * 2.3)}</g>`;
 
     // STATIC art group (glow filters target it) + an animating leaf cloud SIBLING
-    // outside it + the NOW marker.
-    body += `<g class="rt-car${state}"${slot}>${nowGlow}<g class="hv-art">${art}${stamp}${name}</g><g class="hv-front">${leafCloud(xs[i], w, i)}</g>${pointer}</g>`;
+    // outside it + the NOW marker. The plant (with its NOW glow, so the halo
+    // tracks it) rides the hv2-float wrappers for the gentle wander; the leaf
+    // cloud stays outside so the soil bed keeps its roots.
+    const fxp = (10 + rng(i * 13 + 5) * 6).toFixed(1), fyp = (6.5 + rng(i * 13 + 8) * 4).toFixed(1);
+    const fxd = (-rng(i * 13 + 2) * 12).toFixed(1), fyd = (-rng(i * 13 + 3) * 8).toFixed(1);
+    const float = (inner) => `<g class="hv2-floatX" style="--fxp:${fxp}s;--fxd:${fxd}s"><g class="hv2-floatY" style="--fyp:${fyp}s;--fyd:${fyd}s">${inner}</g></g>`;
+    body += `<g class="rt-car${state}"${slot}>${float(`${nowGlow}<g class="hv2-art">${art}${stamp}${name}</g>`)}<g class="hv2-front">${leafCloud(xs[i], w, i)}</g>${pointer}</g>`;
   });
 
   const holder = document.createElement('div');
-  holder.innerHTML = `<svg class="rt-theme-highvibes" viewBox="0 0 ${totalW} ${VIEW_H}" role="img" style="--rt-ride:1.2">${defs()}${body}</svg>`;
+  holder.innerHTML = `<svg class="rt-theme-highvibes2" viewBox="0 0 ${totalW} ${VIEW_H}" role="img" style="--rt-ride:1.2">${defs()}${body}</svg>`;
   const svg = holder.firstElementChild;
 
   // Keep references so a time tick re-styles in place (never a rebuild).
@@ -651,6 +707,8 @@ export function build(train, opts = {}) {
         g.classList.toggle('rt-car--current', car.isCurrent);
         g.classList.toggle('rt-car--departed', car.isDeparted);
         g.classList.toggle('rt-car--spotlit', car.isSpotlit);
+        const t = g.querySelector('.hv2-time');
+        if (t && !car.isOpen) t.textContent = (car.timeLines ?? [car.relativeTime])[0] ?? '';
       }
       const eng = nextTrain.engine;
       if (engineRef) {
@@ -677,12 +735,9 @@ function nowMarkerSVG(cx, y) {
 }
 
 // 4) The default export IS the Theme: register it in src/train-renderer.js.
-/** Baseline (`foot`) — this Theme's FLOOR as a fraction of --rt-th, measured down
- *  from the top of the Train's box; the renderer drops the Train until this line
- *  reaches the bottom edge at height=100 (see --rt-foot in train-renderer.js).
- *  Floor here = the name line's ink (baseline baseY + 108, 17px type → ~4 units of
- *  descender), which sits BELOW the viewBox — the name overhangs the box by design
- *  and shows via the renderer's .rt-track > svg overflow:visible, so foot > 1. */
-export const foot = (baseY + 112) / VIEW_H;
+/** Floor: the names moved from below the soil onto the pot face, so the old
+ *  overhanging foot (baseY+112) left a big air gap — the lowest ink is now the
+ *  soil-line time caption (~baseY-8 + descenders) and the pot shadow at baseY. */
+export const foot = (baseY + 6) / VIEW_H; // floor = soil line + pot shadow / time descenders
 
 export default { key: 'highvibes', ensureStyles, build, buildTrack, foot };
