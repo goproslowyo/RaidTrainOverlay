@@ -26,6 +26,8 @@ export default {
   'status.departed': 'PARTIU',
   'status.lead': 'LÍDER',
   'departures.header': 'PARTIDAS',
+  'departures.nextSlot': 'PRÓXIMA VAGA',
+  'departures.coach': 'VAGÃO {n}',
 
   // ── Relative time: "in {v}", where {v} = compact units like "2h30m" ──────
   // Unit tokens are single-letter for the fixed-width car; {v} is assembled

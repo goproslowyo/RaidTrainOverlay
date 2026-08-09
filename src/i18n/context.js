@@ -65,6 +65,8 @@ export const BADGE_BUDGET = {
   'status.departed': 12,
   'status.lead': 10,
   'departures.header': 12,
+  'departures.nextSlot': 16,
+  'departures.coach': 13,
   // Not on a Car — the diagonal stamp across an Ended train's card in the
   // Configurator. Budgeted anyway (#42): docs/i18n-review-notes.md tells
   // reviewers it is length-constrained, and this is the machine-readable half
@@ -94,6 +96,8 @@ export const DESCRIPTIONS = {
   'status.departed': 'Departures-board status: this slot is over ("departed"). Rail/airport sense.',
   'status.lead': 'Departures-board status on the lead streamer who has played but still heads the train. "Lead / head of the line".',
   'departures.header': 'Header strip on the Departures-board theme reading "DEPARTURES" (the board title). The ● bullet is added in code.',
+  'departures.nextSlot': 'Board header on an OPEN (unbooked) slot in the Departures theme: the next slot up for grabs. Keep short — fixed-width header strip.',
+  'departures.coach': 'Board header numbering a booked slot in the Departures theme, e.g. "COACH 02" — {n} is the zero-padded slot number. Rail carriage sense; keep short.',
   // Relative time assembly.
   'time.in': 'Wrapper for an upcoming time: "in {v}" where {v} is e.g. "2h30m". Use your language\'s "in X time" preposition. Keep {v}.',
   'time.d': 'Compact unit token for DAYS, used like "2d" with no space. Shortest conventional abbreviation, lowercase.',

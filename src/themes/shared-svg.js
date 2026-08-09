@@ -28,11 +28,14 @@ const LABELS_EN = {
   'overlay.played': 'PLAYED',
   'overlay.organisedBy': 'ORGANISED BY',
   'overlay.staff': 'STAFF',
+  'overlay.conductor': 'CONDUCTOR',
   'status.onTime': 'ON TIME',
   'status.boarding': 'BOARDING',
   'status.departed': 'DEPARTED',
   'status.lead': 'LEAD',
   'departures.header': 'DEPARTURES',
+  'departures.nextSlot': 'NEXT SLOT',
+  'departures.coach': 'COACH {n}',
 };
 
 /**

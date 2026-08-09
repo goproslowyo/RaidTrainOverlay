@@ -165,6 +165,39 @@ test('the open-slots checkbox names the badge its own overlay paints', async () 
   }
 });
 
+test('theme modules paint viewer words through the translator, never as literals', async () => {
+  // Every word painted into the on-stream train art must come from the catalog
+  // via L(...) — a hardcoded 'BOARDING' renders English to a German viewer and
+  // no catalog test can see it. node can't mount a Theme (no DOM), so the
+  // invariant is pinned at the source, like the rAF and Configurator-translator
+  // tests: no theme module may carry an en badge value as a bare string.
+  // shared-svg.js is exempt — it IS the English fallback catalog (LABELS_EN).
+  const { readFile, readdir } = await import('node:fs/promises');
+  const dir = new URL('../src/themes/', import.meta.url);
+  // The en values of every viewer-facing badge/status/caption, plus the words
+  // the departures board once hardcoded outside the catalog.
+  const words = [
+    'NOW', 'OPEN', 'PLAYED', 'STAFF', 'ORGANISED BY',
+    'ON TIME', 'BOARDING', 'DEPARTED', 'LEAD', 'CONDUCTOR',
+    'NEXT SLOT', 'COACH', 'DEPARTURES',
+  ];
+  // \b-style boundaries that also treat _ and digits as word chars, so the
+  // identifiers R_OPEN / LEAD_W don't read as painted words.
+  const wordRe = new RegExp(`(?<![A-Za-z0-9_])(?:${words.join('|')})(?![A-Za-z0-9_])`);
+  const offenders = [];
+  for (const entry of await readdir(dir)) {
+    if (!entry.endsWith('.js') || entry === 'shared-svg.js') continue;
+    const code = (await readFile(new URL(entry, dir), 'utf8'))
+      .replace(/\/\*[\s\S]*?\*\//g, '')      // block comments
+      .replace(/^\s*\/\/.*$/gm, '')          // whole-line comments
+      .replace(/\s\/\/[^'"`]*$/gm, '');      // trailing comments (never a string; ':/\/' in URLs survives)
+    const m = code.match(wordRe);
+    if (m) offenders.push(`${entry}: paints "${m[0]}" as a literal`);
+  }
+  assert.ok((await readdir(dir)).includes('departures.js'), 'the walk found the theme roster');
+  assert.deepEqual(offenders, [], 'viewer words must go through L(...) so locales translate them');
+});
+
 test('every Configurator render call passes a translator', async () => {
   // settings-schema.js holds no English — it names its strings by catalog key —
   // so the modules that render from it (settings-form, train-list, preview-frame)

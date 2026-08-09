@@ -26,6 +26,8 @@ export default {
   'status.departed': 'PARTIÓ',
   'status.lead': 'EN CABEZA',
   'departures.header': 'SALIDAS',
+  'departures.nextSlot': 'PRÓXIMO HUECO',
+  'departures.coach': 'VAGÓN {n}',
 
   // ── Relative time: "in {v}", where {v} = compact units like "2h30m" ──────
   'time.in': 'en {v}',

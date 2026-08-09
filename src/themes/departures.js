@@ -1,10 +1,10 @@
 /**
  * departures2 — split-flap departure boards as roadside signs on wheels,
  * rebuilt from the user's reference boards: compact near-square dark boards,
- * a black header strip, real flap letter cells with a centre seam for the
- * name, yellow monospace time, coloured status (BOARDING / ON TIME / status
- * from i18n for played), on short legs with caster wheels like a billboard
- * sign. HTML/CSS medium via the --u token.
+ * a black header strip (CONDUCTOR / NEXT SLOT / COACH NN, all from i18n), real
+ * flap letter cells with a centre seam for the name, yellow monospace time,
+ * coloured status (boarding / on-time / played, all from i18n), on short legs
+ * with caster wheels like a billboard sign. HTML/CSS medium via the --u token.
  */
 import { fitAll, undulate, toVehicles, esc, themeT } from './shared-svg.js';
 import { ensureHtmlShared, injectStyle, htmlAvatar, htmlWheel, stateClasses } from './shared-html.js';
@@ -92,26 +92,35 @@ function flapCells(text, max = 12) {
   for (const ch of t) out += ch === ' ' ? '<span class="dp2-cell"></span>' : `<span class="dp2-cell dp2-on" style="animation-delay:${(idx++ * 0.07).toFixed(2)}s">${esc(ch)}</span>`;
   return out;
 }
+/** Plain text (escaped where it meets HTML): the status cell is rewritten via
+ *  textContent on a time tick, so pre-escaping here would double-escape there.
+ *  status.* values live uppercase in every catalog; signUp/played are sentence-
+ *  case shared badges, uppercased for the board. (Plain toUpperCase is safe for
+ *  the shipped locales — none has Turkish-style dotted-i casing.) */
 function statusText(v) {
-  if (v.isOpen) return esc(L('overlay.signUp')).toUpperCase();
-  if (v.isCurrent) return 'BOARDING';
-  if (v.isDeparted || v.isDimmed) return esc(L('overlay.played')).toUpperCase();
-  return 'ON TIME';
+  if (v.isOpen) return L('overlay.signUp').toUpperCase();
+  if (v.isCurrent) return L('status.boarding');
+  if (v.isDeparted || v.isDimmed) return L('overlay.played').toUpperCase();
+  return L('status.onTime');
 }
 
 function boardUnit(v, isEngine) {
   const cls = `rt-car dp2-unit ${v.isOpen ? 'dp2-open' : ''} ${stateClasses(v)}`.replace(/\s+/g, ' ').trim();
   const dataAttr = isEngine ? ' data-engine="1"' : ` data-slot="${v.slotOrder}"`;
-  const head = isEngine ? 'CONDUCTOR' : v.isOpen ? 'NEXT SLOT' : `COACH ${String(v.slotOrder ?? '').padStart(2, '0')}`;
+  const head = isEngine
+    ? L('overlay.conductor')
+    : v.isOpen
+      ? L('departures.nextSlot')
+      : L('departures.coach', { n: String(v.slotOrder ?? '').padStart(2, '0') });
   const name = v.isOpen ? L('overlay.open') : v.name;
   const time = v.timeLines?.[0] ?? '';
   const ava = v.isOpen ? '<div class="dp2-ava">+</div>' : `<div class="dp2-ava">${htmlAvatar(v)}</div>`;
   return `<div class="${cls}"${dataAttr}>
     <div class="dp2-board">
       <div class="rt-pointer rt-now-bob dp2-flag">▼ ${esc(L('overlay.now'))}</div>
-      <div class="dp2-head"><b>${head}</b><span class="dp2-lamp"></span></div>
+      <div class="dp2-head"><b>${esc(head)}</b><span class="dp2-lamp"></span></div>
       <div class="dp2-flaps">${flapCells(name)}</div>
-      <div class="dp2-info">${ava}<span class="dp2-time">${esc(time)}</span><span class="dp2-status">${statusText(v)}</span></div>
+      <div class="dp2-info">${ava}<span class="dp2-time">${esc(time)}</span><span class="dp2-status">${esc(statusText(v))}</span></div>
     </div>
     <div class="dp2-base"><span class="dp2-leg"></span><span class="dp2-leg"></span></div>
     <div class="dp2-chassis"></div>

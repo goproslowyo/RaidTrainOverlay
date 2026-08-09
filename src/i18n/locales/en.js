@@ -31,6 +31,8 @@ export default {
   'status.departed': 'DEPARTED',
   'status.lead': 'LEAD',
   'departures.header': 'DEPARTURES',
+  'departures.nextSlot': 'NEXT SLOT',
+  'departures.coach': 'COACH {n}',
 
   // ── Relative time: "in {v}", where {v} = compact units like "2h30m" ──────
   // Unit tokens are single-letter for the fixed-width car; {v} is assembled
