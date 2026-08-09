@@ -14,10 +14,10 @@
  */
 
 import { MAX_BLOB_CHARS } from './blob-codec.js';
-import { fetchUserPayload, normalizeUser } from './raidpal-client.js';
-import { startEventFeed } from './event-feed.js';
+import { fetchUserPayload, fetchEventPayload, normalizeUser, normalizeEvent } from './raidpal-client.js';
+import { startEventFeed, cacheKey as eventCacheKey } from './event-feed.js';
 import { nextPollDelayMs } from './backoff.js';
-import { decodeTrainMap, resolveLiveTrain, effectiveQuery } from './live-link.js';
+import { decodeTrainMap, resolveLiveTrain, effectiveQuery, mySlot } from './live-link.js';
 import { parseConfig } from './config.js';
 
 const USER_CACHE_PREFIX = 'raidtrainoverlay.cache.user.v1.';
@@ -30,6 +30,70 @@ const DEFAULT_RESOLVE_MIN = 15;
 export function userCacheKey(login) {
   return USER_CACHE_PREFIX + login.toLowerCase();
 }
+
+// The idle card re-reads a lineup this often at most (per slug); between
+// reads the Overlay's own event cache answers. Lineups shift, but slot times
+// rarely move within hours — and the resolve tick re-runs this every cycle.
+const SLOT_FRESH_MS = 6 * 60 * 60_000;
+// The polite pause between consecutive lineup fetches (my-raid-trains' pacing).
+const SLOT_FETCH_PAUSE_MS = 400;
+
+/** Read the event-feed cache's `{ payload, savedAt }` for a slug, or null. */
+function readEventCache(storage, slug) {
+  const raw = storage.getItem(eventCacheKey(slug));
+  if (raw == null) return null;
+  try {
+    const entry = JSON.parse(raw);
+    return entry?.payload ? entry : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The upcoming trains, each annotated with `mySlotAt` — when the streamer's
+ * OWN slot starts — wherever the Event's lineup names them. Lineups come
+ * cache-first from the Overlay's own event cache (shared with the active
+ * train's feed) and are fetched sequentially with a polite pause when stale;
+ * `cacheOnly` skips the network entirely, so the first paint never waits on
+ * it. Fail-soft throughout: a lineup that cannot be read, or one the
+ * streamer isn't on, simply leaves the row on the train's departure time.
+ */
+export async function annotateMySlots(upcoming, names, {
+  fetchImpl, storage, clock = Date.now,
+  setTimer = (fn, ms) => setTimeout(fn, ms), cacheOnly = false,
+}) {
+  const out = [];
+  let fetched = false;
+  for (const train of upcoming) {
+    const cached = readEventCache(storage, train.slug);
+    let payload = cached?.payload ?? null;
+    const fresh = cached != null && clock() - cached.savedAt < SLOT_FRESH_MS;
+    if (!fresh && !cacheOnly) {
+      try {
+        if (fetched) await new Promise((resolve) => setTimer(resolve, SLOT_FETCH_PAUSE_MS));
+        payload = await fetchEventPayload(train.slug, fetchImpl);
+        fetched = true;
+        storage.setItem(eventCacheKey(train.slug), JSON.stringify({ payload, savedAt: clock() }));
+      } catch {
+        // keep whatever the cache had (possibly null) — the row falls back.
+      }
+    }
+    let slot = null;
+    if (payload != null) {
+      try {
+        slot = mySlot(normalizeEvent(payload), names);
+      } catch {
+        slot = null; // a malformed cached payload must not sink the card
+      }
+    }
+    out.push(slot ? { ...train, mySlotAt: slot.starttime } : { ...train });
+  }
+  return out;
+}
+
+/** The annotation fingerprint — two paints with the same signature are the same card. */
+const slotSignature = (list) => list.map((t) => +(t.mySlotAt ?? 0)).join(',');
 
 /** Read the cached user payload, or null. Never throws (event-feed discipline). */
 function readUserCache(storage, login) {
@@ -133,16 +197,27 @@ export function startLiveLinkFeed(baseQuery, deps) {
     } else if (r.user) {
       notFoundReported = false;
       const { state, train, upcoming } = resolveLiveTrain(r.user.events, new Date(clock()));
+      // The card says when the streamer PLAYS, wherever a lineup names them:
+      // paint immediately from whatever the cache knows, then complete the
+      // lineups over the network and repaint only if that changed anything.
+      const names = [login, r.user.displayName];
+      const paintIdle = async () => {
+        const slotDeps = { fetchImpl, storage, clock, setTimer };
+        const first = await annotateMySlots(upcoming, names, { ...slotDeps, cacheOnly: true });
+        onIdle({ upcoming: first });
+        const full = await annotateMySlots(upcoming, names, slotDeps);
+        if (!stopped && slotSignature(full) !== slotSignature(first)) onIdle({ upcoming: full });
+      };
       if (baseConfig.uponly) {
         // Upcoming-only Live Link (?uponly=1): whatever state the resolver
         // found, this source renders the upcoming card and never the Train —
-        // a second URL for a separate OBS scene (starting soon / BRB). No
-        // inner lineup feed is ever started, so no per-train fetches happen.
+        // a second URL for a separate OBS scene (starting soon / BRB). The
+        // inner lineup feed is never started.
         stopInner();
-        onIdle({ upcoming });
+        await paintIdle();
       } else if (state === 'idle') {
         stopInner();
-        onIdle({ upcoming });
+        await paintIdle();
       } else if (train.slug !== activeSlug) {
         stopInner();
         activeSlug = train.slug;

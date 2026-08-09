@@ -157,6 +157,34 @@ test('shouldSelfReload: only when idle AND the page is over an hour old', () => 
   assert.equal(IDLE_RELOAD_MS, 60 * MIN);
 });
 
+// ---- whose slot is mine (the card shows when the streamer actually plays) ----
+
+import { mySlot } from '../src/live-link.js';
+
+const slot = (name, iso, occupied = true) => ({
+  starttime: at(iso), occupied,
+  broadcaster: occupied ? { displayName: name, image: '', live: false, id: 1 } : null,
+});
+
+test('mySlot finds the occupied slot whose broadcaster matches any candidate name, case-insensitively', () => {
+  const event = { slots: [slot('DJ Alpha', '2026-08-15T10:00:00Z'), slot('GoProFlowYo', '2026-08-16T06:00:00Z')] };
+  assert.equal(mySlot(event, ['goproflowyo']).starttime.toISOString(), '2026-08-16T06:00:00.000Z');
+  assert.equal(mySlot(event, ['GOPROFLOWYO', 'other']).starttime.toISOString(), '2026-08-16T06:00:00.000Z');
+  // The display name may differ from the login — any candidate may match.
+  assert.equal(mySlot(event, ['some_login', 'dj alpha']).starttime.toISOString(), '2026-08-15T10:00:00.000Z');
+});
+
+test('mySlot ignores open slots and returns null when the streamer is not in the lineup', () => {
+  const event = { slots: [slot('GoProFlowYo', '2026-08-15T10:00:00Z', false), slot('DJ Alpha', '2026-08-15T11:00:00Z')] };
+  assert.equal(mySlot(event, ['goproflowyo']), null, 'an OPEN slot is nobody\'s');
+  assert.equal(mySlot(event, ['stranger']), null);
+  // Fail-soft on absent data: no event, no slots, no candidates.
+  assert.equal(mySlot(null, ['goproflowyo']), null);
+  assert.equal(mySlot({}, ['goproflowyo']), null);
+  assert.equal(mySlot(event, []), null);
+  assert.equal(mySlot(event, [null, undefined]), null);
+});
+
 // ---- card paging (many upcoming trains must not grow the card) ----
 
 import { visibleUpcoming, upcomingPages, CARD_MAX_ROWS } from '../src/live-link.js';

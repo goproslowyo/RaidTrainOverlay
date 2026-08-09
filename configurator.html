@@ -143,7 +143,10 @@
     .avatar {
       width: 26px; height: 26px; border-radius: 50%; flex: none;
       display: inline-flex; align-items: center; justify-content: center;
-      font: 800 12px/1 var(--rt-font-ui); color: #FFE7C6;
+      /* line-height = the circle's height: with line-height 1 the font's own
+         metrics could seat the cap low enough to shave its foot on the
+         circle's edge (the clipped G). A full-height line box centres it. */
+      font: 800 12px/26px var(--rt-font-ui); color: #FFE7C6; user-select: none;
       background: linear-gradient(140deg, var(--rt-sodium-600), var(--rt-sodium-700));
     }
     .profile-btn .chev { color: var(--rt-ink-3); font-size: 11px; flex: none; }
@@ -315,7 +318,7 @@
       color: var(--rt-ink); border-color: var(--rt-danger-edge); background: var(--rt-danger-tint);
     }
     .ll-note.bad .w { color: var(--rt-danger); }
-    .ll-idle { margin-top: 13px; padding-top: 6px; border-top: 1px dashed var(--rt-line); }
+    .ll-idle-fold { margin-top: 13px; margin-bottom: 0; background: var(--rt-well); }
     .ll-meta { color: var(--rt-ink-2); font-size: 12.5px; margin-top: 10px; }
 
     /* ── The idle-card fields (shared by Simple and the Live Link card) ── */
@@ -416,6 +419,9 @@
        min-width defaults to its content, so without it a long name refuses to
        shrink and bursts the card instead of truncating. */
     .up .row .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    /* The UTC anchor every row carries on the real card — viewers are
+       worldwide, so a local-only time would mean nothing to most of them. */
+    .up .row .utc { margin-left: auto; flex: none; font-family: var(--rt-font-mono); font-size: 9px; color: rgba(237, 241, 247, .45); white-space: nowrap; }
     /* One-line variant: a real marquee, duplicated so the loop has no seam.
        Sized to take most of the scene's width — a ticker squeezed into a
        sliver shows one word at a time and reads as broken. */
@@ -428,6 +434,7 @@
     .ticklap { display: inline-flex; gap: 10px; align-items: baseline; padding-right: 10px; }
     .tickrun .tick { display: inline-flex; align-items: baseline; gap: 7px; font-size: 12.5px; }
     .tickrun .tick .tm { font-family: var(--rt-font-mono); color: #FFC578; font-size: 11px; }
+    .tickrun .tick .utc { font-family: var(--rt-font-mono); font-size: 9px; color: rgba(237, 241, 247, .45); }
     .tickrun .tsep { color: #4C5A6B; }
     @keyframes tickmarquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
     @media (prefers-reduced-motion: reduce) { .tickrun { animation: none; } .up .row.enter { animation: none; } }
@@ -860,7 +867,7 @@
   import { instantToZonedWallClock, snapDuration } from './src/manual-lineup.js';
   import { parseStreamers, serializeStreamers, addStreamers, removeStreamer, listStreamers } from './src/streamers.js';
   import { loadEvent, normalizeUser } from './src/raidpal-client.js';
-  import { parseConfig } from './src/config.js';
+  import { parseConfig, resolveZone } from './src/config.js';
   import { createPreviewFrame } from './src/preview-frame.js';
   import { resolveLocale, loadMessages, makeT } from './src/i18n/index.js';
   import { localizeDom } from './src/i18n/dom.js';
@@ -874,7 +881,7 @@
     resolveTrainSettings, countPresetReferences, materializePreset, liveLinkPrefs, setLiveLinkPrefs,
     isSetupDone, markSetupDone, pruneOrphanedConfigs, restoreTrainConfigs,
   } from './src/profiles.js';
-  import { filterUpcoming, upcomingPages, visibleUpcoming, CARD_MAX_ROWS } from './src/live-link.js';
+  import { filterUpcoming, upcomingPages, visibleUpcoming, mySlot, CARD_MAX_ROWS } from './src/live-link.js';
   import { anchorStyle } from './src/upcoming-card.js';
   import { loadMyRaidTrains, loadEventDetails, refreshEventDetail, userCacheKey } from './src/my-raid-trains.js';
   import { buildLiveLink, baseSettings } from './src/live-link-url.js';
@@ -894,6 +901,9 @@
   const LIBRARY_KEY = 'raidtrainoverlay.configurator.presets.v2';
   const PROFILES_KEY = 'raidtrainoverlay.configurator.profiles.v1';
   const STREAMERS_KEY = 'raidtrainoverlay.configurator.streamers';
+  // Which home frame (simple | everything) the streamer last chose — a UI
+  // preference, so device-level rather than per-Profile.
+  const HOMEVIEW_KEY = 'raidtrainoverlay.configurator.homeview.v1';
 
   // The idle card's horizons, in the `upcoming=` grammar the Overlay parses,
   // each pointing at its catalog key rather than an English label.
@@ -1011,11 +1021,12 @@
     // (first visit, or "Run setup again"); `home` is Simple / Everything.
     stage: 'home',         // setup | home
     stop: 1,               // setup: which stop (1..3)
-    homeView: 'simple',    // home: simple | everything
+    homeView: localStorage.getItem(HOMEVIEW_KEY) === 'everything' ? 'everything' : 'simple',
     copied: false,         // setup stop 3: has the Live Link been copied here
     themesOpen: false,     // Simple/stop 2: theme grid expanded past one row
     justLanded: false,     // show the graduation ribbon once after setup
     idlePage: 0,           // which page the idle-card mock preview is showing
+    llIdleOpen: false,     // Live Link page: idle-card group expanded
     view: 'trains',        // trains | presets | profile | oneoff
     editing: null,         // Event slug — the Raid Train Config editor is open
     editingPreset: null,   // Preset id — the Preset editor is open
@@ -1209,6 +1220,7 @@
       // returning null, which feedVerified() requires first.
       state.feed = {
         ...state.feed, status: 'ready', events: result.user.events,
+        displayName: result.user.displayName,
         error: result.error ?? null, fromCache: result.fromCache === true,
       };
       cleanUpOrphans({ force });
@@ -1359,7 +1371,23 @@
       </div>
       ${tooBig}
       <div class="ll-note"><span class="w" aria-hidden="true">${icon('warn', 15)}</span><span>${te('configurator.llWarn')}</span></div>
-      ${idle ? `<div class="ll-idle">${idleControlsHtml()}</div>` : ''}
+      ${idle ? (() => {
+        const v = idleValues();
+        const on = v.upcoming != null;
+        const status = on
+          ? [te(v.upstyle === 'ticker' ? 'configurator.footTicker' : 'configurator.footCard'),
+            te((POSITIONS.find(([k]) => k === v.uppos) ?? POSITIONS[7])[1]),
+            te(HORIZON_KEYS[v.upcoming] ?? 'configurator.horizon3')].join(' · ')
+          : te('configurator.idleOffNote');
+        return `<details class="fgroup ll-idle-fold" id="ll-idle-fold"${state.llIdleOpen ? ' open' : ''}>
+          <summary>
+            <span class="g-label">${te('configurator.idleWhileLabel')}</span>
+            <span class="cap dim" style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${status}</span>
+            <span class="g-chev" aria-hidden="true">${icon('chev', 12)}</span>
+          </summary>
+          <div class="fgroup-body">${idleControlsHtml()}</div>
+        </details>`;
+      })() : ''}
       <div class="ll-meta">${esc(link.trainCount === 0
         ? t('configurator.llCoversNone')
         : plural(link.trainCount, 'configurator.llCoversOne', 'configurator.llCoversMany'))}</div>
@@ -1775,7 +1803,25 @@
   /** The soonest upcoming train, or null. */
   const nextTrain = () => upcomingTrains()[0] ?? null;
 
-  const fmtDep = (date) => new Intl.DateTimeFormat(pageLocale, { weekday: 'short', hour: '2-digit', minute: '2-digit' }).format(date);
+  // The same Intl options the real card uses (upcoming-card.js
+  // formatDeparture), so the preview's rows read exactly like the stream's:
+  // zone-named times, pinned to the base Preset's first `tz` zone when set.
+  function cardZone() {
+    const tz = baseSettings(library, profiles, me()).tz ?? '';
+    return resolveZone(tz.split(',')[0])?.zone;
+  }
+  const fmtDep = (date) => new Intl.DateTimeFormat(pageLocale, {
+    weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
+    timeZoneName: 'short', ...(cardZone() && { timeZone: cardZone() }),
+  }).format(date);
+  /** The UTC anchor the real card carries on every row (upcoming-card.js). */
+  function fmtDepUtc(date) {
+    const day = (zone) => new Intl.DateTimeFormat('en', { weekday: 'short', ...(zone && { timeZone: zone }) }).format(date);
+    const prefix = day(undefined) === day('UTC') ? ''
+      : `${new Intl.DateTimeFormat(pageLocale, { weekday: 'short', timeZone: 'UTC' }).format(date)} `;
+    const time = new Intl.DateTimeFormat(pageLocale, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: 'UTC' }).format(date);
+    return `${prefix}${time} UTC`;
+  }
 
   /**
    * Rows for the idle mock: the real feed, or labeled examples before it
@@ -1783,16 +1829,27 @@
    * run through the same formatter as real rows, so they localize; only the
    * train names are literals (proper nouns, like the demo lineup's).
    */
+  /**
+   * When a train's row should say the streamer plays: their own slot from the
+   * loaded lineup detail (the same rule the overlay's card applies), else the
+   * train's departure while the lineup is still loading or absent.
+   */
+  function mockWhen(e) {
+    const detail = state.feed.details[e.slug]?.event;
+    return mySlot(detail, [me(), state.feed.displayName])?.starttime ?? e.starttime;
+  }
+
   function idleMockRows() {
+    const asRow = (date, title) => [fmtDep(date), title, fmtDepUtc(date)];
     const real = upcomingTrains();
-    if (real.length > 0) return { rows: real.map((e) => [fmtDep(e.starttime), e.title]), example: false };
+    if (real.length > 0) return { rows: real.map((e) => asRow(mockWhen(e), e.title)), example: false };
     const DAY_MS = 24 * 60 * 60_000;
     const at = (days, hour) => { const d = new Date(Date.now() + days * DAY_MS); d.setHours(hour, 0, 0, 0); return d; };
     return {
       rows: [
-        [fmtDep(at(1, 21)), 'House Is A Feeling'],
-        [fmtDep(at(3, 20)), 'Trainwreck Lucky 13'],
-        [fmtDep(at(6, 18)), 'Sunday Slow Burn'],
+        asRow(at(1, 21), 'House Is A Feeling'),
+        asRow(at(3, 20), 'Trainwreck Lucky 13'),
+        asRow(at(6, 18), 'Sunday Slow Burn'),
       ],
       example: true,
     };
@@ -1810,7 +1867,7 @@
    */
   function idleMockList(horizon) {
     const { rows, example } = idleMockRows();
-    const matched = example ? rows : horizonTrains(horizon).map((e) => [fmtDep(e.starttime), e.title]);
+    const matched = example ? rows : horizonTrains(horizon).map((e) => [fmtDep(mockWhen(e)), e.title, fmtDepUtc(mockWhen(e))]);
     return matched.length > 0 ? matched : rows;
   }
 
@@ -1820,7 +1877,7 @@
     const horizon = v.upcoming ?? '3';
     const list = idleMockList(horizon);
     if (v.upstyle === 'ticker') {
-      const run = list.map(([tm, nm]) => `<span class="tick"><span class="tm">${esc(tm)}</span>${esc(nm)}</span>`).join('<span class="tsep">•</span>');
+      const run = list.map(([tm, nm, utc]) => `<span class="tick"><span class="tm">${esc(tm)}</span>${esc(nm)}<span class="utc">${esc(utc ?? '')}</span></span>`).join('<span class="tsep">•</span>');
       // Two identical LAP spans (each closing with its separator + a matching
       // pad) so the -50% loop is seamless — the same discipline as the real
       // ticker in upcoming-card.js.
@@ -1836,8 +1893,8 @@
     const pages = upcomingPages(list);
     const page = ((state.idlePage % pages) + pages) % pages;
     const win = visibleUpcoming(list, page);
-    const rowsHtml = win.map(([tm, nm]) => `
-      <div class="row enter"><span class="tm">${esc(tm)}</span><span class="nm">${esc(nm)}</span></div>`).join('');
+    const rowsHtml = win.map(([tm, nm, utc]) => `
+      <div class="row enter"><span class="tm">${esc(tm)}</span><span class="nm">${esc(nm)}</span><span class="utc">${esc(utc ?? '')}</span></div>`).join('');
     return `<div style="${anchorStyle(v.uppos, 12)}">
       <div class="up" style="--upop:${esc(v.upop)}">
         <div class="uphead">
@@ -2779,6 +2836,11 @@
 
   // ── Main-content actions (delegated: the views are re-rendered wholesale) ──
   $('#main').addEventListener('click', async (e) => {
+    // The Live Link page's idle fold: record where the user put it BEFORE the
+    // default toggle runs, so a settings repaint reopens it where it was.
+    if (e.target.closest('#ll-idle-fold > summary')) {
+      state.llIdleOpen = !$('#ll-idle-fold').open;
+    }
     const el = e.target.closest('[data-act]');
     if (!el) return;
     const act = el.dataset.act;
@@ -2821,6 +2883,7 @@
       saveProfiles();
       state.stage = 'home';
       state.homeView = 'simple';
+      localStorage.setItem(HOMEVIEW_KEY, 'simple');
       state.view = 'trains';
       state.editing = null;
       state.editingPreset = null;
@@ -2830,6 +2893,7 @@
     }
     if (act === 'goto-everything') {
       state.homeView = 'everything';
+      localStorage.setItem(HOMEVIEW_KEY, state.homeView);
       go('trains');
       return;
     }
@@ -3120,6 +3184,7 @@
     const b = e.target.closest('button[data-view]');
     if (!b || b.dataset.view === state.homeView) return;
     state.homeView = b.dataset.view;
+    localStorage.setItem(HOMEVIEW_KEY, state.homeView);
     state.editing = null;
     state.editingPreset = null;
     state.view = 'trains';

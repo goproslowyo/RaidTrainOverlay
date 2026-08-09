@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { startLiveLinkFeed, userCacheKey } from '../src/live-link-feed.js';
 import { encodeTrainMap } from '../src/live-link.js';
+import { cacheKey as eventCacheKey } from '../src/event-feed.js';
 import { MAX_BLOB_CHARS } from '../src/blob-codec.js';
 import { makeUserPayload } from './fixtures/user-payload.js';
 import { makeEventPayload } from './fixtures/event-payload.js';
@@ -60,13 +61,13 @@ function routedFetch(routes, log = []) {
 const okUser = () => ({ ok: true, status: 200, text: async () => JSON.stringify(makeUserPayload()) });
 const okEvent = (title) => () => ({ ok: true, status: 200, json: async () => makeEventPayload({ title }) });
 
-function harness({ query, clockMs, routes, log }) {
+function harness({ query, clockMs, routes, log, storage }) {
   const timers = manualTimers();
   const calls = { switches: [], events: [], idles: [], errors: [] };
   const clock = { ms: clockMs };
   const feed = startLiveLinkFeed(query, {
     fetchImpl: routedFetch(routes, log),
-    storage: fakeStorage(),
+    storage: storage ?? fakeStorage(),
     clock: () => clock.ms,
     setTimer: timers.setTimer,
     clearTimer: timers.clearTimer,
@@ -109,7 +110,59 @@ test('uponly: even a LIVE train resolves to the idle card — never onSwitch, ne
   assert.equal(calls.idles.length, 1);
   // luna is LIVE at this clock, so it is not "upcoming" — the card lists the rest.
   assert.deepEqual(calls.idles[0].upcoming.map((e) => e.slug), ['trainwreck-lucky-13', 'my-own-train']);
-  assert.deepEqual(log, [userUrl], 'no per-train lineup fetch is ever started');
+  // The inner LINEUP FEED never starts (no onSwitch/onEvent above); the only
+  // per-event traffic is the one-shot slot lookups, which fail soft here
+  // (unrouted) and leave the rows on their departure times.
+  assert.deepEqual(log, [userUrl, eventUrl('trainwreck-lucky-13'), eventUrl('my-own-train')]);
+});
+
+test('the idle card learns when the streamer actually plays: cached lineups annotate mySlotAt', async () => {
+  // The user payload's display name is 'GoProFlowYo'; seed both upcoming
+  // events' lineups (the Overlay's own event cache) with a slot of theirs.
+  const lineup = (slotIso) => ({
+    payload: makeEventPayload({
+      time_table: [{
+        starttime: slotIso, slot_occupied: true, broadcaster_display_name: 'GoProFlowYo',
+        broadcaster_image: '', broadcaster_live: false, broadcaster_id: 7,
+      }],
+    }),
+    savedAt: BETWEEN - 1000,
+  });
+  const storage = fakeStorage({
+    [eventCacheKey('trainwreck-lucky-13')]: JSON.stringify(lineup('2026-08-10T21:00:00Z')),
+    [eventCacheKey('my-own-train')]: JSON.stringify(lineup('2026-08-20T19:30:00Z')),
+  });
+  const log = [];
+  const { calls, feed } = harness({
+    query: '?user=goproflowyo&uponly=1&upcoming=all',
+    clockMs: BETWEEN,
+    routes: { [userUrl]: okUser },
+    log, storage,
+  });
+  await feed.ready;
+  // Fresh caches → the FIRST paint already carries the slot times, no repaint.
+  assert.equal(calls.idles.length, 1);
+  assert.deepEqual(
+    calls.idles[0].upcoming.map((e) => e.mySlotAt?.toISOString() ?? null),
+    ['2026-08-10T21:00:00.000Z', '2026-08-20T19:30:00.000Z'],
+  );
+  assert.deepEqual(log, [userUrl], 'fresh lineup caches mean no per-event fetches');
+});
+
+test('a lineup the streamer is not on leaves mySlotAt absent — the row falls back to departure', async () => {
+  const storage = fakeStorage({
+    [eventCacheKey('trainwreck-lucky-13')]: JSON.stringify({ payload: makeEventPayload(), savedAt: BETWEEN - 1000 }),
+    [eventCacheKey('my-own-train')]: JSON.stringify({ payload: makeEventPayload(), savedAt: BETWEEN - 1000 }),
+  });
+  const { calls, feed } = harness({
+    query: '?user=goproflowyo&uponly=1&upcoming=all',
+    clockMs: BETWEEN,
+    routes: { [userUrl]: okUser },
+    storage,
+  });
+  await feed.ready;
+  assert.equal(calls.idles.length, 1);
+  assert.deepEqual(calls.idles[0].upcoming.map((e) => e.mySlotAt ?? null), [null, null]);
 });
 
 test('the trains= mapping shapes the switched-to config; base params flow through', async () => {
@@ -178,7 +231,7 @@ test('an absent trains= is silent — no blob is not a broken blob', async () =>
   assert.deepEqual(warns, []);
 });
 
-test('no live train and none within lead: onIdle with the upcoming list, no event fetch', async () => {
+test('no live train and none within lead: onIdle with the upcoming list, no inner feed', async () => {
   const log = [];
   const { calls, feed } = harness({
     query: '?user=goproflowyo',
@@ -190,7 +243,9 @@ test('no live train and none within lead: onIdle with the upcoming list, no even
   assert.deepEqual(calls.switches, []);
   assert.equal(calls.idles.length, 1);
   assert.deepEqual(calls.idles[0].upcoming.map((e) => e.slug), ['trainwreck-lucky-13', 'my-own-train']);
-  assert.deepEqual(log, [userUrl]);
+  // The only per-event traffic is the card's one-shot slot lookups (which
+  // fail soft here, unrouted) — never a started lineup feed.
+  assert.deepEqual(log, [userUrl, eventUrl('trainwreck-lucky-13'), eventUrl('my-own-train')]);
 });
 
 test('a train departing within the lead window takes the full render', async () => {

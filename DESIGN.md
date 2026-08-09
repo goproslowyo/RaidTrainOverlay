@@ -305,14 +305,19 @@ separators) are typographic, not icons.
 
 ### The Idle Slab (signature, overlay-side)
 The Live Link's idle panel (`src/upcoming-card.js`) and its mock in the
-Configurator: a translucent dark slab — `rgba(9,12,17, .88)` (opacity is the
-streamer's `upop` knob), 1px `rgba(255,255,255,.09–.12)` border, 9–12px radius,
-`backdrop-filter: blur(6–8px)`, `0 6px 22px rgba(0,0,0,.45)` shadow — built to
-sit on *any* scene. Deliberately palette-neutral and off-token (it renders
-inside the Overlay, next to Theme art): the real panel uses `system-ui`, while
-the Configurator's mock previews it in the app's own fonts with sodium-glow
-times (#FFC578). Ticker variant is a full pill with mask-faded edges and a
-seamless −50% transform marquee.
+Configurator share one design, at two scales: a translucent dark slab —
+`rgba(9,12,17, .88)` (opacity is the streamer's `upop` knob), 1px
+`rgba(255,255,255,.09)` border, 9–12px radius, `backdrop-filter: blur(8px)`,
+deep soft shadow — opening with a tracked amber mono eyebrow
+(`overlay.upcoming`, #FFC578, `.2em`), a `1 / N` mono page counter, and rows
+of amber mono local time → bold name (ellipsising) → dim mono UTC anchor
+(every row carries UTC — viewers are worldwide). Built to sit on *any* scene.
+The Overlay side renders through local font stacks only (`'DM Mono',
+ui-monospace, …` / `'Public Sans', system-ui, …` — an OBS source must never
+block on a webfont); the Configurator's mock is a legible miniature of the
+same design over a stand-in stream scene. Ticker variant is a full pill with
+mask-faded edges and a seamless −50% transform marquee (two identical lap
+spans, gap inside the lap).
 
 ## Do's and Don'ts
 

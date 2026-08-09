@@ -27,6 +27,13 @@ included.
   are per-Profile — the idle state belongs to the Live Link, not to any single
   train — and ride the URL like every other setting. Its preview sits over a
   stand-in stream scene, full width, so placement and opacity actually read.
+- **The idle card says when YOU play.** Each row shows your own slot time from
+  the train's lineup (cache-first, polite one-shot lookups) rather than the
+  train's departure — a UTC-afternoon European train no longer reads as a
+  3 AM Pacific set. Every time names its zone (…11:00 PM PDT), keeps the dim
+  UTC anchor, and falls back to the departure while a lineup is unknown. The
+  Configurator preview mirrors the same rule.
+- **The Configurator remembers Simple vs Everything** across visits.
 - **An upcoming-trains link (`uponly`).** A second overlay URL for a separate
   OBS scene (starting soon, be right back): it always shows your upcoming
   trains — even while one is live — and never the train itself. Copy it from
@@ -37,6 +44,10 @@ included.
 - **Sodium palette, app-wide.** The Configurator and landing page adopt the
   redesign's warm sodium tokens (shared via `assets/app.css`), replacing the
   blue/gold set. `preview.html` keeps its own palette, as before.
+- **The overlay's idle card wears the same design the Configurator previews.**
+  Amber mono departure times and label, a page counter, and a dim UTC anchor
+  on every row and ticker entry (viewers are worldwide — local time alone
+  says little), replacing the old plain white panel.
 - **The idle card pages instead of sliding.** With 8 trains the old
   one-row-at-a-time window wrapped the list (`7, 8, 1`), so a chronological
   list stopped reading chronologically twice per lap. It now pages three at a

@@ -109,6 +109,20 @@ export function shouldSelfReload({ loadedAt, now }) {
 /** The idle card never grows past this many rows — it must not creep up a stream. */
 export const CARD_MAX_ROWS = 3;
 
+/**
+ * The streamer's own slot in an Event's lineup, or null. `names` are the
+ * candidate identities (login, display name — RaidPal's lineup only carries
+ * display names), matched case-insensitively against occupied slots. This is
+ * what lets the idle card say when the streamer actually PLAYS rather than
+ * when the train departs — the reading everyone assumes anyway.
+ */
+export function mySlot(event, names) {
+  const wanted = (names ?? []).filter(Boolean).map((n) => String(n).toLowerCase());
+  if (!event?.slots || wanted.length === 0) return null;
+  return event.slots.find((s) => s.occupied
+    && wanted.includes(s.broadcaster?.displayName?.toLowerCase())) ?? null;
+}
+
 /** How many CARD_MAX_ROWS pages a list needs — at least 1, so `% pages` is always safe. */
 export function upcomingPages(trains) {
   return Math.max(1, Math.ceil(trains.length / CARD_MAX_ROWS));
