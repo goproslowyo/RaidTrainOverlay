@@ -38,7 +38,12 @@ export function ensureStyles() {
     .dp2-cell.dp2-on { animation: dp2-cellflip 9s linear infinite; }
     @keyframes dp2-cellflip { 0%, 3.4%, 100% { transform: scaleY(1); } 1.1% { transform: scaleY(0.06); } 2.2% { transform: scaleY(1); } }
     @keyframes dp2-flipin { 0% { transform: rotateX(88deg); } 55% { transform: rotateX(-16deg); } 100% { transform: rotateX(0); } }
-    @media (prefers-reduced-motion: reduce) { .dp2-cell.dp2-on { animation: none; } }
+    /* status changes flip in via this class (update() re-toggles it) — a class,
+       not an inline style, so the reduced-motion rule below can actually win */
+    .dp2-status.dp2-flip { animation: dp2-flipin .5s ease-out; }
+    @media (prefers-reduced-motion: reduce) {
+      .dp2-cell.dp2-on, .dp2-status.dp2-flip, .dp2-unit.rt-car--current .dp2-lamp { animation: none; }
+    }
 
     /* flap letter cells with the centre seam */
     .dp2-flaps { display: flex; gap: ${u(2)}; justify-content: center; }
@@ -155,9 +160,9 @@ export function build(train, opts = {}) {
       const next = statusText({ isOpen: ref.isOpen, isCurrent: st.isCurrent, isDeparted: st.isDeparted });
       if (ref.statusEl.textContent !== next) {
         ref.statusEl.textContent = next;
-        ref.statusEl.style.animation = 'none';
+        ref.statusEl.classList.remove('dp2-flip');
         void ref.statusEl.offsetWidth;
-        ref.statusEl.style.animation = 'dp2-flipin .5s ease-out';
+        ref.statusEl.classList.add('dp2-flip');
       }
     }
   };
