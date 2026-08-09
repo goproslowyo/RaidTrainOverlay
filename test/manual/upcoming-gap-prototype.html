@@ -1,0 +1,422 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>PROTOTYPE — Upcoming card between Passes</title>
+  <!--
+    ═══════════════════════════════════════════════════════════════════════
+    PROTOTYPE — THROWAWAY. Not production. Not a public surface.
+    ═══════════════════════════════════════════════════════════════════════
+
+    Question (wayfinder ticket #56, map #53): does the between-Pass
+    choreography FEEL right — the card pulsing in the gap's true-empty
+    middle, whole page rotations only, deterministic sit-out on short gaps,
+    yielding with lead time before the next Pass?
+
+    Mechanism under test (from the #54 grilling resolution): every
+    appearance window is baked as static percentages into ONE gap-synced
+    opacity keyframe on the same period as rt-pass — drift-free, zero
+    per-frame JS. The card's internal pager free-runs on its own upcycle
+    clock; a stint of pages×upcycle guarantees a full rotation regardless
+    of pager phase.
+
+    Proposed constants surfaced here for reaction (not yet spec'd):
+      beat after rails-out . 3 s   card fade in/out . 0.9 s
+      lead before rails-in . 3 s   cadence N ....... 3 min of usable gap
+
+    Double-click to open. Use the preset tabs; crank TIME to compress a
+    15-minute period into ~1 minute of watching. Everything on stage is
+    driven by CSS animations generated once per settings change; the only
+    timers are the card's own upcycle pager and a ½-second readout tick
+    (prototype chrome, not part of the mechanism).
+  -->
+  <style>
+    :root { --amber: #FFC578; --ink: #EDF1F7; }
+    html, body { margin: 0; height: 100%; background: #14161a; overflow: hidden;
+      font-family: 'Public Sans', 'Helvetica Neue', system-ui, sans-serif; color: var(--ink); }
+
+    /* ── the stage ─────────────────────────────────────────────────── */
+    #stage { position: absolute; inset: 0 0 190px 0; overflow: hidden;
+      background:
+        radial-gradient(1200px 500px at 50% 120%, #1d2129 0%, transparent 70%),
+        #14161a; }
+
+    /* simplified Train (stand-in art — the real Themes are not the question) */
+    #train { position: absolute; bottom: 34%; left: 0; display: flex; align-items: flex-end;
+      gap: 14px; will-change: transform; }
+    .car { width: 150px; height: 74px; border-radius: 10px 10px 4px 4px;
+      background: linear-gradient(#2c3442, #232a35);
+      border: 1px solid #3a4454; position: relative; }
+    .car::after { content: ''; position: absolute; left: 14px; right: 14px; top: 14px;
+      height: 24px; border-radius: 4px; background: rgba(255, 197, 120, 0.28); }
+    .car.engine { width: 190px; height: 88px; border-radius: 40px 12px 4px 4px;
+      background: linear-gradient(#39424f, #2a323e); }
+    .car.engine::after { background: rgba(255, 197, 120, 0.55); }
+    .wheels { position: absolute; bottom: -12px; left: 16px; right: 16px;
+      display: flex; justify-content: space-between; }
+    .wheels i { width: 20px; height: 20px; border-radius: 50%; background: #11151b;
+      border: 3px solid #46505e; }
+
+    /* rails: the stationary line the periodic fade owns */
+    #rails { position: absolute; bottom: calc(34% - 18px); left: 0; right: 0; height: 6px;
+      background: repeating-linear-gradient(90deg, #3a4150 0 46px, #262c37 46px 60px);
+      border-top: 2px solid #4a5364; }
+
+    /* the sodium Upcoming card (visuals lifted from src/upcoming-card.js) */
+    #cardAnchor { position: absolute; left: 0; right: 0; bottom: 24px; display: flex;
+      justify-content: center; pointer-events: none; opacity: 0; }
+    #card { background: rgba(9, 12, 17, 0.88); color: var(--ink);
+      border: 1px solid rgba(255,255,255,0.09); border-radius: 12px;
+      backdrop-filter: blur(8px); box-shadow: 0 10px 34px rgba(0,0,0,0.45);
+      box-sizing: border-box; max-width: min(72vw, 680px); min-width: 340px;
+      padding: 14px 18px; transition: opacity 0.35s ease-in-out; }
+    #cardHead { display: flex; align-items: baseline; gap: 14px; padding-bottom: 9px;
+      margin-bottom: 7px; border-bottom: 1px solid rgba(255,255,255,0.07); }
+    .mono { font-family: 'DM Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace; }
+    #cardLabel { font-size: 13px; font-weight: 700; letter-spacing: 0.2em;
+      text-transform: uppercase; color: var(--amber); white-space: nowrap; }
+    #pageMark { margin-left: auto; font-size: 12.5px; color: #71808F;
+      letter-spacing: 0.06em; font-variant-numeric: tabular-nums; }
+    #cardList { display: grid; grid-template-columns: max-content minmax(0,1fr) max-content;
+      column-gap: 14px; align-items: baseline; }
+    .rowWhen { font-size: 15px; color: var(--amber); white-space: nowrap; padding: 4px 0; }
+    .rowName { min-width: 0; font-size: 17px; font-weight: 600; overflow: hidden;
+      text-overflow: ellipsis; white-space: nowrap; padding: 4px 0;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.85), 0 0 8px rgba(0,0,0,0.5); }
+    .rowUtc { font-size: 12.5px; color: rgba(237,241,247,0.45); white-space: nowrap; padding: 4px 0; }
+
+    /* on-stage phase caption (prototype chrome) */
+    #phase { position: absolute; top: 18px; left: 50%; transform: translateX(-50%);
+      font-family: ui-monospace, Menlo, monospace; font-size: 13px; letter-spacing: 0.14em;
+      text-transform: uppercase; color: #71808F; }
+    #phase b { color: var(--amber); font-weight: 700; }
+
+    /* ── the control deck ──────────────────────────────────────────── */
+    #deck { position: absolute; left: 0; right: 0; bottom: 0; height: 190px;
+      background: #0d0f13; border-top: 1px solid #262c37; box-sizing: border-box;
+      padding: 10px 16px; display: grid; grid-template-rows: auto auto 1fr;
+      gap: 8px; font-size: 12.5px; }
+    #tabs { display: flex; gap: 6px; align-items: center; }
+    #tabs button { background: #1a1f28; color: #9aa7b6; border: 1px solid #2c3442;
+      border-radius: 6px; padding: 5px 12px; font: inherit; cursor: pointer; }
+    #tabs button.on { background: #2c2416; color: var(--amber); border-color: #5a4a2a; }
+    #tabs .note { margin-left: auto; color: #56616e; }
+    #timeline { position: relative; height: 30px; border-radius: 5px; overflow: hidden;
+      background: #171b22; border: 1px solid #262c37; }
+    #timeline .seg { position: absolute; top: 0; bottom: 0; }
+    #timeline .seg span { position: absolute; inset: 0; display: flex; align-items: center;
+      justify-content: center; font-size: 10px; letter-spacing: 0.08em; color: #0d0f13;
+      font-weight: 700; overflow: hidden; white-space: nowrap; }
+    #playFill { position: absolute; inset: 0; transform-origin: left;
+      background: rgba(255,255,255,0.14); transform: scaleX(0); pointer-events: none; }
+    #bottom { display: grid; grid-template-columns: auto 1fr; gap: 24px; min-height: 0; }
+    #knobs { display: grid; grid-template-columns: repeat(4, auto); gap: 6px 18px; align-content: start; }
+    #knobs label { display: flex; align-items: center; gap: 8px; color: #9aa7b6; white-space: nowrap; }
+    #knobs input[type=number] { width: 58px; background: #171b22; border: 1px solid #2c3442;
+      color: var(--ink); border-radius: 4px; padding: 3px 6px; font: inherit; }
+    #knobs input[type=checkbox] { accent-color: var(--amber); }
+    #readout { font-family: ui-monospace, Menlo, monospace; font-size: 11.5px; line-height: 1.55;
+      color: #8794a3; white-space: pre; overflow: auto; }
+    #readout b { color: var(--amber); font-weight: 700; }
+    #readout .bad { color: #e07a6a; font-weight: 700; }
+  </style>
+</head>
+<body>
+  <div id="stage">
+    <div id="phase">…</div>
+    <div id="rails"></div>
+    <div id="train"></div>
+    <div id="cardAnchor">
+      <div id="card">
+        <div id="cardHead">
+          <span id="cardLabel" class="mono">Upcoming trains</span>
+          <span id="pageMark" class="mono"></span>
+        </div>
+        <div id="cardList"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="deck">
+    <div id="tabs">
+      <span style="color:#56616e">PROTOTYPE · ticket #56 · presets:</span>
+      <span class="note">amber timeline blocks = card windows · fill bar = playhead</span>
+    </div>
+    <div id="timeline"><div id="playFill"></div></div>
+    <div id="bottom">
+      <div id="knobs">
+        <label>interval <input type="number" id="k_interval" min="1" max="60" step="1"> min</label>
+        <label>upcycle <input type="number" id="k_upcycle" min="3" max="120" step="1"> s</label>
+        <label>cadence N <input type="number" id="k_cadence" min="1" max="15" step="0.5"> min</label>
+        <label>time ×<input type="number" id="k_scale" min="1" max="60" step="1"></label>
+        <label>trains <input type="number" id="k_trains" min="0" max="12" step="1"></label>
+        <label>speed <input type="number" id="k_speed" min="0.25" max="4" step="0.25"></label>
+        <label><input type="checkbox" id="k_always"> trackvis=always</label>
+        <label><button id="k_restart" style="font:inherit;cursor:pointer;background:#1a1f28;color:#9aa7b6;border:1px solid #2c3442;border-radius:4px;padding:3px 10px">⟲ restart period</button></label>
+      </div>
+      <div id="readout"></div>
+    </div>
+  </div>
+
+<script>
+/* ── proposed constants (the things to react to) ─────────────────────── */
+const RAILS_OUT = 10;   // s — rails fade-out after the Pass exits (config default)
+const RAILS_IN  = 15;   // s — rails fade-in ahead of the next Pass (config default)
+const BEAT      = 3;    // s — true-empty breath after rails-out, before the card
+const LEAD      = 3;    // s — card fully out this long before rails-in begins
+const CARD_FADE = 0.9;  // s — card ease in/out on stage
+const VELOCITY_VW = 0.054; // BASE_VELOCITY_VW_PER_SEC from train-renderer.js
+const MAX_ROWS  = 3;    // CARD_MAX_ROWS from live-link.js
+
+const state = { interval: 15, upcycle: 12, cadence: 3, scale: 10, trains: 7, speed: 1, always: false };
+
+/* fake horizon — enough trains for 3 pages at the default */
+const NAMES = ['Friday Frequencies', 'Synthwave Sunrise Express', 'The Midnight Local',
+  'Bass Canyon Flyer', 'Chiptune Caboose Run', 'Lo-fi Limited', 'Hardstyle Highball',
+  'Vinyl Valley Crawler', 'Aurora Overnighter', 'Drum & Bass Drifter', 'Peak Time Pacific',
+  'Sunday Steam Social'];
+function fakeTrains(n) {
+  const base = Date.now() + 36e5;
+  return Array.from({ length: n }, (_, i) => ({ title: NAMES[i % NAMES.length], at: new Date(base + i * 864e5 / 3) }));
+}
+const fmtWhen = (d) => new Intl.DateTimeFormat('en', { weekday: 'short', month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit', timeZoneName: 'short' }).format(d);
+const fmtUtc = (d) => new Intl.DateTimeFormat('en', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: 'UTC' }).format(d) + ' UTC';
+
+/* ── the choreography derivation (the real logic under test) ─────────── */
+/* All numbers in REAL seconds; the time-scale divides only at render time. */
+function choreo(s, traversalSec) {
+  const periodSec = Math.max(s.interval * 60, traversalSec);
+  const gap = periodSec - traversalSec;
+  const u0 = traversalSec + RAILS_OUT + BEAT;      // usable middle opens
+  const u1 = periodSec - RAILS_IN - LEAD;          // …and closes
+  const usable = Math.max(0, u1 - u0);
+  const totalPages = Math.max(1, Math.ceil(s.trains / MAX_ROWS));
+  const fit = (k) => {  // pages a stint can hold when k appearances share the middle
+    const slot = usable / k;
+    return Math.min(totalPages, Math.floor((slot - 2 * CARD_FADE) / s.upcycle));
+  };
+  let k = Math.max(1, Math.floor(usable / (s.cadence * 60)));
+  let pages = fit(k);
+  if (pages < 1 && k > 1) { k = 1; pages = fit(1); } // fewer, longer stints before giving up
+  const sitsOut = s.trains === 0 || pages < 1;
+  const stint = sitsOut ? 0 : pages * s.upcycle + 2 * CARD_FADE;
+  const windows = [];
+  if (!sitsOut) {
+    const slot = usable / k;
+    for (let i = 0; i < k; i += 1) {
+      const c = u0 + slot * (i + 0.5);
+      windows.push([c - stint / 2, c + stint / 2]);
+    }
+  }
+  return { periodSec, gap, u0, u1, usable, totalPages, k: sitsOut ? 0 : k, pages, stint, windows, sitsOut };
+}
+
+/* ── stage build ─────────────────────────────────────────────────────── */
+const $ = (id) => document.getElementById(id);
+const styleEl = document.head.appendChild(document.createElement('style'));
+let pagerTimer = null, readoutTimer = null, t0 = 0, lastC = null;
+
+function buildTrain() {
+  const t = $('train');
+  t.replaceChildren();
+  const car = (cls) => {
+    const d = document.createElement('div');
+    d.className = 'car' + (cls ? ' ' + cls : '');
+    d.innerHTML = '<div class="wheels"><i></i><i></i></div>';
+    return d;
+  };
+  t.append(car('engine'), car(), car(), car(), car());
+}
+
+function paintPage(page, totalPages, trains) {
+  $('pageMark').textContent = totalPages > 1 ? `${(page % totalPages) + 1} / ${totalPages}` : '';
+  const list = $('cardList');
+  list.replaceChildren();
+  for (const tr of trains.slice((page % totalPages) * MAX_ROWS, (page % totalPages) * MAX_ROWS + MAX_ROWS)) {
+    const when = document.createElement('span'); when.className = 'rowWhen mono'; when.textContent = fmtWhen(tr.at);
+    const name = document.createElement('span'); name.className = 'rowName'; name.textContent = tr.title;
+    const utc = document.createElement('span'); utc.className = 'rowUtc mono'; utc.textContent = fmtUtc(tr.at);
+    list.append(when, name, utc);
+  }
+}
+
+const pct = (sec, period) => +(sec / period * 100).toFixed(4);
+
+function apply() {
+  clearInterval(pagerTimer); clearInterval(readoutTimer);
+  buildTrain();
+  const vw = window.innerWidth;
+  if (!vw) { setTimeout(apply, 120); return; } // pre-layout load: retry once real
+  const trainW = $('train').getBoundingClientRect().width;
+  const traversal = (trainW + vw) / (VELOCITY_VW * vw * state.speed);
+  const c = choreo(state, traversal);
+  lastC = c;
+  const scaled = c.periodSec / state.scale; // one period, in wall-clock seconds
+
+  /* one CSS block: rt-pass + rails periodic + the gap-synced card keyframe
+     + the timeline playhead — all on the same (scaled) period. */
+  const holdFrom = pct(traversal, c.periodSec);
+  const outPct = pct(RAILS_OUT, c.periodSec), inPct = pct(RAILS_IN, c.periodSec);
+  let cardFrames = `0%, ${pct(c.windows[0]?.[0] ?? 0, c.periodSec)}% { opacity: 0; }`;
+  if (!c.sitsOut) {
+    cardFrames = ['0% { opacity: 0; }'];
+    for (const [a, b] of c.windows) {
+      cardFrames.push(`${pct(a, c.periodSec)}% { opacity: 0; }`,
+        `${pct(a + CARD_FADE, c.periodSec)}%, ${pct(b - CARD_FADE, c.periodSec)}% { opacity: 1; }`,
+        `${pct(b, c.periodSec)}% { opacity: 0; }`);
+    }
+    cardFrames.push('100% { opacity: 0; }');
+    cardFrames = cardFrames.join('\n        ');
+  }
+  styleEl.textContent = `
+    @keyframes p-pass {
+      0% { transform: translateX(100vw); visibility: visible; }
+      ${holdFrom}%, 100% { transform: translateX(-100%); visibility: hidden; }
+    }
+    #train { animation: p-pass ${scaled}s linear infinite; }
+    @keyframes p-rails {
+      0%, ${holdFrom}% { opacity: 1; }
+      ${holdFrom + outPct}%, ${100 - inPct}% { opacity: 0; }
+      100% { opacity: 1; }
+    }
+    #rails { animation: ${state.always ? 'none' : `p-rails ${scaled}s linear infinite`}; }
+    @keyframes p-card { ${c.sitsOut ? '0%, 100% { opacity: 0; }' : cardFrames} }
+    #cardAnchor { animation: p-card ${scaled}s linear infinite; }
+    @keyframes p-play { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+    #playFill { animation: p-play ${scaled}s linear infinite; }
+  `;
+  /* restart all four in lockstep */
+  for (const id of ['train', 'rails', 'cardAnchor', 'playFill']) {
+    const el = $(id); el.style.animation = 'none'; void el.offsetWidth;
+    el.style.animation = ''; el.style.animationDelay = '';
+  }
+  t0 = performance.now();
+
+  /* the free-running pager — deliberately NOT synced to the windows: the
+     stint length (pages×upcycle) is what guarantees a full rotation. */
+  const trains = fakeTrains(state.trains);
+  let page = 0;
+  paintPage(page, c.totalPages, trains);
+  if (c.totalPages > 1) {
+    // the real card's page-turn crossfade: a quarter of the cycle, capped at
+    // 1.1s (upcoming-card.js pageFadeMs) — scaled with everything else.
+    const fadeMs = Math.min(1100, state.upcycle * 1000 / 4) / state.scale;
+    $('card').style.transition = `opacity ${fadeMs}ms ease-in-out`;
+    pagerTimer = setInterval(() => {
+      $('card').style.opacity = '0';
+      setTimeout(() => { page += 1; paintPage(page, c.totalPages, trains); $('card').style.opacity = '1'; }, fadeMs);
+    }, state.upcycle / state.scale * 1000);
+  }
+
+  drawTimeline(c, traversal);
+  drawReadout(c, traversal);
+  readoutTimer = setInterval(tickPhase, 250);
+}
+
+function drawTimeline(c, traversal) {
+  const tl = $('timeline');
+  tl.querySelectorAll('.seg').forEach((n) => n.remove());
+  const seg = (a, b, color, label) => {
+    const d = document.createElement('div');
+    d.className = 'seg';
+    d.style.cssText = `left:${pct(a, c.periodSec)}%;width:${pct(b - a, c.periodSec)}%;background:${color}`;
+    if (label) d.innerHTML = `<span>${label}</span>`;
+    tl.appendChild(d);
+  };
+  seg(0, traversal, '#46505e', 'PASS');
+  seg(traversal, traversal + RAILS_OUT, '#333c49', '');
+  for (const [a, b] of c.windows) seg(a, b, 'var(--amber)', 'CARD');
+  seg(c.periodSec - RAILS_IN, c.periodSec, '#333c49', '');
+  tl.appendChild($('playFill')); // keep the playhead on top
+}
+
+const mmss = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+function drawReadout(c, traversal) {
+  const lines = [
+    `period <b>${mmss(c.periodSec)}</b>  =  Pass ${mmss(traversal)}  +  gap ${mmss(c.gap)}`,
+    `usable middle <b>${mmss(c.usable)}</b>  (gap − rails-out ${RAILS_OUT}s − beat ${BEAT}s − lead ${LEAD}s − rails-in ${RAILS_IN}s)`,
+    c.sitsOut
+      ? `<span class="bad">CARD SITS OUT</span> — the middle cannot hold one whole page (${state.upcycle}s) + fades`
+      : `appearances <b>${c.k}</b> (⌊usable / ${state.cadence} min⌋)  ·  stint <b>${mmss(c.stint)}</b> = ${c.pages} page${c.pages > 1 ? 's' : ''} × ${state.upcycle}s + fades`
+      + (c.pages < c.totalPages ? `  <span class="bad">· capped below a full ${c.totalPages}-page rotation</span>` : '  · full rotation ✓'),
+    `pager free-runs at ${state.upcycle}s — window length, not sync, guarantees the full lap`,
+  ];
+  $('readout').innerHTML = lines.join('\n');
+}
+
+function tickPhase() {
+  if (!lastC) return;
+  const t = ((performance.now() - t0) / 1000 * state.scale) % lastC.periodSec;
+  const c = lastC;
+  const traversal = c.periodSec - c.gap;
+  let label;
+  if (t < traversal) label = `<b>PASS</b> — the Train owns the stage · ${mmss(traversal - t)} to exit`;
+  else if (t < traversal + RAILS_OUT && !state.always) label = 'rails fading out…';
+  else if (t > c.periodSec - RAILS_IN && !state.always) label = `rails fading in — next Pass in ${mmss(c.periodSec - t)}`;
+  else {
+    const w = c.windows.findIndex(([a, b]) => t >= a && t <= b);
+    if (w >= 0) label = `<b>CARD ${w + 1}/${c.k}</b> — stint ends in ${mmss(c.windows[w][1] - t)}`;
+    else label = c.sitsOut ? 'true-empty (card sits out — gap too short)'
+      : `true-empty · next Pass in ${mmss(c.periodSec - t)}`;
+  }
+  $('phase').innerHTML = label;
+}
+
+/* ── presets + knobs ─────────────────────────────────────────────────── */
+const PRESETS = {
+  'Roomy 15 min': { interval: 15, upcycle: 12, cadence: 3, scale: 12, trains: 7, speed: 1, always: false },
+  'Medium 8 min': { interval: 8, upcycle: 12, cadence: 3, scale: 8, trains: 7, speed: 1, always: false },
+  'Tight 5 min': { interval: 5, upcycle: 12, cadence: 3, scale: 5, trains: 7, speed: 1, always: false },
+  'Sit-out': { interval: 1, upcycle: 12, cadence: 3, scale: 2, trains: 7, speed: 1, always: false },
+  'trackvis=always': { interval: 8, upcycle: 12, cadence: 3, scale: 8, trains: 7, speed: 1, always: true },
+  'Real time': { interval: 15, upcycle: 12, cadence: 3, scale: 1, trains: 7, speed: 1, always: false },
+};
+const tabs = $('tabs');
+for (const [name, cfg] of Object.entries(PRESETS)) {
+  const b = document.createElement('button');
+  b.textContent = name;
+  b.onclick = () => {
+    Object.assign(state, cfg);
+    tabs.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b));
+    syncKnobs(); apply();
+  };
+  tabs.insertBefore(b, tabs.querySelector('.note'));
+}
+function syncKnobs() {
+  $('k_interval').value = state.interval; $('k_upcycle').value = state.upcycle;
+  $('k_cadence').value = state.cadence; $('k_scale').value = state.scale;
+  $('k_trains').value = state.trains; $('k_speed').value = state.speed;
+  $('k_always').checked = state.always;
+}
+for (const [id, key] of [['k_interval', 'interval'], ['k_upcycle', 'upcycle'], ['k_cadence', 'cadence'],
+  ['k_scale', 'scale'], ['k_trains', 'trains'], ['k_speed', 'speed']]) {
+  $(id).addEventListener('change', (e) => { state[key] = +e.target.value || state[key]; apply(); });
+}
+$('k_always').addEventListener('change', (e) => { state.always = e.target.checked; apply(); });
+$('k_restart').addEventListener('click', apply);
+
+/* click the timeline to SEEK — sets currentTime on all four period-locked
+   CSS animations in lockstep via the Web Animations API (absolute, not the
+   relative negative-delay trick, which drifts by however long has elapsed). */
+function seek(sec) {
+  const ms = sec / state.scale * 1000;
+  for (const id of ['train', 'rails', 'cardAnchor', 'playFill']) {
+    for (const a of $(id).getAnimations()) a.currentTime = ms;
+  }
+  t0 = performance.now() - ms;
+  tickPhase();
+}
+$('timeline').addEventListener('click', (e) => {
+  if (!lastC) return;
+  const r = $('timeline').getBoundingClientRect();
+  seek((e.clientX - r.left) / r.width * lastC.periodSec);
+});
+
+tabs.querySelector('button').classList.add('on');
+Object.assign(state, PRESETS['Roomy 15 min']);
+syncKnobs();
+apply();
+window.addEventListener('resize', apply);
+</script>
+</body>
+</html>

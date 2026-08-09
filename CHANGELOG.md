@@ -4,6 +4,17 @@ All notable changes to RaidTrainOverlay are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and the project follows
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- **A manual prototype of the Upcoming card's between-Pass choreography**
+  (`test/manual/upcoming-gap-prototype.html`, dev-facing, not shipped to the
+  overlay): the card pulsing in the true-empty middle of a pass-mode gap on
+  one gap-synced CSS keyframe — preset gap scenarios, time compression, a
+  click-to-seek period timeline, and a readout of the derived appearance
+  windows. The approved choreography feeds the between-Passes spec
+  (wayfinder map #53, ticket #56).
+
 ## [0.9.1] - 2026-08-09
 
 A standards pass over the v2 theme roster: the OBS-perf rule ("no filter
@@ -403,6 +414,8 @@ for an OBS browser source. Static hosting on GitHub Pages, no build step.
 - A cache-first RaidPal client resilient to transient fetch failures, and a GitHub
   Pages landing page with a live deployed-commit stamp in the footer.
 
+[Unreleased]: https://github.com/goproslowyo/RaidTrainOverlay/compare/v0.9.1...HEAD
+[0.9.1]: https://github.com/goproslowyo/RaidTrainOverlay/releases/tag/v0.9.1
 [0.9.0]: https://github.com/goproslowyo/RaidTrainOverlay/releases/tag/v0.9.0
 [0.8.0]: https://github.com/goproslowyo/RaidTrainOverlay/releases/tag/v0.8.0
 [0.7.2]: https://github.com/goproslowyo/RaidTrainOverlay/releases/tag/v0.7.2
