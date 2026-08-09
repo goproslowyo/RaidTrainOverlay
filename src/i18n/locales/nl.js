@@ -14,8 +14,6 @@ export default {
   'status.onTime': 'OP TIJD',
   'status.boarding': 'INSTAPPEN',
   'status.departed': 'VERTROKKEN',
-  'status.lead': 'KOP',
-  'departures.header': 'VERTREK',
   'departures.nextSlot': 'VOLGEND SLOT',
   'departures.coach': 'WAGON {n}',
 

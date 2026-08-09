@@ -14,8 +14,6 @@ export default {
   'status.onTime': 'TIL TIDEN',
   'status.boarding': 'BOARDING',
   'status.departed': 'AFGÅET',
-  'status.lead': 'FØRER',
-  'departures.header': 'AFGANGE',
   'departures.nextSlot': 'NÆSTE PLADS',
   'departures.coach': 'VOGN {n}',
 

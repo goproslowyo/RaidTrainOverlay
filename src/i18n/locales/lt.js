@@ -28,8 +28,6 @@ export default {
   'status.onTime': 'PAGAL LAIKĄ',
   'status.boarding': 'ĮLAIPINIMAS',
   'status.departed': 'IŠVYKO',
-  'status.lead': 'PRIEKYJE',
-  'departures.header': 'IŠVYKIMAI',
   'departures.nextSlot': 'KITA VIETA',
   'departures.coach': 'VAGONAS {n}',
 

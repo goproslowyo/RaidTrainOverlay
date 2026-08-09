@@ -64,8 +64,6 @@ export const BADGE_BUDGET = {
   'status.onTime': 12,
   'status.boarding': 12,
   'status.departed': 12,
-  'status.lead': 10,
-  'departures.header': 12,
   'departures.nextSlot': 16,
   'departures.coach': 13,
   // Not on a Car — the diagonal stamp across an Ended train's card in the
@@ -95,8 +93,6 @@ export const DESCRIPTIONS = {
   'status.onTime': 'Departures-board status lamp: upcoming, on schedule. Airport/rail "on time".',
   'status.boarding': 'Departures-board status: this streamer is live now (their slot is "boarding").',
   'status.departed': 'Departures-board status: this slot is over ("departed"). Rail/airport sense.',
-  'status.lead': 'Departures-board status on the lead streamer who has played but still heads the train. "Lead / head of the line".',
-  'departures.header': 'Header strip on the Departures-board theme reading "DEPARTURES" (the board title). The ● bullet is added in code.',
   'departures.nextSlot': 'Board header on an OPEN (unbooked) slot in the Departures theme: the next slot up for grabs. Keep short — fixed-width header strip.',
   'departures.coach': 'Board header numbering a booked slot in the Departures theme, e.g. "COACH 02" — {n} is the zero-padded slot number. Rail carriage sense; keep short.',
   // Relative time assembly.

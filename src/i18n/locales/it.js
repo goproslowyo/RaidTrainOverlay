@@ -14,8 +14,6 @@ export default {
   'status.onTime': 'IN ORARIO',
   'status.boarding': 'IMBARCO',
   'status.departed': 'PARTITO',
-  'status.lead': 'CAPOTRENO',
-  'departures.header': 'PARTENZE',
   'departures.nextSlot': 'PROSSIMO SLOT',
   'departures.coach': 'CARROZZA {n}',
 

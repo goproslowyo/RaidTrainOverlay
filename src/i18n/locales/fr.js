@@ -14,8 +14,6 @@ export default {
   'status.onTime': 'À L’HEURE',
   'status.boarding': 'EMBARQUEMENT',
   'status.departed': 'PARTI',
-  'status.lead': 'TÊTE',
-  'departures.header': 'DÉPARTS',
   'departures.nextSlot': 'CRÉNEAU SUIVANT',
   'departures.coach': 'VOITURE {n}',
 

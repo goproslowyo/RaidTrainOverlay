@@ -32,8 +32,6 @@ const LABELS_EN = {
   'status.onTime': 'ON TIME',
   'status.boarding': 'BOARDING',
   'status.departed': 'DEPARTED',
-  'status.lead': 'LEAD',
-  'departures.header': 'DEPARTURES',
   'departures.nextSlot': 'NEXT SLOT',
   'departures.coach': 'COACH {n}',
 };

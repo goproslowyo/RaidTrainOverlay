@@ -14,8 +14,6 @@ export default {
   'status.onTime': 'PÜNKTLICH',
   'status.boarding': 'EINSTIEG',
   'status.departed': 'ABGEFAHREN',
-  'status.lead': 'KOPF',
-  'departures.header': 'ABFAHRTEN',
   'departures.nextSlot': 'NÄCHSTER SLOT',
   'departures.coach': 'WAGEN {n}',
 

@@ -24,8 +24,6 @@ export default {
   'status.onTime': 'NO HORÁRIO',
   'status.boarding': 'EMBARCANDO',
   'status.departed': 'PARTIU',
-  'status.lead': 'LÍDER',
-  'departures.header': 'PARTIDAS',
   'departures.nextSlot': 'PRÓXIMA VAGA',
   'departures.coach': 'VAGÃO {n}',
 

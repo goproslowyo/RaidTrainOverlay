@@ -24,8 +24,6 @@ export default {
   'status.onTime': 'A TIEMPO',
   'status.boarding': 'EMBARCANDO',
   'status.departed': 'PARTIÓ',
-  'status.lead': 'EN CABEZA',
-  'departures.header': 'SALIDAS',
   'departures.nextSlot': 'PRÓXIMO HUECO',
   'departures.coach': 'VAGÓN {n}',
 
