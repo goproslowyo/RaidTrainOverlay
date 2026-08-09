@@ -113,9 +113,12 @@ function cycleUnit(x, w, v, i, opts = {}) {
   const { caboose = false, tint = TUBE } = opts;
   const fw = x + 36, rw = x + w - 36;
   let s = '';
-  // trail FIRST so the whole machine rides on top of it: from the front wheel
-  // back across the coupler gap (caboose gets a long fading tail instead)
-  s += caboose ? ribbon(x + 14, w + GAP + 46, true, tint, i) : ribbon(x + 14, w + GAP - 12, false, tint, i);
+  // trail as its own layer UNDER the filtered art group so the machine rides
+  // on top of it: from the front wheel back across the coupler gap (caboose
+  // gets a long fading tail instead). The ribbon breathes and sweeps, so it
+  // must not sit inside .tr2-art — an animation under the glow drop-shadow
+  // would re-raster the filter every frame.
+  const trail = caboose ? ribbon(x + 14, w + GAP + 46, true, tint, i) : ribbon(x + 14, w + GAP - 12, false, tint, i);
   // ground reflection
   s += `<ellipse cx="${mid(x, w)}" cy="${railY + WHEEL_R + 2}" rx="${w * 0.44}" ry="4" fill="${tint}" opacity=".16" style="filter:blur(3px)"/>`;
   // low fuselage spar between the wheels, with glowing energy cell
@@ -150,7 +153,7 @@ function cycleUnit(x, w, v, i, opts = {}) {
   const sy = railY + 14;
   s += `<g class="tr2-stamp"><rect x="${cx - 46}" y="${sy - 12}" width="92" height="24" rx="4" fill="#02040af0" stroke="#234450" stroke-width="1.5"/><text x="${cx}" y="${sy + 5}" text-anchor="middle" font-weight="700" font-size="12" fill="#4d7a8c" letter-spacing="4" font-family="'DM Mono', monospace">${esc(L('overlay.played'))}</text></g>`;
   const front = hubless(fw, tint) + hubless(rw, tint);
-  return { body: s, front, nowX: cx, nowY: 20 };
+  return { body: s, trail, front, nowX: cx, nowY: 20 };
 }
 
 function openUnit(x, w, v) {
@@ -182,7 +185,7 @@ function renderUnit(unit, x, w, i) {
     dataAttr = ` data-slot="${v.slotOrder}"`;
   }
   const pointer = `<g class="rt-pointer rt-now-bob">${pointerSVG(parts.nowX, parts.nowY, COL.now, L('overlay.now'))}</g>`;
-  return `<g class="rt-car${state}"${dataAttr}><g class="tr2-art">${parts.body}</g>${parts.front}${pointer}</g>`;
+  return `<g class="rt-car${state}"${dataAttr}>${parts.trail ?? ''}<g class="tr2-art">${parts.body}</g>${parts.front}${pointer}</g>`;
 }
 
 export function build(train, opts = {}) {

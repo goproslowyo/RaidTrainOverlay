@@ -154,9 +154,11 @@ function carUnit(x, w, v, i, opts = {}) {
   s += `<path d="${canopyPath(x, w)}" fill="${GLASS}" stroke="${CYAN}" stroke-width="1.5"/>`;
   s += `<line x1="${x + 112}" y1="${y - 44}" x2="${x + w - 68}" y2="${y - 44}" stroke="${CYAN}" stroke-width="1" opacity=".5"/>`;
   s += `<line x1="${x + 109}" y1="${y - 38}" x2="${x + w - 64}" y2="${y - 38}" stroke="${CYAN}" stroke-width="1" opacity=".3"/>`;
-  // lit pop-up headlight + beam
+  // lit pop-up headlight (the animated beam lives OUTSIDE the filtered art
+  // group — an opacity animation under the glow drop-shadow would re-raster
+  // the filter every frame)
   s += `<rect x="${x + 16}" y="${y - 24}" width="15" height="6" rx="2" fill="#ffe9a8" style="filter:drop-shadow(0 0 4px #ffe75c)"/>`;
-  s += `<path class="sw2-beam" d="M ${x + 16} ${y - 21} L ${x - 30} ${y - 31} L ${x - 30} ${y - 9} Z" fill="#ffe75c" opacity=".5" style="filter:blur(2px)"/>`;
+  const beam = `<path class="sw2-beam" d="M ${x + 16} ${y - 21} L ${x - 30} ${y - 31} L ${x - 30} ${y - 9} Z" fill="#ffe75c" opacity=".5" style="filter:blur(2px)"/>`;
   // twin tail-light clusters on the kamm tail (Countach-style)
   s += `<rect x="${x + w - 10}" y="${y - 20}" width="5" height="5.5" rx="1" fill="#ff2b5c" style="filter:drop-shadow(0 0 3px #ff2b5c)"/>`;
   s += `<rect x="${x + w - 10}" y="${y - 12}" width="5" height="5.5" rx="1" fill="#ff2b5c" style="filter:drop-shadow(0 0 3px #ff2b5c)"/>`;
@@ -183,7 +185,7 @@ function carUnit(x, w, v, i, opts = {}) {
   const sy = y - 30;
   s += `<g class="sw2-stamp" transform="rotate(-9 ${cx} ${sy})"><rect x="${cx - 44}" y="${sy - 13}" width="88" height="26" rx="5" fill="#2a0a2acc" stroke="#ff7ad6" stroke-width="2" style="filter:drop-shadow(0 0 5px #ff2bd699)"/><text x="${cx}" y="${sy + 5}" text-anchor="middle" font-weight="800" font-size="13" fill="#ffe1f5" letter-spacing="2" style="filter:drop-shadow(0 0 3px #ff2bd6)">${esc(L('overlay.played'))}</text></g>`;
   const front = rim(x + 46) + rim(x + w - 46);
-  return { body: s, front, nowX: cx, nowY: 40 };
+  return { body: s, beam, front, nowX: cx, nowY: 40 };
 }
 
 function openUnit(x, w, v) {
@@ -215,7 +217,7 @@ function renderUnit(unit, x, w, i) {
     dataAttr = ` data-slot="${v.slotOrder}"`;
   }
   const pointer = `<g class="rt-pointer rt-now-bob">${pointerSVG(parts.nowX, parts.nowY, COL.now, L('overlay.now'))}</g>`;
-  return `<g class="rt-car${state}"${dataAttr}><g class="sw2-art">${parts.body}</g>${parts.front}${pointer}</g>`;
+  return `<g class="rt-car${state}"${dataAttr}><g class="sw2-art">${parts.body}</g>${parts.beam ?? ''}${parts.front}${pointer}</g>`;
 }
 
 export function build(train, opts = {}) {

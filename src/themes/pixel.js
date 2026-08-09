@@ -103,10 +103,12 @@ function pxEngine(x, v, i) {
   s += box(x + 88, 64, 52, 62, BLUE) + R(x + 92, 68, 44, 4, BLUE_HI);
   s += R(x + 96, 76, 36, 36, NAVY) + R(x + 100, 80, 28, 28, SKY);
   s += avatarSVG(`px2-av-${i}`, x + 114, 94, 13, v.image, v.name, NAVY);
-  // stepped smoke puffs trailing back off the funnel
-  s += `<g class="px2-puff">${R(x + 60, 36, 12, 12, '#fff')}${R(x + 70, 28, 8, 8, '#e6eef6')}</g>`;
   s += caption(x + 78, { name: v.name, timeLines: v.timeLines }, 130);
-  const front = pxWheel(x + 36, 14) + pxWheel(x + 78, 14) + pxWheel(x + 118, 14);
+  // stepped smoke puffs trailing back off the funnel — in the unfiltered front
+  // layer, not .px2-art: the puff animates, and a state filter (current/spotlit/
+  // departed saturate) over an animating subtree would re-raster every frame
+  const front = `<g class="px2-puff">${R(x + 60, 36, 12, 12, '#fff')}${R(x + 70, 28, 8, 8, '#e6eef6')}</g>` +
+    pxWheel(x + 36, 14) + pxWheel(x + 78, 14) + pxWheel(x + 118, 14);
   return { body: s, front, nowX: x + 78 };
 }
 

@@ -337,7 +337,9 @@ than blanking the Overlay.
   `lava`: its metaball `#goo` and hue-rotate cycle are two per-frame filters over a
   *single* shared field layer (one raster for the whole train, not one per Car), and
   the module's header documents the trade and the OBS-test obligation. Every other
-  Theme is filter-free at rest; don't add a second exception without the same
+  Theme's filters are *static* — a glow rastered once and cached, with everything that
+  animates (wheels, beams, light trails) in an unfiltered sibling layer — so no filter
+  re-computes per frame; don't add a second per-frame exception without the same
   justification.
 - **Undulate is sway + rock, not a bob** — and it's free via `undulate()`. Keep added
   motion compositor-only and reduced-motion-safe.
