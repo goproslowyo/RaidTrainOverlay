@@ -4,6 +4,28 @@ All notable changes to RaidTrainOverlay are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and the project follows
 [Semantic Versioning](https://semver.org/).
 
+## [0.9.1] - 2026-08-09
+
+A standards pass over the v2 theme roster: the OBS-perf rule ("no filter
+re-computes per frame") and the reduced-motion promise now hold on every theme.
+
+### Fixed
+- **Synthwave, Tron and Pixel stop paying a per-frame filter tax.** Each had an
+  animating element living *inside* its glow-filtered art group — synthwave's
+  breathing headlight beam (on the live car), tron's trail ribbon (breathing
+  wall + travelling sweep, on **every** machine, at rest), and pixel's stepped
+  smoke puff (on the engine whenever it carried a state filter). An animation
+  under an SVG filter re-rasterises the filter every frame; all three now
+  animate in unfiltered sibling layers — same look, and each glow bitmap is
+  rastered once and cached. The authoring guide's rule was also re-worded to
+  state the real invariant (static filters cached, animation in sibling
+  layers) instead of the untrue "every other Theme is filter-free at rest".
+- **The Departures board honors `prefers-reduced-motion`.** The split-flap
+  status change restarted its flip via an inline style, which outranks any
+  media-query guard; it is now a class toggle the reduced-motion rule can
+  beat. The live unit's blinking lamp — an infinite animation with no guard at
+  all — joins the same rule, alongside the existing cell-wave guard.
+
 ## [0.9.0] - 2026-08-09
 
 The Configurator grew up into two ages of one app. A first visit is a three-stop
