@@ -133,7 +133,14 @@ export function startLiveLinkFeed(baseQuery, deps) {
     } else if (r.user) {
       notFoundReported = false;
       const { state, train, upcoming } = resolveLiveTrain(r.user.events, new Date(clock()));
-      if (state === 'idle') {
+      if (baseConfig.uponly) {
+        // Upcoming-only Live Link (?uponly=1): whatever state the resolver
+        // found, this source renders the upcoming card and never the Train —
+        // a second URL for a separate OBS scene (starting soon / BRB). No
+        // inner lineup feed is ever started, so no per-train fetches happen.
+        stopInner();
+        onIdle({ upcoming });
+      } else if (state === 'idle') {
         stopInner();
         onIdle({ upcoming });
       } else if (train.slug !== activeSlug) {

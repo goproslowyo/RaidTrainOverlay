@@ -93,6 +93,25 @@ test('a live train renders: onSwitch with its slug, then the lineup flows via on
   assert.deepEqual(calls.idles, []);
 });
 
+test('uponly: even a LIVE train resolves to the idle card — never onSwitch, never a lineup fetch', async () => {
+  // The upcoming-only Live Link (a second URL for a separate OBS scene):
+  // whatever resolveLiveTrain says, this source renders the upcoming card.
+  const log = [];
+  const { calls, feed } = harness({
+    query: '?user=goproflowyo&uponly=1&upcoming=all',
+    clockMs: DURING_LUNA,
+    routes: { [userUrl]: okUser },
+    log,
+  });
+  await feed.ready;
+  assert.deepEqual(calls.switches, []);
+  assert.deepEqual(calls.events, []);
+  assert.equal(calls.idles.length, 1);
+  // luna is LIVE at this clock, so it is not "upcoming" — the card lists the rest.
+  assert.deepEqual(calls.idles[0].upcoming.map((e) => e.slug), ['trainwreck-lucky-13', 'my-own-train']);
+  assert.deepEqual(log, [userUrl], 'no per-train lineup fetch is ever started');
+});
+
 test('the trains= mapping shapes the switched-to config; base params flow through', async () => {
   const trains = encodeTrainMap({ 'luna-hao8': { overrides: { theme: 'lava' }, spotlight: ['Guest'] } });
   const { calls, feed } = harness({

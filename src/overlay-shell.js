@@ -134,8 +134,11 @@ if (!config.event && !config.lineup && !config.user) {
         }
         // Default: fully empty — an ended train must never roll over a live
         // stream. With ?upcoming=, the compact card lists the next trains.
+        // An upcoming-only source (?uponly=1) exists to show the card, so an
+        // absent horizon falls back to the next 3 instead of nothing.
+        const spec = config.upcoming ?? (config.uponly ? { kind: 'count', n: 3 } : null);
         current = null;
-        renderUpcomingCard(container, filterUpcoming(upcoming, config.upcoming, new Date()), config);
+        renderUpcomingCard(container, filterUpcoming(upcoming, spec, new Date()), config);
       },
       onError(err) {
         const state = current ? 'showing the last-good state' : 'nothing rendered yet';

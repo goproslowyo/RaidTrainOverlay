@@ -157,6 +157,10 @@ export function parseConfig(queryString) {
     // The card's footprint: a 3-row card, or a one-line ticker for scenes
     // with no room for a card.
     upstyle: oneOf(params.get('upstyle'), ['card', 'ticker'], 'card'),
+    // Upcoming-only mode: this Live Link never renders the Train — it always
+    // shows the upcoming card, even while a train is live. A second URL for a
+    // separate OBS scene (starting soon / be right back).
+    uponly: boolean(params.get('uponly')),
     // The display locale, kept as the raw requested tag (or null). Resolution to
     // a supported locale + the navigator fallback happen in the overlay shell so
     // parseConfig stays pure (no `navigator`); the Configurator's selector sets it.
@@ -229,6 +233,7 @@ export function serializeConfig(config) {
     if (config.upcycle !== 12) params.set('upcycle', String(config.upcycle));
     if (config.upscroll !== 34) params.set('upscroll', String(config.upscroll));
     if (config.upstyle !== 'card') params.set('upstyle', config.upstyle);
+    if (config.uponly) params.set('uponly', '1');
   } else if (config.event) params.set('event', config.event);
   else if (config.lineup) params.set('lineup', config.lineup);
   // Locale: emit whenever explicitly set. Even `lang=en` is semantically

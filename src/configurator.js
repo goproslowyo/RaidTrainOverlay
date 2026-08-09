@@ -78,6 +78,7 @@ export function buildOverlayQuery(formState = {}) {
     // The idle card's own knobs (per-Profile Live Link prefs, never per-train).
     if (formState.uppos) params.set('uppos', String(formState.uppos));
     if (formState.upstyle) params.set('upstyle', String(formState.upstyle));
+    if (formState.uponly) params.set('uponly', '1');
     for (const key of ['upop', 'upcycle', 'upscroll']) {
       const value = formState[key];
       if (value != null && String(value).trim() !== '') params.set(key, String(value));

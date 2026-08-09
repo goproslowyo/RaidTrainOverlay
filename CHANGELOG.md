@@ -25,7 +25,13 @@ included.
   (`upop`), how long each page holds (`upcycle`), and a one-line ticker
   footprint (`upstyle`, `upscroll`) for scenes with no room for a card. They
   are per-Profile — the idle state belongs to the Live Link, not to any single
-  train — and ride the URL like every other setting.
+  train — and ride the URL like every other setting. Its preview sits over a
+  stand-in stream scene, full width, so placement and opacity actually read.
+- **An upcoming-trains link (`uponly`).** A second overlay URL for a separate
+  OBS scene (starting soon, be right back): it always shows your upcoming
+  trains — even while one is live — and never the train itself. Copy it from
+  the Live Link page, which is now its own page in Everything instead of
+  sitting on top of My Raid Trains.
 
 ### Changed
 - **Sodium palette, app-wide.** The Configurator and landing page adopt the

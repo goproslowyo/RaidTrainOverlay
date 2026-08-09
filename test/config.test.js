@@ -25,7 +25,7 @@ test('parseConfig ignores unknown and malformed params', () => {
   const config = parseConfig('?event=trainwreck-lucky-13&bogus=1&%%%');
   assert.equal(config.event, 'trainwreck-lucky-13');
   assert.deepEqual(Object.keys(config), [
-    'event', 'lineup', 'user', 'trains', 'upcoming', 'uppos', 'upop', 'upcycle', 'upscroll', 'upstyle',
+    'event', 'lineup', 'user', 'trains', 'upcoming', 'uppos', 'upop', 'upcycle', 'upscroll', 'upstyle', 'uponly',
     'lang', 'mode', 'interval', 'speed', 'track', 'trackfadein', 'trackfadeout', 'scale',
     'openslots', 'spotlight', 'tz', 'height', 'hidefinished', 'enginedim', 'refresh', 'theme',
   ]);
@@ -446,11 +446,27 @@ test('serializeConfig emits idle-card params only under user= and only off-defau
   assert.equal(serializeConfig(parseConfig('?event=x&uppos=tr&upstyle=ticker')), 'event=x');
 });
 
+test('parseConfig reads uponly as a flag, defaulting off', () => {
+  // The upcoming-only Live Link: a second URL for a separate OBS scene that
+  // always shows the upcoming card and never the train itself.
+  assert.equal(parseConfig('?user=x').uponly, false);
+  assert.equal(parseConfig('?user=x&uponly=1').uponly, true);
+  assert.equal(parseConfig('?user=x&uponly=true').uponly, true);
+  assert.equal(parseConfig('?user=x&uponly=banana').uponly, false);
+});
+
+test('serializeConfig emits uponly only under user= and only when on', () => {
+  assert.equal(serializeConfig(parseConfig('?user=x&uponly=1')), 'user=x&uponly=1');
+  assert.equal(serializeConfig(parseConfig('?user=x&uponly=0')), 'user=x');
+  assert.equal(serializeConfig(parseConfig('?event=x&uponly=1')), 'event=x');
+});
+
 test('serialize∘parse round-trips the idle-card params', () => {
   for (const query of [
     'user=x&uppos=tl&upstyle=ticker&upscroll=44',
     'user=x&upop=0.6&upcycle=9',
     'user=x&uppos=mr&upop=0.3&upcycle=120&upscroll=10&upstyle=ticker',
+    'user=x&uponly=1&upcoming=all&upstyle=ticker',
   ]) {
     const parsed = parseConfig(query);
     assert.deepEqual(parseConfig(serializeConfig(parsed)), parsed, `round-trip failed for: ${query}`);

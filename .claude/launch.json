@@ -4,7 +4,10 @@
     {
       "name": "overlay",
       "runtimeExecutable": "python3",
-      "runtimeArgs": ["-m", "http.server", "8321"],
+      "runtimeArgs": [
+        "-c",
+        "from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler\n# no-store: module JS cached by the browser once served a STALE overlay\n# (a Live Link kept rendering pre-update logic after a local update).\nclass H(SimpleHTTPRequestHandler):\n    def end_headers(self):\n        self.send_header('Cache-Control', 'no-store')\n        SimpleHTTPRequestHandler.end_headers(self)\nThreadingHTTPServer(('', 8321), H).serve_forever()"
+      ],
       "port": 8321
     }
   ]

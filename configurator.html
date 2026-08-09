@@ -286,8 +286,6 @@
       box-shadow: var(--rt-glow-sodium);
       position: relative;
     }
-    .live-link.flash { animation: flashcard 1.1s ease; }
-    @keyframes flashcard { 0%, 40% { box-shadow: 0 0 0 2px var(--rt-accent), var(--rt-glow-sodium); } 100% { box-shadow: var(--rt-glow-sodium); } }
     .ll-head { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
     .ll-head h2 { font: 700 19px/1.25 var(--rt-font-ui); letter-spacing: -.3px; margin: 0; }
     .ll-badge {
@@ -374,6 +372,24 @@
         linear-gradient(45deg, rgba(255,255,255,.028) 25%, transparent 25%, transparent 75%, rgba(255,255,255,.028) 75%);
       background-size: 22px 22px; background-position: 0 0, 11px 11px;
     }
+    /* The idle preview's stage plays a stand-in STREAM SCENE rather than the
+       transparency checkerboard: the card's whole point between trains is how
+       it sits over a scene, and near-black-on-checkerboard makes the opacity
+       and blur controls read as broken (nothing visibly changes). Soft glows +
+       a faint grid give the card edges and light to be translucent against. */
+    .pf .stage.scene {
+      height: 280px;
+      /* The `background` SHORTHAND on purpose: the base .stage rule tiles its
+         checkerboard at 22px, and inherited background-size would tile these
+         big radials into thousands of bright cells (a washed-out grid). The
+         shorthand resets size/position for every layer. */
+      background:
+        repeating-linear-gradient(90deg, rgba(255, 255, 255, .022) 0 1px, transparent 1px 44px),
+        radial-gradient(260px 170px at 82% 26%, rgba(127, 182, 255, .13), transparent 70%),
+        radial-gradient(460px 280px at 20% 80%, rgba(167, 139, 250, .09), transparent 70%),
+        radial-gradient(320px 210px at 55% 40%, rgba(255, 157, 46, .06), transparent 70%),
+        linear-gradient(160deg, #1A2231 0%, #131A26 45%, #0E1420 100%) #10161F;
+    }
     .pf .pf-cap { padding: 8px 12px; border-top: 1px solid var(--rt-line); color: var(--rt-ink-3); font-size: 11.5px; display: flex; gap: 8px; align-items: center; }
     .pf .stagelabel {
       position: absolute; top: 9px; left: 11px; font: 500 10px/1 var(--rt-font-mono); letter-spacing: .14em;
@@ -384,6 +400,9 @@
       border: 1px solid rgba(255, 255, 255, .09); border-radius: 9px; padding: 9px 11px;
       background: rgba(9, 12, 17, var(--upop, .88)); backdrop-filter: blur(8px); color: #EDF1F7;
       box-shadow: 0 6px 22px rgba(0, 0, 0, .45); min-width: 210px;
+      /* Never wider than the anchor allows — a long train name ellipsises
+         inside the card (see .row .nm), it must not stretch the card. */
+      max-width: 100%;
     }
     .up .uphead { display: flex; align-items: baseline; gap: 8px; padding-bottom: 6px; margin-bottom: 5px; border-bottom: 1px solid rgba(255, 255, 255, .07); }
     .up .lbl { font: 700 8.5px/1 var(--rt-font-mono); letter-spacing: .2em; text-transform: uppercase; color: #FFC578; }
@@ -393,17 +412,22 @@
     .up .row.enter { animation: rowin .62s cubic-bezier(.22, .61, .36, 1) both; }
     @keyframes rowin { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
     .up .row .tm { font-family: var(--rt-font-mono); color: #FFC578; font-size: 10.5px; flex: none; min-width: 56px; }
-    .up .row .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    /* One-line variant: a real marquee, duplicated so the loop has no seam. */
-    .up.ticker { display: flex; align-items: center; gap: 11px; border-radius: 999px; padding: 7px 15px; flex: 0 1 420px; min-width: 0; }
+    /* flex:1 + min-width:0 is what makes the ellipsis real: a flex item's
+       min-width defaults to its content, so without it a long name refuses to
+       shrink and bursts the card instead of truncating. */
+    .up .row .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    /* One-line variant: a real marquee, duplicated so the loop has no seam.
+       Sized to take most of the scene's width — a ticker squeezed into a
+       sliver shows one word at a time and reads as broken. */
+    .up.ticker { display: flex; align-items: center; gap: 11px; border-radius: 999px; padding: 8px 16px; flex: 1 1 auto; min-width: 0; }
     .up.ticker .lbl { flex: none; }
     .tickwrap { overflow: hidden; flex: 1; min-width: 0; -webkit-mask-image: linear-gradient(90deg, transparent, #000 22px, #000 calc(100% - 22px), transparent); mask-image: linear-gradient(90deg, transparent, #000 22px, #000 calc(100% - 22px), transparent); }
     .tickrun { display: inline-flex; white-space: nowrap; animation: tickmarquee var(--tickdur, 34s) linear infinite; }
     /* The gap lives inside each lap (plus a matching trailing pad), never on
        .tickrun — a gap astride the -50% point would jump the loop half a gap. */
     .ticklap { display: inline-flex; gap: 10px; align-items: baseline; padding-right: 10px; }
-    .tickrun .tick { display: inline-flex; align-items: baseline; gap: 7px; font-size: 11.5px; }
-    .tickrun .tick .tm { font-family: var(--rt-font-mono); color: #FFC578; font-size: 10.5px; }
+    .tickrun .tick { display: inline-flex; align-items: baseline; gap: 7px; font-size: 12.5px; }
+    .tickrun .tick .tm { font-family: var(--rt-font-mono); color: #FFC578; font-size: 11px; }
     .tickrun .tsep { color: #4C5A6B; }
     @keyframes tickmarquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
     @media (prefers-reduced-motion: reduce) { .tickrun { animation: none; } .up .row.enter { animation: none; } }
@@ -913,8 +937,11 @@
   const IDLE_DEFAULTS = { uppos: 'bc', upop: '0.88', upcycle: '12', upscroll: '34', upstyle: 'card' };
   // The scroll-speed slider reads left-slow → right-fast while the value is a
   // DURATION (bigger = slower), so it is stored flipped: value = FLIP − slider.
-  // 84 = slider min (14) + slider max (70).
-  const UPSCROLL_FLIP = 84;
+  // Lap range 24s (fastest — still readable) to 120s (a genuinely lazy crawl);
+  // FLIP = min + max, so the flip maps the range onto itself.
+  const UPSCROLL_MIN = 24;
+  const UPSCROLL_MAX = 120;
+  const UPSCROLL_FLIP = UPSCROLL_MIN + UPSCROLL_MAX;
 
   const ICONS = {
     pencil: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11.3 2.7l2 2L5.4 12.6l-2.9.9.9-2.9z"/><path d="m9.9 4.1 2 2"/></svg>',
@@ -1277,7 +1304,8 @@
     $('#nc-presets').textContent = String(listPresets(library).length);
     for (const el of $$('.nav-item')) {
       const nav = el.dataset.nav;
-      const active = (nav === 'trains' && (state.view === 'trains' || state.editing))
+      const active = (nav === 'trains' && ((state.view === 'trains' && !state.editingPreset) || state.editing))
+        || (nav === 'livelink' && state.view === 'livelink')
         || (nav === 'presets' && (state.view === 'presets' || state.editingPreset))
         || (nav === 'profile' && state.view === 'profile')
         || (nav === 'oneoff' && state.view === 'oneoff');
@@ -1341,6 +1369,36 @@
     </section>`;
   }
 
+  /** The upcoming-only URL: the Live Link with ?uponly=1 riding along. */
+  function upOnlyUrl() {
+    const link = liveLink();
+    if (!link.query) return '';
+    const params = new URLSearchParams(link.query);
+    params.set('uponly', '1');
+    return `${OVERLAY_BASE}?${params.toString()}`;
+  }
+
+  /**
+   * The Live Link view (Everything): the one URL your stream uses, its idle
+   * card group, the upcoming-only companion link, and the OBS handoff — its
+   * own page, no longer stacked on top of My Raid Trains.
+   */
+  function liveLinkViewHtml() {
+    if (!me()) return `<div class="empty">${te('configurator.addProfileFirstView')}</div>`;
+    return `<h2 class="view-title">${te('configurator.navLiveLink')}</h2>
+      <p class="view-sub">${te('configurator.llViewSub')}</p>
+      ${liveLinkCardHtml()}
+      <section class="card">
+        <h2 class="card-h">${te('configurator.llUpOnlyTitle')}</h2>
+        <p class="ll-sub">${te('configurator.llUpOnlySub')}</p>
+        <div class="url-row">
+          <input type="text" id="ll-uponly-url" readonly value="${esc(upOnlyUrl())}" aria-label="${te('configurator.llUpOnlyAria')}">
+          <button type="button" class="btn" data-act="copy-uponly">${te('configurator.copy')}</button>
+        </div>
+      </section>
+      ${obsStepsHtml()}`;
+  }
+
   function trainsViewHtml() {
     if (!me()) {
       return `<h2 class="view-title">${te('configurator.navTrains')}</h2>
@@ -1359,8 +1417,7 @@
         </section>`;
     }
     const head = `<h2 class="view-title">${te('configurator.navTrains')}</h2>
-      <p class="view-sub">${t('configurator.trainsSubFor', { login: `<b>${esc(me())}</b>` })}</p>
-      ${liveLinkCardHtml()}`;
+      <p class="view-sub">${t('configurator.trainsSubFor', { login: `<b>${esc(me())}</b>` })}</p>`;
     if (state.feed.status === 'loading') return `${head}<div class="empty">${te('configurator.trainsLoading')}</div>`;
     if (state.feed.status === 'notfound') {
       return `${head}<section class="card"><h2 class="card-h">${te('configurator.unknownUser')}</h2>
@@ -1791,7 +1848,7 @@
       </div></div>`;
   }
 
-  /** The idle mock inside its checkerboard OBS stage. */
+  /** The idle mock inside its stand-in stream-scene stage. */
   function idleStageHtml() {
     const v = idleValues();
     const on = v.upcoming != null;
@@ -1801,7 +1858,7 @@
     const example = on && idleMockRows().example
       ? ` <span class="dim">${te('configurator.idleExample')}</span>` : '';
     return `<div class="pf">
-      <div class="stage"><span class="stagelabel">${te('configurator.idleStageLabel')}</span><span id="idle-mock">${on ? idleMockHtml() : ''}</span></div>
+      <div class="stage scene"><span class="stagelabel">${te('configurator.idleStageLabel')}</span><span id="idle-mock">${on ? idleMockHtml() : ''}</span></div>
       <div class="pf-cap">${caption}${example}</div>
     </div>`;
   }
@@ -1809,10 +1866,11 @@
   /**
    * The idle-card controls — the Live Link group. Per-Profile (the idle state
    * exists outside any single raid train), so these live beside the horizon
-   * toggle, never in the Preset/override model. Shared verbatim by Simple's
-   * "Between trains" section and Everything's Live Link card.
+   * toggle, never in the Preset/override model. Shared by Simple's "Between
+   * trains" section (as two columns under the preview) and Everything's Live
+   * Link card (as one stack) — `idleControlParts` is the single source.
    */
-  function idleControlsHtml() {
+  function idleControlParts() {
     const v = idleValues();
     const on = v.upcoming != null;
     const dis = on ? '' : ' disabled';
@@ -1833,7 +1891,7 @@
       return t('configurator.cycleHintPages', { pages, s, n, total: `<b>${pages * s}</b>` });
     })();
     const posLabel = POSITIONS.find(([k]) => k === v.uppos);
-    return `
+    const main = `
       <div class="sfield">
         <span class="flabel">${te('configurator.idleWhileLabel')}</span>
         <label class="check">
@@ -1853,7 +1911,8 @@
           <button type="button" data-act="foot" data-id="ticker" aria-pressed="${v.upstyle === 'ticker'}"${dis}>${te('configurator.footTicker')}</button>
         </div>
         <span class="fhint">${v.upstyle === 'ticker' ? te('configurator.footTickerHint') : te('configurator.footCardHint')}</span>
-      </div>
+      </div>`;
+    const tune = `
       <div class="sfield">
         <span class="flabel">${te('configurator.posLabel')}</span>
         <div class="posrow">
@@ -1890,25 +1949,38 @@
         <div class="rangerow">
           <!-- Reversed on purpose: the slider reads left-slow → right-fast, while
                the underlying value is a duration, where bigger means slower. -->
-          <input type="range" id="ll-scroll" min="14" max="70" step="2" value="${UPSCROLL_FLIP - Number(v.upscroll)}"${dis}>
+          <input type="range" id="ll-scroll" min="${UPSCROLL_MIN}" max="${UPSCROLL_MAX}" step="2" value="${UPSCROLL_FLIP - Number(v.upscroll)}"${dis}>
           <output>${esc(v.upscroll)}s</output>
         </div>
         <span class="fhint">${te('configurator.scrollHint')}</span>
       </div>`}`;
+    return { main, tune };
   }
 
-  /** The "Between trains" section: idle controls beside their live mock. */
+  /** The full stack, for Everything's Live Link card. */
+  function idleControlsHtml() {
+    const parts = idleControlParts();
+    return parts.main + parts.tune;
+  }
+
+  /**
+   * The "Between trains" section: the scene preview at full width — big
+   * enough that placement, opacity and the ticker actually read — with the
+   * controls in two columns beneath it.
+   */
   function idleSectionHtml() {
     const next = nextTrain();
+    const parts = idleControlParts();
     return `<section class="card" id="idle-section">
       <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:4px;flex-wrap:wrap">
         <div class="eyebrow">${te('configurator.idleTitle')}</div>
         ${next ? `<span class="cap dim">${te('configurator.idleNextIs', { when: fmtDep(next.starttime) })}</span>` : ''}
       </div>
       <p class="sm dim" style="margin:0 0 14px">${te('configurator.idleLede')}</p>
-      <div class="split tight">
-        <div>${idleControlsHtml()}</div>
-        <div class="railcol">${idleStageHtml()}</div>
+      ${idleStageHtml()}
+      <div class="duo" style="margin-top:16px">
+        <div>${parts.main}</div>
+        <div>${parts.tune}</div>
       </div>
     </section>`;
   }
@@ -1974,7 +2046,7 @@
      store the Live Link is styled by, so what Simple shows is what streams. */
   function lookCardHtml() {
     const s = baseSettings(library, profiles, me());
-    return `<section class="card">
+    return `<section class="card" id="look-card">
       <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:12px">
         <div style="font:600 13.5px/1 var(--rt-font-ui)">${te('configurator.pickLook')}</div>
         <span class="cap dim">${te('configurator.pickLookHint')}</span>
@@ -2275,6 +2347,31 @@
     if (summary) summary.textContent = simpleSummary();
   }
 
+  /**
+   * Repaint just the "Between trains" section (or, where it isn't on screen —
+   * Everything's Live Link view — the whole main). renderMain would rebuild
+   * the preview IFRAME too, which reloads the overlay and reads as a flicker
+   * on every idle-knob commit.
+   */
+  function repaintIdle() {
+    const section = $('#idle-section');
+    if (section) {
+      section.outerHTML = idleSectionHtml();
+      scheduleIdleMock();
+    } else {
+      renderMain();
+    }
+  }
+
+  /** Same discipline for the look card: repaint it without touching the iframe. */
+  function repaintLook() {
+    const card = $('#look-card');
+    if (card) card.outerHTML = lookCardHtml();
+    else renderMain();
+    refreshSimpleChrome();
+    renderChrome(); // the setup stop rail's subtitle carries the look
+  }
+
   /** Idle-knob write path: per-Profile Live Link prefs, never the Preset. */
   function writeIdlePref(key, value) {
     if (!me()) { toast(t('configurator.toastAddProfileFirst')); return; }
@@ -2282,6 +2379,8 @@
     saveProfiles();
     const url = $('#ll-url');
     if (url) url.value = liveLinkUrl();
+    const uponly = $('#ll-uponly-url');
+    if (uponly) uponly.value = upOnlyUrl();
   }
 
   // ── Master render ──────────────────────────────────────────────────────
@@ -2300,6 +2399,7 @@
     else if (state.editing) main.innerHTML = configEditorHtml();
     else if (state.editingPreset) main.innerHTML = presetEditorHtml();
     else if (state.homeView === 'simple') main.innerHTML = simpleViewHtml();
+    else if (state.view === 'livelink') main.innerHTML = liveLinkViewHtml();
     else if (state.view === 'presets') main.innerHTML = presetsViewHtml();
     else if (state.view === 'profile') main.innerHTML = profileViewHtml();
     else if (state.view === 'oneoff') main.innerHTML = oneOffViewHtml();
@@ -2339,18 +2439,10 @@
     $('#shell').classList.toggle('no-side', setup || (state.homeView === 'simple' && !state.editing && !state.editingPreset));
   }
 
-  function render(opts = {}) {
+  function render() {
     renderTopbar();
     renderChrome();
     renderMain();
-    if (opts.flashLiveLink) {
-      const card = $('#live-link-card');
-      if (card) {
-        card.classList.add('flash');
-        card.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        setTimeout(() => card.classList.remove('flash'), 1200);
-      }
-    }
   }
 
   /** Wire the pieces that only exist inside the view just rendered. */
@@ -2617,15 +2709,11 @@
     state.editing = null;
     state.editingPreset = null;
     state.renaming = opts.renaming ?? null;
-    render(opts);
+    render();
   }
 
   for (const el of $$('.nav-item')) {
-    el.addEventListener('click', () => {
-      const nav = el.dataset.nav;
-      if (nav === 'livelink') { go('trains', { flashLiveLink: true }); return; }
-      go(nav);
-    });
+    el.addEventListener('click', () => go(el.dataset.nav));
   }
 
   // ── Profile menu ───────────────────────────────────────────────────────
@@ -2696,21 +2784,21 @@
     const act = el.dataset.act;
 
     // ── Variant D: setup + Simple actions ──
-    if (act === 'theme') { writeBaseSetting('theme', el.dataset.id); renderMain(); renderChrome(); return; }
-    if (act === 'themesmore') { state.themesOpen = !state.themesOpen; renderMain(); return; }
-    if (act === 'dispmode') { writeBaseSetting('mode', el.dataset.id); renderMain(); renderChrome(); return; }
-    if (act === 'played') { writeBaseSetting('hidefinished', el.dataset.id === 'hide'); renderMain(); return; }
+    if (act === 'theme') { writeBaseSetting('theme', el.dataset.id); repaintLook(); return; }
+    if (act === 'themesmore') { state.themesOpen = !state.themesOpen; repaintLook(); return; }
+    if (act === 'dispmode') { writeBaseSetting('mode', el.dataset.id); repaintLook(); return; }
+    if (act === 'played') { writeBaseSetting('hidefinished', el.dataset.id === 'hide'); repaintLook(); return; }
     if (act === 'foot') {
       // `card` is the Overlay default — stored as null so the URL stays lean.
       writeIdlePref('upstyle', el.dataset.id === 'ticker' ? 'ticker' : null);
       toast(t('configurator.toastIdleUpdated'));
-      renderMain();
+      repaintIdle();
       return;
     }
     if (act === 'uppos') {
       writeIdlePref('uppos', el.dataset.id === 'bc' ? null : el.dataset.id);
       toast(t('configurator.toastIdleUpdated'));
-      renderMain();
+      repaintIdle();
       return;
     }
     if (act === 'stop') {
@@ -2799,6 +2887,12 @@
       // Stop 3's finish bar promotes Finish the moment the link is copied —
       // Copy and Finish are a sequence, and this is the handover.
       if (state.stage === 'setup' && !state.copied) { state.copied = true; renderMain(); }
+      return;
+    }
+    if (act === 'copy-uponly') {
+      const url = upOnlyUrl();
+      if (!url) { toast(t('configurator.toastAddProfileFirst')); return; }
+      copyText(url, t('configurator.toastLinkCopied'));
       return;
     }
     if (act === 'copy-cfg-url') { copyText($('#cfg-url').value, t('configurator.toastLinkCopied')); return; }
@@ -2994,27 +3088,26 @@
   $('#main').addEventListener('change', (e) => {
     if (e.target.id === 'll-idle-toggle') {
       const horizon = $('#ll-horizon');
-      profiles = setLiveLinkPrefs(profiles, me(), { upcoming: e.target.checked ? (horizon?.value ?? '3') : null });
-      saveProfiles();
+      writeIdlePref('upcoming', e.target.checked ? (horizon?.value ?? '3') : null);
       toast(t(e.target.checked ? 'configurator.toastIdleOn' : 'configurator.toastIdleOff'));
-      renderMain();
+      repaintIdle();
       return;
     }
     if (e.target.id === 'll-horizon') {
-      profiles = setLiveLinkPrefs(profiles, me(), { upcoming: e.target.value });
-      saveProfiles();
+      writeIdlePref('upcoming', e.target.value);
       toast(t('configurator.toastHorizonUpdated'));
-      renderMain();
+      repaintIdle();
       return;
     }
-    // The knob drags above commit here: rebuild so the derived hints (page
-    // math, cycle caption) catch up, and say the URL changed.
+    // The knob drags above commit here: repaint the section so the derived
+    // hints (page math, cycle caption) catch up, and say the URL changed —
+    // never renderMain, which would reload the preview iframe (a flicker).
     if (['ll-op', 'll-cycle', 'll-scroll'].includes(e.target.id)) {
       toast(t('configurator.toastIdleUpdated'));
-      renderMain();
+      repaintIdle();
       return;
     }
-    if (e.target.dataset?.act === 'interval') { renderMain(); return; }
+    if (e.target.dataset?.act === 'interval') { repaintLook(); return; }
     if (e.target.id === 'default-preset-select') {
       profiles = setDefaultPreset(profiles, me(), e.target.value || null);
       saveProfiles();

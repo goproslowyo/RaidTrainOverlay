@@ -125,7 +125,10 @@ function renderCard(container, trains, config) {
       row.style.cssText = 'display:flex;gap:16px;justify-content:space-between;align-items:baseline;padding:3px 0';
       const name = document.createElement('span');
       name.textContent = train.title;
-      name.style.cssText = 'font-size:16px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+      // flex:1 + min-width:0 makes the ellipsis real — a flex item's min-width
+      // defaults to its content, so a long title would stretch the card
+      // instead of truncating.
+      name.style.cssText = 'flex:1;min-width:0;font-size:16px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
       const times = document.createElement('span');
       times.style.cssText = 'display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0';
       const when = document.createElement('span');
