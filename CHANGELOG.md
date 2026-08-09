@@ -4,7 +4,7 @@ All notable changes to RaidTrainOverlay are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and the project follows
 [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.9.0] - 2026-08-09
 
 The Configurator grew up into two ages of one app. A first visit is a three-stop
 journey — who's streaming, how it looks, put it on your stream — and every visit
@@ -63,6 +63,12 @@ included.
   list stopped reading chronologically twice per lap. It now pages three at a
   time — every page chronological, the whole list shown per lap — holding each
   page 12s by default.
+- **The idle card reads as a table.** One grid for the whole list — every
+  row's time and UTC share columns sized by the widest entry — with
+  constant-width departures (2-digit days and hours) so the columns cannot
+  drift between pages. Train names carry a soft shadow to pop off the scene,
+  and page turns dissolve over a quarter of the hold (up to 1.1s each way).
+  Zone names are per-date, so PDT and PST rows coexist correctly on one card.
 - **The idle card's whole lifecycle is faded, never cut.** It eases in on
   mount and out when the horizon empties; page turns crossfade while the
   panel holds a locked outline, so a shorter last page no longer snaps the
@@ -375,6 +381,7 @@ for an OBS browser source. Static hosting on GitHub Pages, no build step.
 - A cache-first RaidPal client resilient to transient fetch failures, and a GitHub
   Pages landing page with a live deployed-commit stamp in the footer.
 
+[0.9.0]: https://github.com/goproslowyo/RaidTrainOverlay/releases/tag/v0.9.0
 [0.8.0]: https://github.com/goproslowyo/RaidTrainOverlay/releases/tag/v0.8.0
 [0.7.2]: https://github.com/goproslowyo/RaidTrainOverlay/releases/tag/v0.7.2
 [0.7.1]: https://github.com/goproslowyo/RaidTrainOverlay/releases/tag/v0.7.1
