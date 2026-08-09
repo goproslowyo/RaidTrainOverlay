@@ -62,6 +62,24 @@ function formatDepartureUtc(date, locale) {
 }
 
 const ROW_ENTER_MS = 620;
+// The panel's own fades: mount/unmount, and the page-turn crossfade. Plain
+// opacity transitions driven by one-shot timers — nothing per-frame, and
+// fades are the motion vocabulary reduced-motion users are okay with.
+const PANEL_FADE_MS = 450;
+const PAGE_FADE_MS = 300;
+
+/**
+ * What the painted panel is a pure function of. Two calls with the same
+ * signature ARE the same panel — so a repaint can be skipped wholesale,
+ * which keeps the resolve tick (every ~15 min) from rebuilding the card
+ * mid-view: rows re-entering and the page cycle resetting read as a blink.
+ */
+function panelSignature(trains, config) {
+  return JSON.stringify([
+    trains.map((t) => [t.slug, +t.starttime, +(t.mySlotAt ?? 0), t.title]),
+    config.uppos, config.upop, config.upcycle, config.upscroll, config.upstyle, config.locale,
+  ]);
+}
 
 /**
  * Anchor key → the inset/justify styles that put a shrink-wrapped box there.
@@ -110,6 +128,9 @@ function panelCss(config) {
     'border:1px solid rgba(255,255,255,0.09)', 'border-radius:12px',
     `font-family:${FONT_UI}`, 'backdrop-filter:blur(8px)',
     'box-shadow:0 10px 34px rgba(0,0,0,0.45)', 'pointer-events:none',
+    // border-box so the geometry lock (min-width := measured offsetWidth)
+    // can never out-vote the max-width by a padding's worth.
+    'box-sizing:border-box',
   ].join(';');
 }
 
@@ -187,12 +208,33 @@ function renderCard(container, trains, config) {
   paintRows(page);
 
   if (pages > 1) {
-    // Page on a slow clock — one batch of DOM swaps per cycle, no per-frame work.
+    card.style.transition = `opacity ${PAGE_FADE_MS}ms ease`;
+    let swapTimer = null;
+    let locked = false;
+    // Page on a slow clock — one batch of DOM swaps per cycle, no per-frame
+    // work. Each turn is a crossfade: the panel eases out, the rows swap
+    // while it is invisible, and it eases back in — so a page with fewer or
+    // narrower rows never snaps the outline in front of the viewer.
     const cycleTimer = setInterval(() => {
-      page += 1;
-      paintRows(page);
+      // Self-disposing: a Train render replaces the container wholesale
+      // without asking us, so a detached list means this cycle is over.
+      if (!list.isConnected) { clearInterval(cycleTimer); return; }
+      if (!locked) {
+        // Page 0 carries the fullest row count, so its box is the floor the
+        // panel holds for the whole cycle — later pages fade in at the same
+        // outline instead of a shorter, narrower one.
+        list.style.minHeight = `${list.offsetHeight}px`;
+        card.style.minWidth = `${card.offsetWidth}px`;
+        locked = true;
+      }
+      card.style.opacity = '0';
+      swapTimer = setTimeout(() => {
+        page += 1;
+        paintRows(page);
+        card.style.opacity = '1';
+      }, PAGE_FADE_MS);
     }, (config.upcycle ?? 12) * 1000);
-    container._rtUpcomingCleanup = () => clearInterval(cycleTimer);
+    container._rtUpcomingCleanup = () => { clearInterval(cycleTimer); clearTimeout(swapTimer); };
   }
   return card;
 }
@@ -249,19 +291,40 @@ function renderTicker(trains, config) {
  * Paint the idle panel into `container` (replacing its contents). An empty
  * `trains` list paints nothing — the overlay stays fully transparent.
  * `config` is the parsed Overlay config (`t`, `locale`, and the up* knobs).
- * Repainting always clears the previous panel's cycle timer first.
+ *
+ * The panel's whole lifecycle is faded, never cut: it eases in on mount,
+ * eases out when the horizon empties, and — the key one — a repaint whose
+ * inputs haven't changed is a no-op, so the Live Link's resolve tick never
+ * blinks a card that is already right (and never resets its page cycle).
  */
 export function renderUpcomingCard(container, trains, config) {
+  const sig = trains.length === 0 ? null : panelSignature(trains, config);
+  const standing = container._rtUpcomingAnchor?.isConnected ?? false;
+  if (standing && container._rtUpcomingSig === sig) return;
   container._rtUpcomingCleanup?.();
   container._rtUpcomingCleanup = null;
-  container.replaceChildren();
-  if (trains.length === 0) return;
+  container._rtUpcomingSig = sig;
+
+  if (trains.length === 0) {
+    if (!standing) { container.replaceChildren(); container._rtUpcomingAnchor = null; return; }
+    // The horizon emptied under a standing panel — let it leave, don't cut it.
+    const old = container._rtUpcomingAnchor;
+    container._rtUpcomingAnchor = null;
+    old.style.transition = `opacity ${PANEL_FADE_MS}ms ease`;
+    old.style.opacity = '0';
+    const gone = setTimeout(() => old.remove(), PANEL_FADE_MS + 60);
+    container._rtUpcomingCleanup = () => { clearTimeout(gone); old.remove(); };
+    return;
+  }
   ensureStyles(container.ownerDocument ?? document);
 
   const anchor = document.createElement('div');
-  anchor.style.cssText = anchorStyle(config.uppos);
+  anchor.style.cssText = `${anchorStyle(config.uppos)};opacity:0;transition:opacity ${PANEL_FADE_MS}ms ease`;
   anchor.appendChild(config.upstyle === 'ticker'
     ? renderTicker(trains, config)
     : renderCard(container, trains, config));
-  container.appendChild(anchor);
+  container.replaceChildren(anchor);
+  container._rtUpcomingAnchor = anchor;
+  void anchor.offsetWidth; // commit the hidden start state before easing in
+  anchor.style.opacity = '1';
 }

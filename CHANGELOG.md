@@ -16,10 +16,20 @@ included.
 ### Added
 - **First-run setup.** Three stops to a working Live Link. Finishing (or
   skipping) is remembered per Profile, so the journey never reappears — it can
-  be re-run any time from the top bar.
+  be re-run any time from the profile menu.
+- **The Live Link page is the whole handoff.** Both stream links — the Live
+  Link and its upcoming-trains companion, now at equal billing with its own
+  badge and copy button — followed by the illustrated four-step OBS
+  walk-through, which lives only there (plus setup's last stop) instead of
+  repeating on every view. A visible **Add to OBS** top-bar button jumps
+  straight to the steps, and the closing line offers a preview button instead
+  of printing the raw overlay URL. Both URL rows carry their own
+  **Preview the overlay** door too, and the idle-card settings sit between the
+  links and the steps as their own section — one card, both links, styled
+  once — instead of reading as the Live Link's alone.
 - **Simple view.** The five decisions that matter — theme, cadence, size, open
   slots, played cars — editing your default Preset directly, beside a live
-  preview, your Live Link, and an illustrated 30-second OBS walk-through.
+  preview and your Live Link.
 - **The idle card is now yours to place.** New Live Link settings for the
   between-trains card: a 9-position anchor in your scene (`uppos`), opacity
   (`upop`), how long each page holds (`upcycle`), and a one-line ticker
@@ -53,6 +63,13 @@ included.
   list stopped reading chronologically twice per lap. It now pages three at a
   time — every page chronological, the whole list shown per lap — holding each
   page 12s by default.
+- **The idle card's whole lifecycle is faded, never cut.** It eases in on
+  mount and out when the horizon empties; page turns crossfade while the
+  panel holds a locked outline, so a shorter last page no longer snaps the
+  box in front of the viewer; and a repaint whose inputs haven't changed is
+  now a no-op — the Live Link's resolve tick no longer blinks a card that is
+  already right or resets its page cycle. The Configurator's between-trains
+  preview turns its pages with the same crossfade.
 
 ## [0.8.0] - 2026-08-08
 

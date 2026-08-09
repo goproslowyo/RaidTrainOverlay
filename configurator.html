@@ -134,19 +134,25 @@
     .top > .profile-wrap { margin-left: auto; }
     .top .top-meta + .profile-wrap, .top .seg ~ .profile-wrap { margin-left: 0; }
     .profile-btn {
-      display: flex; align-items: center; gap: 9px; max-width: 100%; height: var(--rt-control-h);
+      display: flex; align-items: center; gap: 8px; max-width: 100%; height: 32px;
       background: var(--rt-surface-2); border: 1px solid var(--rt-line); border-radius: var(--rt-radius-pill);
-      color: var(--rt-ink); padding: 0 13px 0 5px; font: 600 13px/1 var(--rt-font-ui); transition: border-color .15s;
+      color: var(--rt-ink); padding: 0 12px 0 4px; font: 600 13px/1 var(--rt-font-ui); transition: border-color .15s;
     }
     .profile-btn:hover { border-color: var(--rt-line-strong); }
-    .profile-btn .pb-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    /* line-height ≥1.4 is load-bearing here, not typography: the ellipsis
+       needs overflow:hidden, and the pill's own line-height is 1 — an em-box
+       line clips everything below the baseline, which is exactly the g/p/y
+       descenders of a Twitch login. (The dropdown never clipped because it
+       never hides overflow.) */
+    .profile-btn .pb-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.4; }
     .avatar {
-      width: 26px; height: 26px; border-radius: 50%; flex: none;
-      display: inline-flex; align-items: center; justify-content: center;
-      /* line-height = the circle's height: with line-height 1 the font's own
-         metrics could seat the cap low enough to shave its foot on the
-         circle's edge (the clipped G). A full-height line box centres it. */
-      font: 800 12px/26px var(--rt-font-ui); color: #FFE7C6; user-select: none;
+      width: 24px; height: 24px; border-radius: 50%; flex: none;
+      /* grid + place-items centres the GLYPH BOX itself (line-height 1 makes
+         that box the em box) — immune to the font-metric drift that kept
+         seating the cap low and shaving it on the circle's edge whenever the
+         UI face falls back. Line-height/flex-baseline tricks are not. */
+      display: grid; place-items: center;
+      font: 800 11px/1 var(--rt-font-ui); color: #FFE7C6; user-select: none;
       background: linear-gradient(140deg, var(--rt-sodium-600), var(--rt-sodium-700));
     }
     .profile-btn .chev { color: var(--rt-ink-3); font-size: 11px; flex: none; }
@@ -193,7 +199,9 @@
     }
     .stop .tt { display: grid; gap: 1px; min-width: 0; }
     .stop .tt b { font: 600 14px/1.2 var(--rt-font-ui); color: var(--rt-ink-2); }
-    .stop .tt span { font: 500 12px/1.2 var(--rt-font-mono); color: var(--rt-ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    /* 1.4 for the same reason as .pb-label: ellipsis clipping + a tight line
+       box would shave descenders off the stop subtitles. */
+    .stop .tt span { font: 500 12px/1.4 var(--rt-font-mono); color: var(--rt-ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .stop.done .num { background: var(--rt-ok-tint); border-color: var(--rt-ok-edge); color: var(--rt-ok); }
     .stop.here { border-bottom-color: var(--rt-accent); }
     .stop.here .num { background: var(--rt-accent); border-color: var(--rt-accent); color: var(--rt-on-accent); }
@@ -298,12 +306,14 @@
     }
     .ll-sub { color: var(--rt-ink-2); font-size: 13.5px; margin: 0 0 14px; }
     .ll-sub b { color: var(--rt-ink); font-weight: 600; }
-    .url-row { display: flex; gap: 8px; min-width: 0; }
+    .url-row { display: flex; gap: 8px; min-width: 0; flex-wrap: wrap; }
     .url-row input {
-      flex: 1; min-width: 0; font-family: var(--rt-font-mono);
+      flex: 1; min-width: 200px; font-family: var(--rt-font-mono);
       font-size: 12.5px; background: var(--rt-well); border-color: var(--rt-sodium-edge); color: var(--rt-sodium-300); padding: 0 12px;
     }
     .url-row .btn { padding-left: 18px; padding-right: 18px; }
+    /* The preview door is an <a> wearing .btn — same box, no underline. */
+    .url-row a.btn { text-decoration: none; display: inline-flex; align-items: center; }
     /* The re-copy rule (`configurator.llWarn`): settings ARE the URL, so it
        gets a visible row, not a footnote. */
     .ll-note {
@@ -701,6 +711,16 @@
     .obsv .k { font: 500 10.5px/1 var(--rt-font-mono); letter-spacing: .1em; color: var(--rt-sodium-300); }
     .obsv .cp { font-size: 12.5px; line-height: 1.45; color: var(--rt-ink-2); }
     .obsv b { color: var(--rt-ink); font-weight: 650; }
+    /* The close of the steps: reassurance + a preview door. The URL itself
+       never prints here — it already reads in step 3 and lives in the copy
+       rows above; dumped raw it was the ugliest line on the page. */
+    .obs-close {
+      display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+      margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--rt-line);
+      color: var(--rt-ink-2); font-size: 12.5px;
+    }
+    .obs-close span { flex: 1; min-width: 220px; line-height: 1.5; }
+    .obs-close .btn { text-decoration: none; flex: none; }
     .obsv .bar { height: 7px; border-radius: 2px; background: var(--rt-surface-3); }
 
     /* The end of stop 3's reading column. Always visible and always clickable —
@@ -818,8 +838,12 @@
   <!-- Setup stage: which stop, spelled out. -->
   <span class="top-meta" id="top-meta" hidden></span>
   <button type="button" class="btn ghost sm" id="skip-setup" hidden data-i18n="configurator.setupSkip">Skip setup</button>
-  <button type="button" class="btn ghost sm" id="resetup" hidden data-i18n="configurator.resetup"
-    data-i18n-attr="title:configurator.resetupTitle" title="Second Profile, or just lost">Run setup again</button>
+  <!-- The OBS handoff's home in the chrome: the steps live on their own page,
+       not inlined into every view. Hidden during setup — stop 3 carries them. -->
+  <button type="button" class="btn sm" id="obs-btn" hidden style="display:flex;align-items:center;gap:7px">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="4" width="19" height="13" rx="2"/><path d="M8 20.5h8M12 17v3.5"/></svg>
+    <span data-i18n="configurator.navObs">Add to OBS</span>
+  </button>
   <div class="profile-wrap">
     <button type="button" class="profile-btn" id="profile-btn" aria-haspopup="true" aria-expanded="false">
       <span class="avatar" id="pb-avatar">+</span>
@@ -968,6 +992,7 @@
     warn: '<path d="M12 3.5 2.8 19.5h18.4z"/><path d="M12 9.5v4.5M12 16.8h.01"/>',
     x: '<path d="M18 6 6 18M6 6l12 12"/>',
     gear: '<circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M18.7 5.3l-2.1 2.1M7.4 16.6l-2.1 2.1"/>',
+    refresh: '<path d="M21 12a9 9 0 1 1-2.64-6.36M21 3v6h-6"/>',
     starOutline: '<path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/>',
   };
   const ICON_FILLS = {
@@ -1307,8 +1332,17 @@
             <span class="p-sub">${te('configurator.manageProfileSub')}</span></span>
         </button>`
       : '';
+    // Setup restart lives HERE, not in the toolbar: a top-bar button was one
+    // stray click from restarting the whole journey. Two deliberate clicks now.
+    const resetup = login && state.stage !== 'setup'
+      ? `<button type="button" class="profile-item p-manage" data-act="resetup">
+          <span class="p-gear" aria-hidden="true">${icon('refresh', 15)}</span>
+          <span><span class="p-name">${te('configurator.resetup')}</span>
+            <span class="p-sub">${te('configurator.resetupTitle')}</span></span>
+        </button>`
+      : '';
     $('#profile-list').innerHTML = rows || `<div class="profile-hint">${te('configurator.noProfiles')}</div>`;
-    $('#profile-list').insertAdjacentHTML('beforeend', manage);
+    $('#profile-list').insertAdjacentHTML('beforeend', manage + resetup);
   }
 
   function renderSidebar() {
@@ -1345,12 +1379,13 @@
 
   // ── View: My Raid Trains ───────────────────────────────────────────────
   /**
-   * The Live Link card. `idle: true` (Everything's trains view) carries the
-   * full idle-card group — the same partial Simple's "Between trains" section
-   * renders, so the two surfaces can never drift; `idle: false` (Simple's
-   * rail, setup stop 3) leaves the idle group to the section that owns it.
+   * The Live Link card — the URL, its copy/preview row and its coverage
+   * facts. The idle-card group is deliberately NOT in here: those settings
+   * shape the upcoming-trains card on BOTH links, so the Live Link page
+   * renders them as their own shared section (idleSharedSectionHtml), and
+   * Simple keeps its "Between trains" stage.
    */
-  function liveLinkCardHtml({ idle = true } = {}) {
+  function liveLinkCardHtml() {
     const base = getPreset(library, myProfile()?.defaultPresetId ?? null);
     const link = liveLink();
     // The blob is over the cap the Overlay decodes against, so this URL's
@@ -1368,26 +1403,10 @@
       <div class="url-row">
         <input type="text" id="ll-url" readonly value="${esc(link.url)}" aria-label="${te('configurator.llUrlAria')}">
         <button type="button" class="btn gold" data-act="copy-live">${te('configurator.llCopy')}</button>
+        ${previewLinkHtml(link.url)}
       </div>
       ${tooBig}
       <div class="ll-note"><span class="w" aria-hidden="true">${icon('warn', 15)}</span><span>${te('configurator.llWarn')}</span></div>
-      ${idle ? (() => {
-        const v = idleValues();
-        const on = v.upcoming != null;
-        const status = on
-          ? [te(v.upstyle === 'ticker' ? 'configurator.footTicker' : 'configurator.footCard'),
-            te((POSITIONS.find(([k]) => k === v.uppos) ?? POSITIONS[7])[1]),
-            te(HORIZON_KEYS[v.upcoming] ?? 'configurator.horizon3')].join(' · ')
-          : te('configurator.idleOffNote');
-        return `<details class="fgroup ll-idle-fold" id="ll-idle-fold"${state.llIdleOpen ? ' open' : ''}>
-          <summary>
-            <span class="g-label">${te('configurator.idleWhileLabel')}</span>
-            <span class="cap dim" style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${status}</span>
-            <span class="g-chev" aria-hidden="true">${icon('chev', 12)}</span>
-          </summary>
-          <div class="fgroup-body">${idleControlsHtml()}</div>
-        </details>`;
-      })() : ''}
       <div class="ll-meta">${esc(link.trainCount === 0
         ? t('configurator.llCoversNone')
         : plural(link.trainCount, 'configurator.llCoversOne', 'configurator.llCoversMany'))}</div>
@@ -1406,10 +1425,47 @@
     return `${OVERLAY_BASE}?${params.toString()}`;
   }
 
+  /** The see-it-yourself door every URL row carries — absent while the URL is. */
+  function previewLinkHtml(url) {
+    if (!url) return '';
+    return `<a class="btn ghost" href="${esc(url)}" target="_blank" rel="noopener">${te('configurator.obsPreviewBtn')} ↗</a>`;
+  }
+
   /**
-   * The Live Link view (Everything): the one URL your stream uses, its idle
-   * card group, the upcoming-only companion link, and the OBS handoff — its
-   * own page, no longer stacked on top of My Raid Trains.
+   * The idle-card settings as their own section: ONE card, shown by BOTH
+   * links (between trains on the Live Link, all the time on the
+   * upcoming-trains link) — so the settings sit beside the two links they
+   * shape, owned by neither. Inside the Live Link card they read as the Live
+   * Link's alone, which is exactly what they aren't.
+   */
+  function idleSharedSectionHtml() {
+    const v = idleValues();
+    const on = v.upcoming != null;
+    const status = on
+      ? [te(v.upstyle === 'ticker' ? 'configurator.footTicker' : 'configurator.footCard'),
+        te((POSITIONS.find(([k]) => k === v.uppos) ?? POSITIONS[7])[1]),
+        te(HORIZON_KEYS[v.upcoming] ?? 'configurator.horizon3')].join(' · ')
+      : te('configurator.idleOffNote');
+    return `<section class="card">
+      <div class="ll-head"><h2>${te('configurator.llIdleCardTitle')}</h2></div>
+      <p class="ll-sub">${te('configurator.idleSharedNote')}</p>
+      <details class="fgroup ll-idle-fold" id="ll-idle-fold"${state.llIdleOpen ? ' open' : ''}>
+        <summary>
+          <span class="g-label">${te('configurator.settings')}</span>
+          <span class="cap dim" style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${status}</span>
+          <span class="g-chev" aria-hidden="true">${icon('chev', 12)}</span>
+        </summary>
+        <div class="fgroup-body">${idleControlsHtml()}</div>
+      </details>
+    </section>`;
+  }
+
+  /**
+   * The Live Link view (Everything): everything your scenes need in one
+   * place — the Live Link, its upcoming-trains companion at equal billing
+   * (whoever wants one almost always wants the other), and the OBS handoff.
+   * The toolbar's Add to OBS button lands here, scrolled to the steps; only
+   * setup stop 3 keeps its own inline copy of them.
    */
   function liveLinkViewHtml() {
     if (!me()) return `<div class="empty">${te('configurator.addProfileFirstView')}</div>`;
@@ -1417,13 +1473,15 @@
       <p class="view-sub">${te('configurator.llViewSub')}</p>
       ${liveLinkCardHtml()}
       <section class="card">
-        <h2 class="card-h">${te('configurator.llUpOnlyTitle')}</h2>
+        <div class="ll-head"><h2>${te('configurator.llUpOnlyTitle')}</h2><span class="ll-badge">${te('configurator.llUpOnlyBadge')}</span></div>
         <p class="ll-sub">${te('configurator.llUpOnlySub')}</p>
         <div class="url-row">
           <input type="text" id="ll-uponly-url" readonly value="${esc(upOnlyUrl())}" aria-label="${te('configurator.llUpOnlyAria')}">
-          <button type="button" class="btn" data-act="copy-uponly">${te('configurator.copy')}</button>
+          <button type="button" class="btn gold" data-act="copy-uponly">${te('configurator.llUpOnlyCopy')}</button>
+          ${previewLinkHtml(upOnlyUrl())}
         </div>
       </section>
+      ${idleSharedSectionHtml()}
       ${obsStepsHtml()}`;
   }
 
@@ -2160,8 +2218,9 @@
      loading" reassurance anywhere: the app cannot observe an OBS browser
      source, so the honest close is what the link WILL do, not what we "see". */
   function obsStepsHtml() {
-    const url = liveLinkUrl() || 'https://…';
-    return `<section class="card">
+    const real = liveLinkUrl();
+    const url = real || 'https://…';
+    return `<section class="card" id="obs-steps">
       <div style="display:flex;align-items:center;gap:11px;margin-bottom:16px;flex-wrap:wrap">
         <h3 style="font:700 15.5px/1.3 var(--rt-font-ui);letter-spacing:-.2px;margin:0">${te('configurator.obsVisTitle')}</h3>
         <span class="mono" style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--rt-ink-3)">${te('configurator.obsVisTime')}</span>
@@ -2204,9 +2263,10 @@
           <div class="cp">${t('configurator.obsVis4')}</div>
         </div>
       </div>
-      <div style="margin-top:14px" class="cap dim">${t('configurator.obsNothingToCheck', {
-        url: `<span class="mono" style="color:var(--rt-sodium-300);overflow-wrap:anywhere">${esc(url)}</span>`,
-      })}</div>
+      <div class="obs-close">
+        <span>${te('configurator.obsNothingToCheck')}</span>
+        ${real ? `<a class="btn ghost sm" href="${esc(real)}" target="_blank" rel="noopener">${te('configurator.obsPreviewBtn')} ↗</a>` : ''}
+      </div>
     </section>`;
   }
 
@@ -2227,14 +2287,17 @@
         </section>
         ${lookCardHtml()}
         ${idleSectionHtml()}
-        ${obsStepsHtml()}
+        <section class="card" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <span class="sm dim" style="flex:1;min-width:220px">${te('configurator.obsPointer')}</span>
+          <button type="button" class="btn" data-act="goto-obs">${te('configurator.navObs')} ›</button>
+        </section>
         <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
           <span class="cap dim" style="flex:1;min-width:220px">${te('configurator.simpleMoreNote')}</span>
           <button type="button" class="btn ghost" data-act="goto-everything">${te('configurator.viewEverything')} ›</button>
         </div>
       </div>
       <div class="railcol sticky">
-        ${liveLinkCardHtml({ idle: false })}
+        ${liveLinkCardHtml()}
         <section class="card" style="padding:16px 18px;margin-bottom:0">
           ${previewFrameHtml()}
         </section>
@@ -2330,7 +2393,7 @@
           <h1 class="t1">${te('configurator.stop3Title')}</h1>
           <p class="dim" style="margin-top:8px">${te('configurator.stop3Lede')}</p>
         </div>
-        ${liveLinkCardHtml({ idle: false })}
+        ${liveLinkCardHtml()}
         ${obsStepsHtml()}
         <!-- Copy and Finish are a SEQUENCE, not a choice: one primary action
              per screen. Finish only gains emphasis once the link is copied. -->
@@ -2369,6 +2432,10 @@
 
   // The idle mock's page clock. Runs only while a paging card mock is on
   // screen; render() re-arms it so the hold time tracks the setting live.
+  // Page turns crossfade exactly like the real card (upcoming-card.js): ease
+  // out, swap while invisible, ease back in — the mock must demonstrate the
+  // Overlay's manners, not just its skin.
+  const MOCK_PAGE_FADE_MS = 300;
   let idleMockTimer = null;
   function scheduleIdleMock() {
     clearTimeout(idleMockTimer);
@@ -2377,10 +2444,25 @@
     const mock = document.getElementById('idle-mock');
     if (!mock) return;
     idleMockTimer = setTimeout(() => {
-      state.idlePage += 1;
-      const el = document.getElementById('idle-mock');
-      if (el) el.innerHTML = idleMockHtml();
-      scheduleIdleMock();
+      const panel = document.querySelector('#idle-mock .up');
+      if (panel) {
+        panel.style.transition = `opacity ${MOCK_PAGE_FADE_MS}ms ease`;
+        panel.style.opacity = '0';
+      }
+      idleMockTimer = setTimeout(() => {
+        state.idlePage += 1;
+        const el = document.getElementById('idle-mock');
+        if (el) {
+          el.innerHTML = idleMockHtml();
+          const fresh = el.querySelector('.up');
+          if (fresh) {
+            fresh.style.cssText += `;opacity:0;transition:opacity ${MOCK_PAGE_FADE_MS}ms ease`;
+            void fresh.offsetWidth;
+            fresh.style.opacity = '1';
+          }
+        }
+        scheduleIdleMock();
+      }, MOCK_PAGE_FADE_MS);
     }, Number(v.upcycle) * 1000);
   }
 
@@ -2477,7 +2559,7 @@
     meta.hidden = !setup;
     if (setup) meta.textContent = t('configurator.setupMeta', { n: state.stop });
     $('#skip-setup').hidden = !setup;
-    $('#resetup').hidden = setup;
+    $('#obs-btn').hidden = setup;
     const stops = $('#stops');
     stops.hidden = !setup;
     if (setup) stops.innerHTML = stopRailHtml();
@@ -2832,6 +2914,13 @@
     profileMenu.classList.remove('open');
     if (item.dataset.act === 'switch-profile') { useProfile(item.dataset.name); toast(t('configurator.toastActingAs', { name: item.dataset.name })); }
     if (item.dataset.act === 'manage-profile') go('profile');
+    if (item.dataset.act === 'resetup') {
+      state.stage = 'setup';
+      state.stop = 1;
+      state.copied = false;
+      state.justLanded = false;
+      render();
+    }
   });
 
   // ── Main-content actions (delegated: the views are re-rendered wholesale) ──
@@ -2891,6 +2980,7 @@
       render();
       return;
     }
+    if (act === 'goto-obs') { goToObsSteps(); return; }
     if (act === 'goto-everything') {
       state.homeView = 'everything';
       localStorage.setItem(HOMEVIEW_KEY, state.homeView);
@@ -3204,13 +3294,13 @@
     state.view = 'trains';
     render();
   });
-  $('#resetup').addEventListener('click', () => {
-    state.stage = 'setup';
-    state.stop = 1;
-    state.copied = false;
-    state.justLanded = false;
-    render();
-  });
+  // The OBS steps live at the bottom of the Live Link page — land there
+  // already scrolled to them, not to two link cards the visitor didn't ask for.
+  function goToObsSteps() {
+    go('livelink');
+    document.getElementById('obs-steps')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+  $('#obs-btn').addEventListener('click', goToObsSteps);
   // The stop rail sits above #main, outside its delegated listener — every
   // stop is a door, so it needs its own.
   $('#stops').addEventListener('click', (e) => {
