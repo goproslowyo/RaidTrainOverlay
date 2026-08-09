@@ -30,12 +30,16 @@ export function createPreviewFrame({ iframe, rollBtn, stillBtn, overlayBase, ori
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
   // This button cycles through three labels, so it owns them rather than the
-  // page — hence the injected `t`. The glyph and the &nbsp; are layout, not
-  // language, and stay in code.
+  // page — hence the injected `t`. The icon and the &nbsp; are layout, not
+  // language, and stay in code — drawn SVG, never a Unicode glyph standing in
+  // for an icon.
+  const ic = (paths) => `<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style="vertical-align:-1px">${paths}</svg>`;
+  const PLAY = ic('<path d="M8 5.5v13l11-6.5z"/>');
+  const PAUSE = ic('<rect x="6.5" y="5.5" width="4" height="13" rx="1"/><rect x="13.5" y="5.5" width="4" height="13" rx="1"/>');
   function updateButtons() {
-    const label = rollState === 'rolling' ? `⏸&nbsp;${esc(t('configurator.freeze'))}`
-      : rollState === 'frozen' ? `▶&nbsp;${esc(t('configurator.resume'))}`
-        : `▶&nbsp;${esc(t('configurator.rollIt'))}`;
+    const label = rollState === 'rolling' ? `${PAUSE}&nbsp;${esc(t('configurator.freeze'))}`
+      : rollState === 'frozen' ? `${PLAY}&nbsp;${esc(t('configurator.resume'))}`
+        : `${PLAY}&nbsp;${esc(t('configurator.rollIt'))}`;
     rollBtn.innerHTML = label;
     // One tooltip covers the whole cycle — it describes roll/freeze/resume together.
     rollBtn.title = t('configurator.rollTitle');

@@ -1,0 +1,150 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-09T00:00:00Z",
+  "title": "Design System: RaidTrainOverlay — Sodium",
+  "extensions": {
+    "colorMeta": {
+      "sodium-500": { "role": "primary", "displayName": "Sodium Lamp", "canonical": "#FF9D2E", "tonalRamp": ["#3A2103", "#6B3B07", "#A9530B", "#EF7C12", "#FF9D2E", "#FFB759", "#FFC578", "#FFE7C6"] },
+      "sodium-300": { "role": "primary", "displayName": "Sodium Glow", "canonical": "#FFC578", "tonalRamp": ["#3A2103", "#6B3B07", "#A9530B", "#EF7C12", "#FF9D2E", "#FFB759", "#FFC578", "#FFE7C6"] },
+      "base": { "role": "neutral", "displayName": "Night Slate", "canonical": "#0C1016", "tonalRamp": ["#07090D", "#080B10", "#0C1016", "#141A22", "#1C2430", "#28323F", "#38424F", "#697686"] },
+      "surface": { "role": "neutral", "displayName": "Card Slate", "canonical": "#141A22", "tonalRamp": ["#07090D", "#080B10", "#0C1016", "#141A22", "#1C2430", "#28323F", "#38424F", "#697686"] },
+      "ink": { "role": "neutral", "displayName": "Headlamp White", "canonical": "#EDF1F7", "tonalRamp": ["#697686", "#78859A", "#8A96A9", "#9BA7B8", "#B3BDCA", "#CBD3DD", "#DDE3EC", "#EDF1F7"] },
+      "live": { "role": "status", "displayName": "On-Air Red", "canonical": "#FF4D63", "tonalRamp": ["#33070C", "#5C0F19", "#8A1728", "#BF2740", "#FF4D63", "#FF7387", "#FF9CAB", "#FFC9D1"] },
+      "ok": { "role": "status", "displayName": "Signal Green", "canonical": "#43D48D", "tonalRamp": ["#06281A", "#0C4A30", "#147049", "#2AA369", "#43D48D", "#6FE0A8", "#9DEBC4", "#CDF5E1"] },
+      "warn": { "role": "status", "displayName": "Caution Amber", "canonical": "#FFD166", "tonalRamp": ["#332703", "#5C4708", "#8A6B10", "#BF981F", "#FFD166", "#FFDD8A", "#FFE8AF", "#FFF3D6"] },
+      "danger": { "role": "status", "displayName": "Derail Red", "canonical": "#FF6B6B", "tonalRamp": ["#330D0D", "#5C1717", "#8A2323", "#BF3D3D", "#FF6B6B", "#FF8D8D", "#FFAFAF", "#FFD4D4"] },
+      "override": { "role": "status", "displayName": "Override Violet", "canonical": "#A78BFA", "tonalRamp": ["#1E1438", "#372360", "#523A8C", "#7659BF", "#A78BFA", "#BBA5FB", "#D0C1FC", "#E6DEFE"] },
+      "info": { "role": "status", "displayName": "Timetable Blue", "canonical": "#7FB6FF", "tonalRamp": ["#0D1F33", "#17385C", "#23548A", "#3D7DBF", "#7FB6FF", "#9CC7FF", "#BAD8FF", "#DAEBFF"] }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Landing hero only; 33px below 820px; key phrase colored sodium." },
+      "headline": { "displayName": "Headline (.t1)", "purpose": "The one stop question per setup screen." },
+      "title": { "displayName": "Title", "purpose": "View titles, the Live Link heading, editor heads." },
+      "body": { "displayName": "Body", "purpose": "All prose; small variants 13.5px/1.5 and 12.5px/1.45; bold-in-body is 600 ink." },
+      "label": { "displayName": "Eyebrow / Label", "purpose": "Uppercase sodium micro-label introducing every section; card-h variant at 12.5px/.07em." },
+      "meter": { "displayName": "Meter (DM Mono)", "purpose": "Times, counts, URLs, slugs, stage labels; tabular-nums; tracking .06-.26em." }
+    },
+    "shadows": [
+      { "name": "shadow-sm", "value": "0 1px 2px rgba(0, 0, 0, .4)", "purpose": "Barely-there lift." },
+      { "name": "shadow-md", "value": "0 10px 28px rgba(0, 0, 0, .55)", "purpose": "Floating chrome: profile menu, toast." },
+      { "name": "shadow-lg", "value": "0 22px 60px rgba(0, 0, 0, .62)", "purpose": "The modal." },
+      { "name": "glow-sodium", "value": "0 0 30px rgba(255, 157, 46, .22)", "purpose": "The meaning-glow: primary button, Live Link hero, selected theme swatch; rides text-shadow on the landing board's times." },
+      { "name": "glow-live", "value": "0 0 26px rgba(255, 77, 99, .20)", "purpose": "On-air emphasis." },
+      { "name": "ring", "value": "0 0 0 2px var(--rt-focus)", "purpose": "Focus ring in sodium-300; also as outline: 2px solid + 2px offset." }
+    ],
+    "motion": [
+      { "name": "hover-transition", "value": ".14s-.2s ease", "purpose": "Border, background, and color state shifts on controls." },
+      { "name": "pop", "value": ".14s ease (opacity + translateY(-4px) in)", "purpose": "Menus and badges appearing." },
+      { "name": "row-in", "value": ".62s cubic-bezier(.22, .61, .36, 1) (opacity + translateY(6px))", "purpose": "Idle-card rows entering; the soft rise that reads as the list moving on." },
+      { "name": "ticker-marquee", "value": "translateX(0 -> -50%) linear, 34s default, infinite", "purpose": "Seamless one-line marquee; content laid twice so the loop has no seam." },
+      { "name": "reduced-motion", "value": "@media (prefers-reduced-motion: reduce) { animation: none }", "purpose": "Every animation opts out; mandatory." }
+    ],
+    "breakpoints": [
+      { "name": "rails-narrow", "value": "1100px" },
+      { "name": "single-column", "value": "860px" },
+      { "name": "landing-collapse", "value": "820px" },
+      { "name": "top-meta-drops", "value": "600px" },
+      { "name": "brand-train-drops", "value": "420px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one sodium action per screen; scorched text, sodium glow.",
+      "html": "<button class=\"ds-btn-primary\">Copy Live Link</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 38px; padding: 0 15px; border-radius: 7px; border: 1px solid var(--rt-accent, #FF9D2E); background: var(--rt-accent, #FF9D2E); color: var(--rt-on-accent, #180D01); font: 700 13.5px/1 'Public Sans', system-ui, sans-serif; white-space: nowrap; cursor: pointer; transition: .14s; box-shadow: 0 0 30px rgba(255, 157, 46, .22); } .ds-btn-primary:hover { background: var(--rt-accent-hover, #FFC578); border-color: var(--rt-accent-hover, #FFC578); } .ds-btn-primary:focus-visible { outline: 2px solid var(--rt-focus, #FFC578); outline-offset: 2px; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "The workhorse control: surface fill, strong hairline.",
+      "html": "<button class=\"ds-btn\">Open editor</button>",
+      "css": ".ds-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 38px; padding: 0 15px; border-radius: 7px; border: 1px solid var(--rt-line-strong, #38424F); background: var(--rt-surface-2, #1C2430); color: var(--rt-ink, #EDF1F7); font: 600 13.5px/1 'Public Sans', system-ui, sans-serif; white-space: nowrap; cursor: pointer; transition: .14s; } .ds-btn:hover { background: var(--rt-surface-3, #28323F); border-color: var(--rt-ink-3, #697686); } .ds-btn:focus-visible { outline: 2px solid var(--rt-focus, #FFC578); outline-offset: 2px; }"
+    },
+    {
+      "name": "Segmented Control",
+      "kind": "nav",
+      "description": "Simple / Everything: a well track whose pressed segment goes solid sodium.",
+      "html": "<div class=\"ds-seg\"><button aria-pressed=\"true\">Simple</button><button>Everything</button></div>",
+      "css": ".ds-seg { display: inline-flex; padding: 3px; gap: 3px; border-radius: 7px; background: var(--rt-well, #080B10); border: 1px solid var(--rt-line, #242D39); } .ds-seg button { height: 30px; padding: 0 14px; border: 0; border-radius: 5px; background: transparent; color: var(--rt-ink-2, #9BA7B8); font: 600 13px/1 'Public Sans', system-ui, sans-serif; cursor: pointer; } .ds-seg button[aria-pressed=true] { background: var(--rt-accent, #FF9D2E); color: var(--rt-on-accent, #180D01); font-weight: 700; } .ds-seg button:focus-visible { outline: 2px solid var(--rt-focus, #FFC578); outline-offset: 2px; }"
+    },
+    {
+      "name": "Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "The resting container: surface slate, hairline, sodium eyebrow header, no shadow.",
+      "html": "<div class=\"ds-card\"><h2 class=\"ds-card-h\">Idle state</h2><p class=\"ds-card-p\">What the Live Link shows <b>between trains</b>.</p></div>",
+      "css": ".ds-card { background: var(--rt-surface, #141A22); border: 1px solid var(--rt-line, #242D39); border-radius: 14px; padding: 18px 20px; min-width: 0; } .ds-card-h { font: 700 12.5px/1.3 'Public Sans', system-ui, sans-serif; text-transform: uppercase; letter-spacing: .07em; color: var(--rt-sodium-300, #FFC578); margin: 0 0 12px; } .ds-card-p { margin: 0; color: var(--rt-ink-2, #9BA7B8); font: 400 13.5px/1.5 'Public Sans', system-ui, sans-serif; } .ds-card-p b { color: var(--rt-ink, #EDF1F7); font-weight: 600; }"
+    },
+    {
+      "name": "Text Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "38px control on surface-2 with a strong hairline; sodium focus ring.",
+      "html": "<input class=\"ds-input\" type=\"text\" placeholder=\"your_twitch_name\">",
+      "css": ".ds-input { width: 100%; height: 38px; padding: 0 11px; border-radius: 7px; border: 1px solid var(--rt-line-strong, #38424F); background: var(--rt-surface-2, #1C2430); color: var(--rt-ink, #EDF1F7); font: 400 15px/1.55 'Public Sans', system-ui, sans-serif; color-scheme: dark; } .ds-input:focus { outline: 2px solid var(--rt-focus, #FFC578); outline-offset: 2px; }"
+    },
+    {
+      "name": "Live Chip",
+      "kind": "chip",
+      "refersTo": "chip-status",
+      "description": "The pill badge grammar: a hue's tint fill + edge border + solid text, with a pulsing dot when live.",
+      "html": "<span class=\"ds-chip-live\"><span class=\"ds-chip-dot\"></span>LIVE</span>",
+      "css": ".ds-chip-live { display: inline-flex; align-items: center; gap: 6px; font: 800 10.5px/1.6 'Public Sans', system-ui, sans-serif; letter-spacing: .1em; color: var(--rt-live, #FF4D63); border: 1px solid var(--rt-live-edge, rgba(255, 77, 99, .34)); background: var(--rt-live-tint, rgba(255, 77, 99, .10)); border-radius: 999px; padding: 2px 9px 2px 7px; } .ds-chip-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--rt-live, #FF4D63); animation: ds-pulse 1.4s ease infinite; } @keyframes ds-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(255, 77, 99, .34); } 55% { box-shadow: 0 0 0 5px rgba(255, 77, 99, 0); } } @media (prefers-reduced-motion: reduce) { .ds-chip-dot { animation: none; } }"
+    },
+    {
+      "name": "Radio Card",
+      "kind": "custom",
+      "description": "A decision as a card: checked state is the sodium tint-and-edge pair with a filled mark.",
+      "html": "<button class=\"ds-radio\" role=\"radio\" aria-checked=\"true\"><span class=\"ds-radio-mark\"></span><span><b>The card</b><span class=\"ds-radio-sub\">Up to three trains with times.</span></span></button>",
+      "css": ".ds-radio { cursor: pointer; display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; width: 100%; text-align: left; border-radius: 10px; border: 1px solid var(--rt-line, #242D39); background: var(--rt-surface-2, #1C2430); color: var(--rt-ink, #EDF1F7); font: 400 13.5px/1.5 'Public Sans', system-ui, sans-serif; } .ds-radio b { font-weight: 700; } .ds-radio-sub { display: block; color: var(--rt-ink-2, #9BA7B8); font-size: 12.5px; } .ds-radio-mark { width: 16px; height: 16px; flex: none; margin-top: 2px; border-radius: 50%; border: 1px solid var(--rt-line-strong, #38424F); background: var(--rt-surface, #141A22); } .ds-radio[aria-checked=true] { border-color: var(--rt-accent-edge, rgba(255, 157, 46, .34)); background: var(--rt-accent-tint, rgba(255, 157, 46, .10)); } .ds-radio[aria-checked=true] .ds-radio-mark { border: 5px solid var(--rt-accent, #FF9D2E); background: var(--rt-on-accent, #180D01); } .ds-radio:focus-visible { outline: 2px solid var(--rt-focus, #FFC578); outline-offset: 2px; }"
+    },
+    {
+      "name": "Idle Slab",
+      "kind": "custom",
+      "description": "The overlay-side idle panel: a translucent dark slab built to sit on any OBS scene; deliberately off-token.",
+      "html": "<div class=\"ds-slab\"><div class=\"ds-slab-head\"><span class=\"ds-slab-lbl\">UPCOMING</span><span class=\"ds-slab-count\">1 / 2</span></div><div class=\"ds-slab-row\"><span class=\"ds-slab-tm\">Fri 22:30</span><span class=\"ds-slab-nm\">Friday Night Raid Train</span></div><div class=\"ds-slab-row\"><span class=\"ds-slab-tm\">Sat 19:00</span><span class=\"ds-slab-nm\">Weekend Express</span></div></div>",
+      "css": ".ds-slab { border: 1px solid rgba(255, 255, 255, .09); border-radius: 9px; padding: 9px 11px; background: rgba(9, 12, 17, .88); backdrop-filter: blur(8px); color: #EDF1F7; box-shadow: 0 6px 22px rgba(0, 0, 0, .45); min-width: 210px; font-family: 'DM Mono', ui-monospace, monospace; } .ds-slab-head { display: flex; align-items: baseline; gap: 8px; padding-bottom: 6px; margin-bottom: 5px; border-bottom: 1px solid rgba(255, 255, 255, .07); } .ds-slab-lbl { font: 700 8.5px/1 'DM Mono', ui-monospace, monospace; letter-spacing: .2em; text-transform: uppercase; color: #FFC578; } .ds-slab-count { margin-left: auto; font: 500 8.5px/1 'DM Mono', ui-monospace, monospace; color: #71808F; letter-spacing: .06em; } .ds-slab-row { display: flex; align-items: baseline; gap: 9px; font-size: 11.5px; padding: 2.5px 0; font-family: 'Public Sans', system-ui, sans-serif; } .ds-slab-tm { font-family: 'DM Mono', ui-monospace, monospace; color: #FFC578; font-size: 10.5px; flex: none; min-width: 56px; } .ds-slab-nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Sodium Yard at Night",
+    "overview": "A rail yard after dark: deep slate surfaces stacked like night air, and one warm sodium-vapor lamp (#FF9D2E) doing all the pointing. The system is dark by construction, not by inversion — five slate steps build depth tonally, hairline borders do the structure, and the sodium accent appears only where the product wants your hand: the primary button, the Live Link, the selected state. Everything operational — times, counts, URLs, stage labels — switches to DM Mono, like departure boards in a station. This system governs exactly two pages: configurator.html and index.html, which share the --rt-* token block in assets/app.css. Outside this system on purpose: preview.html keeps its older, dimmer palette, and the Overlay's Theme art is per-Theme, governed by docs/authoring-a-theme.md, never by these tokens.",
+    "keyCharacteristics": [
+      "One warm accent (sodium orange) on tonal deep slate; every other hue is a status voice.",
+      "Public Sans for prose and UI; DM Mono for anything a machine would print.",
+      "Pill controls and pill badges; softly rounded cards (14px); hairline borders everywhere.",
+      "Checkerboard stages wherever OBS transparency is being depicted.",
+      "Transform-only, slow motion — the OBS performance mandate reaches the app's own chrome."
+    ],
+    "rules": [
+      { "name": "The One Lamp Rule", "body": "Sodium is the only hue that means \"act here\" or \"this is chosen.\" Every other color is a status report, never a call to action.", "section": "colors" },
+      { "name": "The Tint-and-Edge Rule", "body": "A colored surface is never a solid flood: it is the hue's -tint fill paired with its -edge border. Solid status color is reserved for dots, text, and the accent button itself.", "section": "colors" },
+      { "name": "The Ink Floor Rule", "body": "Helper copy below 14px reads in ink-2 — ink-3 sits under the 4.5:1 contrast floor at that size and is reserved for large or non-essential marks.", "section": "colors" },
+      { "name": "The Timetable Rule", "body": "Anything a machine would print — a time, a count, a URL, a slug, a stage label — is DM Mono. Anything a person would say is Public Sans. No third font.", "section": "typography" },
+      { "name": "The Sodium Eyebrow Rule", "body": "Sections are introduced by the uppercase sodium micro-label, not by big headings. The heading below it stays sentence-case and tight.", "section": "typography" },
+      { "name": "The minmax(0,1fr) Rule", "body": "Every fluid grid track is minmax(0, 1fr) and every flex/grid child that can carry text gets min-width: 0 — the Live Link URL and a Twitch login are single unbreakable words. Rail widths are modifier classes, never inline styles.", "section": "layout" },
+      { "name": "The Earned Glow Rule", "body": "The sodium glow marks the one thing a screen most wants you to do or the thing you chose — never decoration. If two elements on a screen glow sodium, one of them is lying.", "section": "elevation" },
+      { "name": "The Checkerboard Rule", "body": "Anywhere the UI depicts what OBS will composite, the stage is a dark checkerboard (~22-28px squares, near-invisible contrast) with a mono uppercase stage label in ink-3.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do style with --rt-* tokens; the legacy aliases (--bg, --gold, …) exist only so old markup reskins.",
+      "Do ship every new status color as the full trio: solid + -tint (~10%) + -edge (~30%).",
+      "Do set anything machine-printed in DM Mono with tabular-nums, uppercase and letter-spaced when it labels.",
+      "Do wrap fluid columns in minmax(0, 1fr) and give their children min-width: 0 — assume every string might be one unbreakable word.",
+      "Do animate with transform/opacity only, on slow timers, and honor prefers-reduced-motion on every animation.",
+      "Do keep new-page layout in that page's own inline <style>; assets/app.css is a shared vocabulary, not a framework."
+    ],
+    "donts": [
+      "Don't put white text on sodium — text on the accent is on-sodium (#180D01).",
+      "Don't glow more than one sodium element per screen, or glow anything that isn't the primary action or the chosen thing.",
+      "Don't use ink-3 for helper copy under 14px (contrast floor); it is for large or non-essential marks only.",
+      "Don't add Unicode-glyph or icon-font icons; draw them as inline stroke SVG in currentColor.",
+      "Don't extend these tokens into preview.html (its palette diverges on purpose) or into Theme art (per-Theme, see docs/authoring-a-theme.md).",
+      "Don't revive the pre-v2 blue/gold (#57b6ff / #f4c430); the sodium system replaced it app-wide."
+    ]
+  }
+}

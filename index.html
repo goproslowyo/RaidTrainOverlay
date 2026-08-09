@@ -5,24 +5,28 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>RaidTrainOverlay</title>
   <meta name="description" content="A stream overlay that turns a RaidPal raid train into an animated train of streamer cars for OBS. One link follows your whole schedule.">
-  <!-- Shared design tokens (#34's Q4). Layout below stays page-local. -->
+  <!-- Shared design tokens (#34's Q4). Layout below stays page-local. The
+       palette is the v2 redesign's warm sodium system (assets/app.css). -->
   <link rel="stylesheet" href="./assets/app.css">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,300..800;1,400..700&family=DM+Mono:ital,wght@0,300;0,400;0,500&display=swap">
   <style>
     * { box-sizing: border-box; }
     html, body { margin: 0; }
     body {
-      background: radial-gradient(1200px 500px at 70% -200px, #1a2230 0%, transparent 60%), var(--bg);
-      color: var(--ink);
-      font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      background: radial-gradient(1200px 500px at 70% -200px, #1d1710 0%, transparent 60%), var(--rt-base);
+      color: var(--rt-ink);
+      font: 15px/1.5 var(--rt-font-ui);
+      -webkit-font-smoothing: antialiased;
       min-height: 100vh;
     }
-    a { color: var(--accent); }
+    a { color: var(--rt-sodium-300); }
 
     /* ── Top bar: the Configurator's, minus its sidebar (#30) ───────────── */
     .top {
       display: flex; align-items: center; gap: 16px;
       padding: 14px 28px; border-bottom: 1px solid var(--line);
-      background: rgba(15, 18, 22, .85); backdrop-filter: blur(6px);
+      background: rgba(20, 26, 34, .85); backdrop-filter: blur(6px);
       position: sticky; top: 0; z-index: 40;
     }
     .brand { display: flex; align-items: baseline; gap: 12px; }
@@ -42,8 +46,8 @@
       background: var(--panel-2); color: var(--ink); font-weight: 600; white-space: nowrap;
       text-decoration: none; display: inline-block;
     }
-    .btn.gold { background: var(--gold); border-color: var(--gold); color: #1f2937; font-weight: 700; }
-    .btn.gold:hover { filter: brightness(1.06); }
+    .btn.gold { background: var(--rt-accent); border-color: var(--rt-accent); color: var(--rt-on-accent); font-weight: 700; box-shadow: var(--rt-glow-sodium); }
+    .btn.gold:hover { background: var(--rt-accent-hover); border-color: var(--rt-accent-hover); }
     .btn.lg { padding: 13px 26px; font-size: 16px; border-radius: 9px; }
     .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
@@ -52,8 +56,8 @@
       position: relative; overflow: hidden; border-bottom: 1px solid var(--line);
       padding: 70px 24px 0;
       background:
-        radial-gradient(760px 300px at 50% 8%, rgba(244, 196, 48, .16), transparent 62%),
-        radial-gradient(900px 400px at 80% 120%, rgba(87, 182, 255, .10), transparent 60%);
+        radial-gradient(760px 300px at 50% 8%, rgba(255, 157, 46, .14), transparent 62%),
+        radial-gradient(900px 400px at 80% 120%, rgba(127, 182, 255, .07), transparent 60%);
     }
     .hero-inner { max-width: 780px; margin: 0 auto; text-align: center; }
     .hero h2 { font-size: 46px; line-height: 1.08; margin: 0 0 14px; letter-spacing: -1.4px; font-weight: 800; }
@@ -121,18 +125,18 @@
     /* ── Departures board ───────────────────────────────────────────────── */
     .body { max-width: 940px; margin: 0 auto; padding: 40px 24px 0; }
     .board-kicker {
-      font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 11.5px; letter-spacing: .26em;
-      color: var(--gold); text-transform: uppercase; margin: 0 0 12px; text-align: center;
+      font-family: var(--rt-font-mono); font-size: 11.5px; letter-spacing: .26em;
+      color: var(--rt-sodium-500); text-transform: uppercase; margin: 0 0 12px; text-align: center;
     }
     .board {
-      border: 1px solid #3a3222; border-radius: 12px; overflow: hidden;
+      border: 1px solid rgba(255, 157, 46, .22); border-radius: 12px; overflow: hidden;
       background: linear-gradient(180deg, #0d1015, #090b0f);
       box-shadow: inset 0 1px 0 #ffffff0d, inset 0 -30px 60px #0006, 0 22px 60px #0008;
     }
     .row {
       display: grid; grid-template-columns: 108px 1fr 152px; align-items: center; gap: 14px;
       padding: 16px 22px; border-bottom: 1px solid #1a1e26;
-      font-family: ui-monospace, "SF Mono", Menlo, monospace;
+      font-family: var(--rt-font-mono);
       transform-origin: top center; animation: flap .5s cubic-bezier(.2, .8, .3, 1) backwards;
     }
     @keyframes flap {
@@ -149,25 +153,27 @@
       background: #12161d; color: var(--muted); font-size: 10.5px;
       letter-spacing: .18em; text-transform: uppercase; padding: 10px 22px; animation-delay: 0s;
     }
-    .when { color: var(--gold); font-size: 13.5px; font-weight: 700; letter-spacing: .06em; text-shadow: 0 0 14px #f4c43055; }
-    .what { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; font-size: 15.5px; }
+    /* The glow rides the shared token (text-shadow shares box-shadow's
+       offset/blur/color grammar), so a palette change cannot strand it. */
+    .when { color: var(--rt-sodium-500); font-size: 13.5px; font-weight: 700; letter-spacing: .06em; text-shadow: var(--rt-glow-sodium); }
+    .what { font-family: var(--rt-font-ui); font-size: 15.5px; }
     .what b { font-weight: 700; }
     .what > span { display: block; color: var(--muted); font-size: 13px; margin-top: 3px; }
     .flag { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; text-align: right; color: var(--muted); }
-    .flag.on { color: var(--live); text-shadow: 0 0 12px #ff5a6766; }
+    .flag.on { color: var(--live); text-shadow: 0 0 12px rgba(255, 77, 99, .4); }
     .flag.on::before { content: "●"; margin-right: 6px; animation: blink 1.6s steps(1, end) infinite; }
     @keyframes blink { 50% { opacity: .2; } }
     .flag.auto { color: var(--ok); }
     .row.cta {
-      background: linear-gradient(90deg, #f4c4301a, #f4c4300a 60%, transparent);
-      padding: 22px; border-top: 1px solid #3a3222;
+      background: linear-gradient(90deg, rgba(255, 157, 46, .10), rgba(255, 157, 46, .04) 60%, transparent);
+      padding: 22px; border-top: 1px solid rgba(255, 157, 46, .22);
     }
     .row.cta .what { font-size: 17.5px; font-weight: 700; }
     /* The one honest limit on "one link", kept to a line so it informs without
        reading as a warning. Same sentence the Live Link panel already uses. */
     .cta-note {
       display: block; color: var(--muted); font-size: 12.5px; font-weight: 400; margin-top: 4px;
-      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      font-family: var(--rt-font-ui);
     }
 
     .themes-door { color: var(--muted); font-size: 13.5px; text-align: center; margin: 22px 0 0; }
@@ -178,7 +184,7 @@
     .foot .credit { margin-top: 9px; }
     .foot .credit a { color: var(--gold); }
     .foot .ver { margin-top: 6px; font-size: 12px; opacity: .7; }
-    .foot .ver a { color: var(--muted); font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+    .foot .ver a { color: var(--muted); font-family: var(--rt-font-mono); }
 
     @media (prefers-reduced-motion: reduce) {
       .rolling, .flag.on::before, .example-cap .dot, .row { animation: none; }

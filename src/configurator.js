@@ -75,6 +75,13 @@ export function buildOverlayQuery(formState = {}) {
     params.set('user', String(formState.user));
     if (formState.trains) params.set('trains', String(formState.trains));
     if (formState.upcoming) params.set('upcoming', String(formState.upcoming));
+    // The idle card's own knobs (per-Profile Live Link prefs, never per-train).
+    if (formState.uppos) params.set('uppos', String(formState.uppos));
+    if (formState.upstyle) params.set('upstyle', String(formState.upstyle));
+    for (const key of ['upop', 'upcycle', 'upscroll']) {
+      const value = formState[key];
+      if (value != null && String(value).trim() !== '') params.set(key, String(value));
+    }
   } else if (formState.source === 'manual') {
     const model = buildLineupModel(formState.manual || {});
     if (model) params.set('lineup', encodeLineup(model));

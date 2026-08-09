@@ -16,9 +16,12 @@ stamp. Fifteen themes, from Classic Americana to 16-bit pixel art to a rainbow P
 
 ## Quick start (OBS)
 
-1. **Open the [Configurator](https://goproslowyo.github.io/RaidTrainOverlay/configurator.html)
-   and type your Twitch username.** No sign-in — RaidPal's public profile is read by name.
-   Every raid train you've joined or organised appears under **My Raid Trains**.
+1. **Open the [Configurator](https://goproslowyo.github.io/RaidTrainOverlay/configurator.html).**
+   Your first visit is a three-stop setup: your Twitch username (no sign-in — RaidPal's
+   public profile is read by name), how the train should look, and putting it on your
+   stream. Every visit after that is one page with a **Simple / Everything** switch —
+   Simple is the five decisions that matter, Everything is the full app (My Raid Trains,
+   Presets, per-train Configs, One-off links).
 2. **Copy your Live Link** — one URL, keyed to your username, that always shows whichever
    train is live (or your next one). Set it in OBS once and never edit it per train.
    Prefer a link pinned to a single train? Hit **Configure** on that train and copy its link:
@@ -55,6 +58,20 @@ All optional, set as query params (the Configurator writes these for you):
 | `tz` | Up to three zones (e.g. `PT,ET,GMT`) for absolute times. |
 | `refresh` | Auto-refresh cadence in minutes (`0` = on load only). |
 | `hidefinished`, `enginedim` | Drop departed cars; how the loco behaves post-event. |
+
+Live Link URLs use `user` (a Twitch login the overlay resolves to the live-or-next train)
+instead of `event`, plus its own params — all written by the Configurator:
+
+| Param | Meaning |
+|---|---|
+| `user` | Twitch login; the overlay resolves your live (or next) train from RaidPal at load. |
+| `trains` | Per-train settings blob (each train's saved differences from your base look). |
+| `upcoming` | Between trains, list what's coming up: `3` (next 3), `2w` (2 weeks), `1m`, `all`. Omitted = fully transparent when idle. |
+| `upstyle` | The idle listing's footprint: `card` (default, three rows, pages through longer lists) or `ticker` (a one-line marquee). |
+| `uppos` | Where it sits in your scene: nine anchors, `tl`/`tc`/`tr`/`ml`/`mc`/`mr`/`bl`/`bc` (default)/`br`. |
+| `upop` | Its opacity, `0.3`–`1` (default `0.88`). |
+| `upcycle` | Seconds each page of three is held (default `12`). |
+| `upscroll` | Seconds per ticker lap (default `34`; higher is slower). |
 
 ## Self-hosting on GitHub Pages
 

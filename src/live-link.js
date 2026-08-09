@@ -109,15 +109,26 @@ export function shouldSelfReload({ loadedAt, now }) {
 /** The idle card never grows past this many rows — it must not creep up a stream. */
 export const CARD_MAX_ROWS = 3;
 
+/** How many CARD_MAX_ROWS pages a list needs — at least 1, so `% pages` is always safe. */
+export function upcomingPages(trains) {
+  return Math.max(1, Math.ceil(trains.length / CARD_MAX_ROWS));
+}
+
 /**
- * The card's visible window: everything when it fits, else a wrapped
- * CARD_MAX_ROWS slice starting at `offset` (any integer — normalized here),
- * so the card can slowly cycle through a long list at constant height.
+ * The card's visible window: everything when it fits, else the `offset`-th
+ * PAGE of CARD_MAX_ROWS (any integer — wrapped by page count here).
+ *
+ * Pages, not a sliding window: sliding by one wraps the end of the list
+ * around to the front (`7,8,1` then `8,1,2` with 8 trains), so a
+ * chronological list stopped reading chronologically twice per lap. Paging
+ * never wraps, gets through the list in ceil(n/3) steps instead of n, and —
+ * at a longer hold — leaves each train on screen about as long as before.
  */
 export function visibleUpcoming(trains, offset) {
   if (trains.length <= CARD_MAX_ROWS) return [...trains];
-  const start = ((offset % trains.length) + trains.length) % trains.length;
-  return Array.from({ length: CARD_MAX_ROWS }, (_, i) => trains[(start + i) % trains.length]);
+  const pages = upcomingPages(trains);
+  const page = ((offset % pages) + pages) % pages;
+  return trains.slice(page * CARD_MAX_ROWS, page * CARD_MAX_ROWS + CARD_MAX_ROWS);
 }
 
 // A mapping entry may only tune settings — never re-point the Overlay at a

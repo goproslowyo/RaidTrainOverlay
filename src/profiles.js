@@ -104,19 +104,42 @@ export function activeProfile(store) {
 }
 
 /**
- * The Profile's Live Link preferences — currently just the idle card's
- * `upcoming` horizon (`'3'`, `'2w'`, `'1m'`, `'all'`, or null for "no card").
- * It lives on the Profile, not in the URL alone, so the Live Link panel
- * regenerates the SAME URL on every visit; a Profile written before this field
- * existed reads as "no card".
+ * The Profile's Live Link preferences — the idle card's `upcoming` horizon
+ * (`'3'`, `'2w'`, `'1m'`, `'all'`, or null for "no card") plus the card's own
+ * knobs (`uppos`, `upop`, `upcycle`, `upscroll`, `upstyle` — null means "the
+ * Overlay's default, omit from the URL"). These are per-Profile, NOT per-train:
+ * the idle state exists outside any single raid train, so it never enters the
+ * Preset/override model. They live on the Profile, not in the URL alone, so
+ * the Live Link panel regenerates the SAME URL on every visit; a Profile
+ * written before a field existed reads as its default.
  */
 export function liveLinkPrefs(store, login) {
-  return { upcoming: null, ...(store.profiles[normalizeLogin(login)]?.liveLink ?? {}) };
+  return {
+    upcoming: null, uppos: null, upop: null, upcycle: null, upscroll: null, upstyle: null,
+    ...(store.profiles[normalizeLogin(login)]?.liveLink ?? {}),
+  };
 }
 
 /** Set the Profile's Live Link preferences (merged over what's there). */
 export function setLiveLinkPrefs(store, login, prefs) {
   return withProfile(store, login, (p) => ({ ...p, liveLink: { ...(p.liveLink ?? {}), ...prefs } }));
+}
+
+/**
+ * Has this Profile been through (or skipped) first-run setup? A persisted
+ * per-Profile flag — deliberately NOT inferred from "has any Raid Train
+ * Config": the flag is set exactly once, by finishing or skipping the setup
+ * journey, so it can never reappear for a Profile that has seen it.
+ * A Profile written before the field existed reads as not-set-up (the setup
+ * journey shows once after this ships — an accepted one-time cost).
+ */
+export function isSetupDone(store, login) {
+  return store.profiles[normalizeLogin(login)]?.setupDone === true;
+}
+
+/** Mark the Profile as set up (finishing or skipping the setup journey). */
+export function markSetupDone(store, login) {
+  return withProfile(store, login, (p) => ({ ...p, setupDone: true }));
 }
 
 /** Set (or clear, with null) a Profile's default Preset reference. */

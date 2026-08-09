@@ -6,7 +6,7 @@ import {
   setDefaultPreset, addSpotlight, removeSpotlight,
   upsertTrainConfig, deleteTrainConfig, getTrainConfig, isEmptyTrainConfig,
   resolveTrainSettings, countPresetReferences, materializePreset,
-  liveLinkPrefs, setLiveLinkPrefs, pruneOrphanedConfigs, restoreTrainConfigs,
+  liveLinkPrefs, setLiveLinkPrefs, isSetupDone, markSetupDone, pruneOrphanedConfigs, restoreTrainConfigs,
 } from '../src/profiles.js';
 import { createPreset } from '../src/preset-library.js';
 
@@ -96,18 +96,52 @@ test('countPresetReferences ignores a Preset no Config reaches', () => {
   assert.deepEqual(countPresetReferences(store, 'id-other'), { configs: 0, defaults: 0 });
 });
 
+// Every Live Link preference, all defaulting to null — "the Overlay's own
+// default, omit from the URL".
+const DEFAULT_PREFS = {
+  upcoming: null, uppos: null, upop: null, upcycle: null, upscroll: null, upstyle: null,
+};
+
 test('liveLinkPrefs round-trips the idle-card horizon, and defaults to no card', () => {
   let store = addProfile(EMPTY, 'alpha');
-  assert.deepEqual(liveLinkPrefs(store, 'alpha'), { upcoming: null });
+  assert.deepEqual(liveLinkPrefs(store, 'alpha'), DEFAULT_PREFS);
   store = setLiveLinkPrefs(store, 'alpha', { upcoming: '2w' });
-  assert.deepEqual(liveLinkPrefs(store, 'ALPHA'), { upcoming: '2w' });
+  assert.deepEqual(liveLinkPrefs(store, 'ALPHA'), { ...DEFAULT_PREFS, upcoming: '2w' });
   store = setLiveLinkPrefs(store, 'alpha', { upcoming: null });
   assert.equal(liveLinkPrefs(store, 'alpha').upcoming, null);
   // A Profile written before the field existed reads as "no card", never a throw.
   const legacy = { active: 'beta', profiles: { beta: { spotlight: [], defaultPresetId: null, trains: {} } } };
-  assert.deepEqual(liveLinkPrefs(legacy, 'beta'), { upcoming: null });
-  assert.deepEqual(liveLinkPrefs(legacy, 'nobody'), { upcoming: null });
+  assert.deepEqual(liveLinkPrefs(legacy, 'beta'), DEFAULT_PREFS);
+  assert.deepEqual(liveLinkPrefs(legacy, 'nobody'), DEFAULT_PREFS);
   assert.equal(setLiveLinkPrefs(legacy, 'beta', { upcoming: 'all' }).profiles.beta.liveLink.upcoming, 'all');
+});
+
+test('liveLinkPrefs carries the idle-card knobs, merged per-key', () => {
+  let store = addProfile(EMPTY, 'alpha');
+  store = setLiveLinkPrefs(store, 'alpha', { upcoming: '3', uppos: 'tr', upop: '0.6' });
+  store = setLiveLinkPrefs(store, 'alpha', { upstyle: 'ticker', upscroll: '44' });
+  assert.deepEqual(liveLinkPrefs(store, 'alpha'), {
+    upcoming: '3', uppos: 'tr', upop: '0.6', upcycle: null, upscroll: '44', upstyle: 'ticker',
+  });
+  // Clearing one knob leaves the others standing.
+  store = setLiveLinkPrefs(store, 'alpha', { uppos: null });
+  assert.equal(liveLinkPrefs(store, 'alpha').uppos, null);
+  assert.equal(liveLinkPrefs(store, 'alpha').upstyle, 'ticker');
+});
+
+test('setup flag: unset for new and legacy Profiles, sticky once marked', () => {
+  let store = addProfile(EMPTY, 'alpha');
+  assert.equal(isSetupDone(store, 'alpha'), false);
+  assert.equal(isSetupDone(store, 'nobody'), false);
+  store = markSetupDone(store, 'ALPHA');
+  assert.equal(isSetupDone(store, 'alpha'), true);
+  assert.equal(isSetupDone(store, 'ALPHA'), true);
+  // Marking an unknown Profile is a silent no-op, like every other write here.
+  assert.deepEqual(markSetupDone(store, 'nobody'), store);
+  // A legacy Profile without the field reads as not-set-up (the setup journey shows once).
+  const legacy = { active: 'beta', profiles: { beta: { spotlight: [], defaultPresetId: null, trains: {} } } };
+  assert.equal(isSetupDone(legacy, 'beta'), false);
+  assert.equal(isSetupDone(markSetupDone(legacy, 'beta'), 'beta'), true);
 });
 
 test('addSpotlight builds the standing promote list, deduped case-insensitively; removeSpotlight drops', () => {

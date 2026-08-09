@@ -7,29 +7,77 @@
  * adopts the Configurator's tokens and primitives — and a copy of them is not
  * an adoption, it is the same drift with a later start date.
  *
+ * The palette is the Configurator-v2 redesign's warm sodium system, copied
+ * verbatim from the Claude Design project ("App redesign for simplicity",
+ * `_ds/raidtrainoverlay-design-system-5136b464`). It replaces the original
+ * blue/gold (`--accent:#57b6ff`, `--gold:#f4c430`) app-wide — the decision the
+ * v2 port made explicit.
+ *
  * ONLY the token block lives here, deliberately. Every page keeps its own
  * inline `<style>` for its own layout: this is a shared vocabulary, not a
  * framework, and there is no build step to make a bigger one safe.
  *
+ * The legacy names (--bg, --panel, --accent, --gold, …) are aliases onto the
+ * sodium tokens so pages written against the old vocabulary reskin instead of
+ * drifting. New styling should use the --rt-* names.
+ *
  * preview.html is NOT on these tokens. Its palette diverges on purpose — a
- * dimmer `--bg` and `--accent: #9ad` against the Configurator's `#57b6ff` —
- * and pulling it in would restyle a page nobody asked to restyle. It is the
- * remaining known drift, and it is a smaller one than the two pages that are
- * supposed to look like a single product.
+ * dimmer `--bg` and `--accent: #9ad` — and pulling it in would restyle a page
+ * nobody asked to restyle. It is the remaining known drift, and it is a
+ * smaller one than the two pages that are supposed to look like one product.
  */
 :root {
-  --bg: #0f1216;
-  --panel: #191e25;
-  --panel-2: #222834;
-  --panel-3: #2a3140;
-  --ink: #e7ecf3;
-  --muted: #96a2b4;
-  --line: #2b313c;
-  --accent: #57b6ff;
-  --accent-dim: #9ad;
-  --gold: #f4c430;
-  --live: #ff5a67;
-  --ok: #5ed18a;
-  --warn: #ffb454;
-  --bad: #ff6b6b;
+  /* ── Sodium design-system tokens (verbatim from the design project) ── */
+  --rt-font-ui: "Public Sans", "Helvetica Neue", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --rt-font-mono: "DM Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  --rt-void: #07090D; --rt-base: #0C1016; --rt-well: #080B10;
+  --rt-surface: #141A22; --rt-surface-2: #1C2430; --rt-surface-3: #28323F;
+  --rt-line: #242D39; --rt-line-strong: #38424F;
+  --rt-ink: #EDF1F7; --rt-ink-2: #9BA7B8; --rt-ink-3: #697686;
+
+  --rt-sodium-100: #FFE7C6; --rt-sodium-300: #FFC578; --rt-sodium-500: #FF9D2E;
+  --rt-sodium-600: #EF7C12; --rt-sodium-700: #A9530B;
+  --rt-sodium-tint: rgba(255, 157, 46, .10); --rt-sodium-edge: rgba(255, 157, 46, .34);
+  --rt-on-sodium: #180D01;
+
+  --rt-accent: var(--rt-sodium-500); --rt-accent-hover: var(--rt-sodium-300);
+  --rt-accent-press: var(--rt-sodium-600); --rt-accent-tint: var(--rt-sodium-tint);
+  --rt-accent-edge: var(--rt-sodium-edge); --rt-on-accent: var(--rt-on-sodium);
+
+  --rt-live: #FF4D63; --rt-live-tint: rgba(255, 77, 99, .10); --rt-live-edge: rgba(255, 77, 99, .34);
+  --rt-ok: #43D48D;   --rt-ok-tint: rgba(67, 212, 141, .10); --rt-ok-edge: rgba(67, 212, 141, .30);
+  --rt-warn: #FFD166; --rt-warn-tint: rgba(255, 209, 102, .10); --rt-warn-edge: rgba(255, 209, 102, .30);
+  --rt-danger: #FF6B6B; --rt-danger-tint: rgba(255, 107, 107, .10); --rt-danger-edge: rgba(255, 107, 107, .34);
+  --rt-override: #A78BFA; --rt-override-tint: rgba(167, 139, 250, .11); --rt-override-edge: rgba(167, 139, 250, .34);
+  --rt-info: #7FB6FF; --rt-info-tint: rgba(127, 182, 255, .10); --rt-info-edge: rgba(127, 182, 255, .30);
+  --rt-focus: var(--rt-sodium-300);
+
+  --rt-shadow-sm: 0 1px 2px rgba(0, 0, 0, .4);
+  --rt-shadow-md: 0 10px 28px rgba(0, 0, 0, .55);
+  --rt-shadow-lg: 0 22px 60px rgba(0, 0, 0, .62);
+  --rt-glow-sodium: 0 0 30px rgba(255, 157, 46, .22);
+  --rt-glow-live: 0 0 26px rgba(255, 77, 99, .20);
+  --rt-ring: 0 0 0 2px var(--rt-focus);
+
+  --rt-radius-xs: 4px; --rt-radius-sm: 7px; --rt-radius-md: 10px;
+  --rt-radius-lg: 14px; --rt-radius-xl: 20px; --rt-radius-pill: 999px;
+  --rt-shell-max: 1240px; --rt-side-width: 224px; --rt-gutter: 28px;
+  --rt-control-h: 38px; --rt-control-h-sm: 30px;
+
+  /* ── Legacy aliases (pre-v2 vocabulary) → sodium ── */
+  --bg: var(--rt-base);
+  --panel: var(--rt-surface);
+  --panel-2: var(--rt-surface-2);
+  --panel-3: var(--rt-surface-3);
+  --ink: var(--rt-ink);
+  --muted: var(--rt-ink-2);
+  --line: var(--rt-line);
+  --accent: var(--rt-accent);
+  --accent-dim: var(--rt-sodium-300);
+  --gold: var(--rt-sodium-500);
+  --live: var(--rt-live);
+  --ok: var(--rt-ok);
+  --warn: var(--rt-warn);
+  --bad: var(--rt-danger);
 }

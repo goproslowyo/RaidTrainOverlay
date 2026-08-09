@@ -166,12 +166,20 @@ export function buildLiveLink(library, store, login, when = {}) {
   const map = buildTrainMap(library, store, login, when);
   const trainCount = Object.keys(map).length;
   const blob = trainCount > 0 ? encodeTrainMap(map) : '';
+  // The idle-card knobs: null prefs stay absent so the Overlay's own defaults
+  // apply and the copy-once URL stays lean.
+  const prefs = profile.liveLink ?? {};
+  const idleKnobs = {};
+  for (const knob of ['uppos', 'upop', 'upcycle', 'upscroll', 'upstyle']) {
+    if (prefs[knob] != null) idleKnobs[knob] = prefs[knob];
+  }
   return {
     query: buildOverlayQuery({
       ...baseSettings(library, store, login),
       user: key,
       trains: blob,
-      upcoming: profile.liveLink?.upcoming ?? '',
+      upcoming: prefs.upcoming ?? '',
+      ...idleKnobs,
       spotlight: (profile.spotlight ?? []).join(','),
     }),
     trainCount,

@@ -4,6 +4,39 @@ All notable changes to RaidTrainOverlay are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and the project follows
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+The Configurator grew up into two ages of one app. A first visit is a three-stop
+journey — who's streaming, how it looks, put it on your stream — and every visit
+after that is a single page with a **Simple / Everything** switch: Simple is five
+decisions with a live preview, Everything is the full app you already know. The
+whole product also moved to the redesign's warm **sodium** palette, landing page
+included.
+
+### Added
+- **First-run setup.** Three stops to a working Live Link. Finishing (or
+  skipping) is remembered per Profile, so the journey never reappears — it can
+  be re-run any time from the top bar.
+- **Simple view.** The five decisions that matter — theme, cadence, size, open
+  slots, played cars — editing your default Preset directly, beside a live
+  preview, your Live Link, and an illustrated 30-second OBS walk-through.
+- **The idle card is now yours to place.** New Live Link settings for the
+  between-trains card: a 9-position anchor in your scene (`uppos`), opacity
+  (`upop`), how long each page holds (`upcycle`), and a one-line ticker
+  footprint (`upstyle`, `upscroll`) for scenes with no room for a card. They
+  are per-Profile — the idle state belongs to the Live Link, not to any single
+  train — and ride the URL like every other setting.
+
+### Changed
+- **Sodium palette, app-wide.** The Configurator and landing page adopt the
+  redesign's warm sodium tokens (shared via `assets/app.css`), replacing the
+  blue/gold set. `preview.html` keeps its own palette, as before.
+- **The idle card pages instead of sliding.** With 8 trains the old
+  one-row-at-a-time window wrapped the list (`7, 8, 1`), so a chronological
+  list stopped reading chronologically twice per lap. It now pages three at a
+  time — every page chronological, the whole list shown per lap — holding each
+  page 12s by default.
+
 ## [0.8.0] - 2026-08-08
 
 RaidPal now knows who you are. Instead of building an overlay URL per event, you

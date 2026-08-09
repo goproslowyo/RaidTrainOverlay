@@ -5,3 +5,6 @@ _*.html
 # Architecture decision records — kept out of the published repo (headed for the
 # project wiki). CONTEXT.md carries the domain model that ships.
 docs/adr/
+# Impeccable working artifacts (review screenshots are transient; DESIGN.md and
+# the design.json sidecar ship).
+.impeccable/review/

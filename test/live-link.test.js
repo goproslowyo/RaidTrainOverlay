@@ -157,20 +157,37 @@ test('shouldSelfReload: only when idle AND the page is over an hour old', () => 
   assert.equal(IDLE_RELOAD_MS, 60 * MIN);
 });
 
-// ---- card window rotation (many upcoming trains must not grow the card) ----
+// ---- card paging (many upcoming trains must not grow the card) ----
 
-import { visibleUpcoming, CARD_MAX_ROWS } from '../src/live-link.js';
+import { visibleUpcoming, upcomingPages, CARD_MAX_ROWS } from '../src/live-link.js';
 
-test('visibleUpcoming shows everything when it fits — no rotation needed', () => {
+test('visibleUpcoming shows everything when it fits — no paging needed', () => {
   assert.equal(CARD_MAX_ROWS, 3);
   assert.deepEqual(visibleUpcoming(UP.slice(0, 2), 0).map((e) => e.slug), ['a', 'b']);
   assert.deepEqual(visibleUpcoming(UP.slice(0, 3), 7).map((e) => e.slug), ['a', 'b', 'c']);
 });
 
-test('visibleUpcoming slides a wrapped 3-row window by the offset', () => {
+test('visibleUpcoming pages by CARD_MAX_ROWS — never a wrapped window', () => {
+  // PAGES, not a sliding window: sliding by one wraps the end of the list
+  // around to the front (`7,8,1` then `8,1,2` with 8 trains), so a
+  // chronological list stops reading chronologically twice per lap.
   assert.deepEqual(visibleUpcoming(UP, 0).map((e) => e.slug), ['a', 'b', 'c']);
-  assert.deepEqual(visibleUpcoming(UP, 1).map((e) => e.slug), ['b', 'c', 'd']);
-  assert.deepEqual(visibleUpcoming(UP, 2).map((e) => e.slug), ['c', 'd', 'a']);
-  // The offset itself wraps: any integer is safe to feed back in forever.
-  assert.deepEqual(visibleUpcoming(UP, 4).map((e) => e.slug), ['a', 'b', 'c']);
+  assert.deepEqual(visibleUpcoming(UP, 1).map((e) => e.slug), ['d']);
+  // The offset wraps by page count: any integer is safe to feed back in forever.
+  assert.deepEqual(visibleUpcoming(UP, 2).map((e) => e.slug), ['a', 'b', 'c']);
+  assert.deepEqual(visibleUpcoming(UP, -1).map((e) => e.slug), ['d']);
+});
+
+test('visibleUpcoming with 8 trains: 3 chronological pages, every train shown once per lap', () => {
+  const eight = Array.from({ length: 8 }, (_, i) => summary(`t${i + 1}`, `2026-08-1${i}T00:00:00Z`, `2026-08-1${i}T06:00:00Z`));
+  assert.equal(upcomingPages(eight), 3);
+  assert.deepEqual(visibleUpcoming(eight, 0).map((e) => e.slug), ['t1', 't2', 't3']);
+  assert.deepEqual(visibleUpcoming(eight, 1).map((e) => e.slug), ['t4', 't5', 't6']);
+  assert.deepEqual(visibleUpcoming(eight, 2).map((e) => e.slug), ['t7', 't8']);
+});
+
+test('upcomingPages is at least 1, even for an empty or short list', () => {
+  assert.equal(upcomingPages([]), 1);
+  assert.equal(upcomingPages(UP.slice(0, 2)), 1);
+  assert.equal(upcomingPages(UP), 2);
 });

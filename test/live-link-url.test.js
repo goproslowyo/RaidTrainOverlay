@@ -91,6 +91,28 @@ test('no idle preference means no upcoming param — the card stays off', () => 
   assert.ok(!new URLSearchParams(buildLiveLinkQuery(library, store, 'gostreamcore')).has('upcoming'));
 });
 
+test('the idle-card knobs ride the Live Link when set, and vanish at defaults', () => {
+  const { library, store } = fixture();
+  let s = setLiveLinkPrefs(store, 'gostreamcore', {
+    upcoming: '5', uppos: 'tr', upop: '0.6', upcycle: '8', upscroll: '44', upstyle: 'ticker',
+  });
+  const config = parseConfig(buildLiveLinkQuery(library, s, 'gostreamcore'));
+  assert.equal(config.uppos, 'tr');
+  assert.equal(config.upop, 0.6);
+  assert.equal(config.upcycle, 8);
+  assert.equal(config.upscroll, 44);
+  assert.equal(config.upstyle, 'ticker');
+  // Null prefs (the stored default) emit nothing — the copy-once URL stays lean.
+  const bare = new URLSearchParams(buildLiveLinkQuery(library, store, 'gostreamcore'));
+  for (const key of ['uppos', 'upop', 'upcycle', 'upscroll', 'upstyle']) {
+    assert.ok(!bare.has(key), `${key} must be absent by default`);
+  }
+  // So do prefs explicitly set TO the Overlay default value.
+  const atDefaults = setLiveLinkPrefs(store, 'gostreamcore', { uppos: 'bc', upstyle: 'card' });
+  const q = new URLSearchParams(buildLiveLinkQuery(library, atDefaults, 'gostreamcore'));
+  assert.ok(!q.has('uppos') && !q.has('upstyle'));
+});
+
 test('an unknown or blank login has no Live Link', () => {
   const { library, store } = fixture();
   assert.equal(buildLiveLinkQuery(library, store, 'someone-else'), '');

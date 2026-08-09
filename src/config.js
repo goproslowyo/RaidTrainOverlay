@@ -117,6 +117,9 @@ function upcomingSpec(raw) {
 
 const UPCOMING_SUFFIX = { count: '', weeks: 'w', months: 'm' };
 
+/** The idle card's nine scene anchors: [top|middle|bottom] × [left|centre|right]. */
+const UPPOS_ANCHORS = ['tl', 'tc', 'tr', 'ml', 'mc', 'mr', 'bl', 'bc', 'br'];
+
 /** Old Theme keys that map to a current one (the mockup's `neon` → `synthwave`). */
 const THEME_ALIASES = { neon: 'synthwave', smoke: 'highvibes', coltrane: 'jazz', shinkansen: 'bullet', lavalamp: 'lava' };
 
@@ -139,6 +142,21 @@ export function parseConfig(queryString) {
     user: user === '' ? null : user,
     trains: trains === '' ? null : trains,
     upcoming: upcomingSpec(params.get('upcoming')),
+    // The idle card's own knobs (Live Link only, like `upcoming`). `uppos`
+    // anchors the card in the scene — deliberately decoupled from the Train's
+    // `height`: a webcam, chat box or alert layer decides where it can sit.
+    // Default bottom-centre, the closest anchor to the shipped placement.
+    uppos: oneOf(params.get('uppos'), UPPOS_ANCHORS, 'bc'),
+    // Card opacity. Floor 0.3: below that the card is unreadable-but-present,
+    // which reads on stream as a rendering bug rather than a choice.
+    upop: boundedNumber(params.get('upop'), 0.3, 1, 0.88),
+    // Seconds each page of rows is held before paging on (card style only).
+    upcycle: boundedNumber(params.get('upcycle'), 3, 120, 12),
+    // Seconds for one full marquee lap (ticker style only); higher is slower.
+    upscroll: boundedNumber(params.get('upscroll'), 10, 120, 34),
+    // The card's footprint: a 3-row card, or a one-line ticker for scenes
+    // with no room for a card.
+    upstyle: oneOf(params.get('upstyle'), ['card', 'ticker'], 'card'),
     // The display locale, kept as the raw requested tag (or null). Resolution to
     // a supported locale + the navigator fallback happen in the overlay shell so
     // parseConfig stays pure (no `navigator`); the Configurator's selector sets it.
@@ -204,6 +222,13 @@ export function serializeConfig(config) {
     if (config.upcoming) {
       params.set('upcoming', config.upcoming.kind === 'all' ? 'all' : `${config.upcoming.n}${UPCOMING_SUFFIX[config.upcoming.kind]}`);
     }
+    // The idle-card knobs ride only with a Live Link — without `user=` there
+    // is no idle state for them to describe.
+    if (config.uppos !== 'bc') params.set('uppos', config.uppos);
+    if (config.upop !== 0.88) params.set('upop', String(config.upop));
+    if (config.upcycle !== 12) params.set('upcycle', String(config.upcycle));
+    if (config.upscroll !== 34) params.set('upscroll', String(config.upscroll));
+    if (config.upstyle !== 'card') params.set('upstyle', config.upstyle);
   } else if (config.event) params.set('event', config.event);
   else if (config.lineup) params.set('lineup', config.lineup);
   // Locale: emit whenever explicitly set. Even `lang=en` is semantically

@@ -25,7 +25,8 @@ test('parseConfig ignores unknown and malformed params', () => {
   const config = parseConfig('?event=trainwreck-lucky-13&bogus=1&%%%');
   assert.equal(config.event, 'trainwreck-lucky-13');
   assert.deepEqual(Object.keys(config), [
-    'event', 'lineup', 'user', 'trains', 'upcoming', 'lang', 'mode', 'interval', 'speed', 'track', 'trackfadein', 'trackfadeout', 'scale',
+    'event', 'lineup', 'user', 'trains', 'upcoming', 'uppos', 'upop', 'upcycle', 'upscroll', 'upstyle',
+    'lang', 'mode', 'interval', 'speed', 'track', 'trackfadein', 'trackfadeout', 'scale',
     'openslots', 'spotlight', 'tz', 'height', 'hidefinished', 'enginedim', 'refresh', 'theme',
   ]);
 });
@@ -379,4 +380,79 @@ test('serialize∘parse round-trips upcoming=', () => {
     assert.equal(new URLSearchParams(q).get('upcoming'), v, v);
   }
   assert.equal(new URLSearchParams(serializeConfig(parseConfig('?user=x'))).get('upcoming'), null);
+});
+
+// ---- Live Link idle-card params (uppos / upop / upcycle / upscroll / upstyle) ----
+
+test('parseConfig reads uppos as a 9-anchor enum, defaulting to bottom-centre', () => {
+  // Where the idle card sits in the scene: [tmb][lcr]. Decoupled from the
+  // Train's own position — a webcam or chat box decides this, not the Train.
+  assert.equal(parseConfig('?user=x').uppos, 'bc');
+  for (const anchor of ['tl', 'tc', 'tr', 'ml', 'mc', 'mr', 'bl', 'bc', 'br']) {
+    assert.equal(parseConfig(`?user=x&uppos=${anchor}`).uppos, anchor, anchor);
+  }
+  assert.equal(parseConfig('?user=x&uppos=TL').uppos, 'tl');
+  assert.equal(parseConfig('?user=x&uppos=middle').uppos, 'bc');
+  assert.equal(parseConfig('?user=x&uppos=').uppos, 'bc');
+});
+
+test('parseConfig reads upop as card opacity 0.3..1, defaulting to 0.88', () => {
+  assert.equal(parseConfig('?user=x').upop, 0.88);
+  assert.equal(parseConfig('?user=x&upop=0.5').upop, 0.5);
+  assert.equal(parseConfig('?user=x&upop=1').upop, 1);
+  assert.equal(parseConfig('?user=x&upop=0.3').upop, 0.3);
+  // Below the floor the card would be unreadable-but-present; fall back.
+  assert.equal(parseConfig('?user=x&upop=0.1').upop, 0.88);
+  assert.equal(parseConfig('?user=x&upop=2').upop, 0.88);
+  assert.equal(parseConfig('?user=x&upop=solid').upop, 0.88);
+});
+
+test('parseConfig reads upcycle as seconds per page 3..120, defaulting to 12', () => {
+  assert.equal(parseConfig('?user=x').upcycle, 12);
+  assert.equal(parseConfig('?user=x&upcycle=7').upcycle, 7);
+  assert.equal(parseConfig('?user=x&upcycle=3').upcycle, 3);
+  assert.equal(parseConfig('?user=x&upcycle=120').upcycle, 120);
+  assert.equal(parseConfig('?user=x&upcycle=1').upcycle, 12);
+  assert.equal(parseConfig('?user=x&upcycle=0').upcycle, 12);
+  assert.equal(parseConfig('?user=x&upcycle=forever').upcycle, 12);
+});
+
+test('parseConfig reads upscroll as marquee lap seconds 10..120, defaulting to 34', () => {
+  assert.equal(parseConfig('?user=x').upscroll, 34);
+  assert.equal(parseConfig('?user=x&upscroll=20').upscroll, 20);
+  assert.equal(parseConfig('?user=x&upscroll=10').upscroll, 10);
+  assert.equal(parseConfig('?user=x&upscroll=120').upscroll, 120);
+  assert.equal(parseConfig('?user=x&upscroll=5').upscroll, 34);
+  assert.equal(parseConfig('?user=x&upscroll=slow').upscroll, 34);
+});
+
+test('parseConfig reads upstyle as card|ticker, defaulting to card', () => {
+  assert.equal(parseConfig('?user=x').upstyle, 'card');
+  assert.equal(parseConfig('?user=x&upstyle=ticker').upstyle, 'ticker');
+  assert.equal(parseConfig('?user=x&upstyle=TICKER').upstyle, 'ticker');
+  assert.equal(parseConfig('?user=x&upstyle=banner').upstyle, 'card');
+});
+
+test('serializeConfig emits idle-card params only under user= and only off-default', () => {
+  // Defaults vanish — the copy-once URL stays minimal.
+  assert.equal(serializeConfig(parseConfig('?user=x&uppos=bc&upop=0.88&upcycle=12&upscroll=34&upstyle=card')), 'user=x');
+  const q = new URLSearchParams(serializeConfig(parseConfig('?user=x&uppos=tr&upop=0.5&upcycle=8&upscroll=20&upstyle=ticker')));
+  assert.equal(q.get('uppos'), 'tr');
+  assert.equal(q.get('upop'), '0.5');
+  assert.equal(q.get('upcycle'), '8');
+  assert.equal(q.get('upscroll'), '20');
+  assert.equal(q.get('upstyle'), 'ticker');
+  // The idle card is a Live Link feature: without user= these params say nothing.
+  assert.equal(serializeConfig(parseConfig('?event=x&uppos=tr&upstyle=ticker')), 'event=x');
+});
+
+test('serialize∘parse round-trips the idle-card params', () => {
+  for (const query of [
+    'user=x&uppos=tl&upstyle=ticker&upscroll=44',
+    'user=x&upop=0.6&upcycle=9',
+    'user=x&uppos=mr&upop=0.3&upcycle=120&upscroll=10&upstyle=ticker',
+  ]) {
+    const parsed = parseConfig(query);
+    assert.deepEqual(parseConfig(serializeConfig(parsed)), parsed, `round-trip failed for: ${query}`);
+  }
 });
