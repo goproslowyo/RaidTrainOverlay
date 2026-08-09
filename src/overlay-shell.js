@@ -9,7 +9,7 @@ import { parseConfig } from './config.js';
 import { startEventFeed } from './event-feed.js';
 import { startLiveLinkFeed } from './live-link-feed.js';
 import { filterUpcoming, shouldSelfReload } from './live-link.js';
-import { renderUpcomingCard } from './upcoming-card.js';
+import { renderUpcomingCard, retireUpcomingCard } from './upcoming-card.js';
 import { buildTrain } from './lineup-engine.js';
 import { renderTrain, SHIPPED_THEMES } from './train-renderer.js';
 import { DEMO_SLUG, DEMO_SPOTLIGHT, makeDemoEvent } from './demo-event.js';
@@ -121,7 +121,14 @@ if (!config.event && !config.lineup && !config.user) {
       },
       onEvent(event) {
         current = { event, view: null };
-        render();
+        // Retire any idle-card state FIRST, every time: it cancels pending
+        // dissolve/mount timers (which would wipe or cover the Train after it
+        // renders) and starts a standing panel's exit fade — the same manners
+        // as the Train dissolving before the panel (upcoming-card.js). The
+        // returned wait is that farewell; 0 means render right now.
+        const wait = retireUpcomingCard(container);
+        if (wait > 0) setTimeout(render, wait);
+        else render();
       },
       onIdle({ upcoming }) {
         // Nothing live and nothing near departure. Idle is the ONLY safe

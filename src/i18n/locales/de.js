@@ -227,6 +227,7 @@ export default {
   'configurator.llUpOnlyCopy': 'Link für anstehende Züge kopieren',
   'configurator.llIdleCardTitle': 'Die Karte der anstehenden Züge',
   'configurator.idleSharedNote': 'Eine Karte, beide Links: der Live-Link zeigt sie, wenn kein Zug läuft, der Link für anstehende Züge zeigt sie durchgehend. Hier einmal gestalten.',
+  'configurator.foldClose': 'Einklappen',
   'configurator.llUpOnlySub': 'Ein zweiter Link für eine separate OBS-Szene (gleich geht’s los, bin gleich zurück): Er zeigt immer deine anstehenden Züge — auch während einer live ist — und nie den Zug selbst. Gleiche Einstellungen wie die Karte oben.',
   'configurator.llUpOnlyAria': 'URL für anstehende Züge',
   'configurator.horizon3': 'Nächste 3 Züge',

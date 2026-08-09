@@ -227,6 +227,7 @@ export default {
   'configurator.llUpOnlyCopy': 'Kopiér link til kommende tog',
   'configurator.llIdleCardTitle': 'Kortet med kommende tog',
   'configurator.idleSharedNote': 'Ét kort, begge links: Live Link viser det, når intet tog kører, og linket til kommende tog viser det hele tiden. Stil det én gang her.',
+  'configurator.foldClose': 'Fold sammen',
   'configurator.llUpOnlySub': 'Et ekstra link til en separat OBS-scene (starter snart, er straks tilbage): viser altid dine kommende tog — også mens ét er live — og aldrig selve toget. Samme indstillinger som kortet ovenfor.',
   'configurator.llUpOnlyAria': 'URL til kommende tog',
   'configurator.horizon3': 'Næste 3 tog',

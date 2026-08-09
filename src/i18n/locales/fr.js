@@ -227,6 +227,7 @@ export default {
   'configurator.llUpOnlyCopy': 'Copier le lien des prochains trains',
   'configurator.llIdleCardTitle': 'La carte des prochains trains',
   'configurator.idleSharedNote': 'Une carte, deux liens : le Lien Live l’affiche quand aucun train n’est en direct, et le lien des prochains trains l’affiche en permanence. Style-la une fois ici.',
+  'configurator.foldClose': 'Replier',
   'configurator.llUpOnlySub': 'Un second lien pour une scène OBS à part (ça commence bientôt, je reviens) : il montre toujours tes prochains trains — même pendant un direct — et jamais le train lui-même. Mêmes réglages que la carte ci-dessus.',
   'configurator.llUpOnlyAria': 'URL des prochains trains',
   'configurator.horizon3': '3 prochains trains',

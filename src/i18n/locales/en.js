@@ -215,6 +215,7 @@ export default {
   'configurator.llUpOnlyCopy': 'Copy upcoming link',
   'configurator.llIdleCardTitle': 'The upcoming-trains card',
   'configurator.idleSharedNote': 'One card, both links: the Live Link shows it while no train is live, and the upcoming-trains link shows it all the time. Style it once here.',
+  'configurator.foldClose': 'Collapse',
   'configurator.llUpOnlySub': 'A second link for a separate OBS scene (starting soon, be right back): it always shows your upcoming trains — even while one is live — and never the train itself. Same idle-card settings as above.',
   'configurator.llUpOnlyAria': 'Upcoming-trains URL',
   'configurator.horizon3': 'Next 3 trains',

@@ -241,6 +241,7 @@ export default {
   'configurator.llUpOnlyCopy': 'Kopijuoti traukinių nuorodą',
   'configurator.llIdleCardTitle': 'Artėjančių traukinių kortelė',
   'configurator.idleSharedNote': 'Viena kortelė, abi nuorodos: Tiesioginė nuoroda ją rodo, kai joks traukinys nevyksta, o artėjančių traukinių nuoroda — visą laiką. Sustilizuok ją čia vieną kartą.',
+  'configurator.foldClose': 'Suskleisti',
   'configurator.llUpOnlySub': 'Antra nuoroda atskirai OBS scenai (tuoj pradedam, tuoj grįšiu): joje visada rodomi artėjantys traukiniai — net kai vienas transliuojamas gyvai — ir niekada pats traukinys. Tie patys nustatymai kaip kortelėje aukščiau.',
   'configurator.llUpOnlyAria': 'Artėjančių traukinių URL',
   'configurator.horizon3': 'Artimiausi 3 traukiniai',

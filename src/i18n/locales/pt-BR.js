@@ -237,6 +237,7 @@ export default {
   'configurator.llUpOnlyCopy': 'Copiar link de próximos trens',
   'configurator.llIdleCardTitle': 'O cartão de próximos trens',
   'configurator.idleSharedNote': 'Um cartão, os dois links: o Link ao Vivo o mostra quando nenhum trem está ao vivo, e o link de próximos trens o mostra o tempo todo. Estilize-o uma vez aqui.',
+  'configurator.foldClose': 'Recolher',
   'configurator.llUpOnlySub': 'Um segundo link para uma cena separada do OBS (começando em breve, já volto): sempre mostra seus próximos trens — mesmo com um ao vivo — e nunca o trem em si. Mesmos ajustes do cartão acima.',
   'configurator.llUpOnlyAria': 'URL de próximos trens',
   'configurator.horizon3': 'Próximos 3 trens',

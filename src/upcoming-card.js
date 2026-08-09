@@ -40,8 +40,12 @@ const INK = '#EDF1F7';
  * own zone.
  */
 function formatDeparture(date, locale, zone) {
+  // Every numeric field 2-digit: in the mono face that makes every departure
+  // the same width, so the time column cannot drift between pages (a
+  // 1-digit day used to re-size the grid on every page turn). The zone name
+  // is per-DATE, so summer vs standard time (PDT/PST) is already right.
   return new Intl.DateTimeFormat(locale, {
-    weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
+    weekday: 'short', month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit',
     timeZoneName: 'short', ...(zone && { timeZone: zone }),
   }).format(date);
 }
@@ -66,7 +70,15 @@ const ROW_ENTER_MS = 620;
 // opacity transitions driven by one-shot timers — nothing per-frame, and
 // fades are the motion vocabulary reduced-motion users are okay with.
 const PANEL_FADE_MS = 450;
-const PAGE_FADE_MS = 300;
+// The page-turn crossfade scales with the hold: a quarter of the cycle,
+// capped — slow enough to read as a dissolve, never most of the hold. At the
+// 12s default that is a 1.1s fade each way; 300ms fixed read as a blink.
+const pageFadeMs = (config) => Math.min(1100, ((config.upcycle ?? 12) * 1000) / 4);
+// A dissolve's finish fires this long after its fade ends; anything that
+// mounts after an exit waits AFTER_EXIT_MS. AFTER_EXIT_MS > EXIT_SETTLE_MS is
+// load-bearing: the mount must always find the finish already run.
+const EXIT_SETTLE_MS = 60;
+const AFTER_EXIT_MS = 80;
 
 /**
  * What the painted panel is a pure function of. Two calls with the same
@@ -161,8 +173,9 @@ function timePair(train, config) {
   return [when, utc];
 }
 
-/** The 3-row paging card. */
-function renderCard(container, trains, config) {
+/** The 3-row paging card. Returns `{ panel, cleanup }` — the caller owns
+ *  attaching the cleanup, so the container handshake lives in one place. */
+function renderCard(trains, config) {
   const card = document.createElement('div');
   card.className = 'rt-upcoming-card';
   card.style.cssText = `${panelCss(config)};max-width:min(72vw, 680px);min-width:340px;padding:14px 18px`;
@@ -179,36 +192,42 @@ function renderCard(container, trains, config) {
   }
   card.appendChild(head);
 
+  // One grid for the whole list, cells as direct children: every row's time
+  // and UTC land in SHARED columns sized by the widest entry, so the card
+  // reads as a table — per-row flex let a long time or name nudge its
+  // neighbours out of column.
   const list = document.createElement('div');
+  list.style.cssText = 'display:grid;grid-template-columns:max-content minmax(0,1fr) max-content;column-gap:14px;align-items:baseline';
   card.appendChild(list);
 
   const paintRows = (page) => {
     if (pageMark) pageMark.textContent = `${(((page % pages) + pages) % pages) + 1} / ${pages}`;
     list.replaceChildren();
     for (const train of visibleUpcoming(trains, page)) {
-      const row = document.createElement('div');
-      // Every row on a fresh page is an entering row; the soft rise is what
-      // makes the swap read as the list moving on, not the card blinking.
-      row.className = 'rt-upcoming-row-enter';
-      row.style.cssText = 'display:flex;gap:14px;align-items:baseline;padding:4px 0';
       const [when, utc] = timePair(train, config);
       const name = document.createElement('span');
       name.textContent = train.title;
-      // flex:1 + min-width:0 makes the ellipsis real — a flex item's min-width
-      // defaults to its content, so a long title would stretch the card
-      // instead of truncating.
-      name.style.cssText = 'flex:1;min-width:0;font-size:17px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
-      utc.style.marginLeft = 'auto';
-      row.append(when, name, utc);
-      list.appendChild(row);
+      // min-width:0 makes the ellipsis real (a grid item's min-width defaults
+      // to its content); the soft shadow lifts the name off any scene behind
+      // the panel's translucency.
+      name.style.cssText = 'min-width:0;font-size:17px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'
+        + 'text-shadow:0 1px 2px rgba(0,0,0,0.85), 0 0 8px rgba(0,0,0,0.5)';
+      // Every cell on a fresh page is an entering cell; the shared soft rise
+      // makes the swap read as the list moving on, not the card blinking.
+      for (const cell of [when, name, utc]) {
+        cell.classList.add('rt-upcoming-row-enter');
+        cell.style.padding = '4px 0';
+      }
+      list.append(when, name, utc);
     }
   };
 
   let page = 0;
   paintRows(page);
 
+  let cleanup = null;
   if (pages > 1) {
-    card.style.transition = `opacity ${PAGE_FADE_MS}ms ease`;
+    card.style.transition = `opacity ${pageFadeMs(config)}ms ease-in-out`;
     let swapTimer = null;
     let locked = false;
     // Page on a slow clock — one batch of DOM swaps per cycle, no per-frame
@@ -232,11 +251,11 @@ function renderCard(container, trains, config) {
         page += 1;
         paintRows(page);
         card.style.opacity = '1';
-      }, PAGE_FADE_MS);
+      }, pageFadeMs(config));
     }, (config.upcycle ?? 12) * 1000);
-    container._rtUpcomingCleanup = () => { clearInterval(cycleTimer); clearTimeout(swapTimer); };
+    cleanup = () => { clearInterval(cycleTimer); clearTimeout(swapTimer); };
   }
-  return card;
+  return { panel: card, cleanup };
 }
 
 /** The one-line ticker: the whole horizon on a seamless transform-only marquee. */
@@ -262,7 +281,10 @@ function renderTicker(trains, config) {
     const [when, utc] = timePair(train, config);
     when.style.fontSize = '13.5px';
     utc.style.fontSize = '11.5px';
-    item.append(when, document.createTextNode(train.title), utc);
+    const name = document.createElement('span');
+    name.textContent = train.title;
+    name.style.textShadow = '0 1px 2px rgba(0,0,0,0.85), 0 0 8px rgba(0,0,0,0.5)';
+    item.append(when, name, utc);
     return item;
   };
   const sep = () => {
@@ -287,44 +309,128 @@ function renderTicker(trains, config) {
   return ticker;
 }
 
+/** Chain a cleanup onto the container's without losing what's already there. */
+function addCleanup(container, fn) {
+  const prior = container._rtUpcomingCleanup;
+  container._rtUpcomingCleanup = prior ? () => { prior(); fn(); } : fn;
+}
+
 /**
- * Paint the idle panel into `container` (replacing its contents). An empty
- * `trains` list paints nothing — the overlay stays fully transparent.
- * `config` is the parsed Overlay config (`t`, `locale`, and the up* knobs).
+ * Fade `target` out over PANEL_FADE_MS, then clear it. `target` is either a
+ * retiring panel anchor (removed) or the container itself when it holds
+ * foreign content — a Train — whose children we cannot restyle one by one;
+ * there the container's own opacity carries the exit and is reset after.
+ * The finish is registered as cleanup, so a superseding render completes the
+ * exit instantly instead of leaving a ghost.
+ */
+function dissolve(container, target) {
+  target.style.transition = `opacity ${PANEL_FADE_MS}ms ease`;
+  target.style.opacity = '0';
+  // Idempotent: the finish stays reachable through the cleanup chain after
+  // the timer has already fired, and running it twice would replaceChildren
+  // whatever mounted since — a hard cut of an innocent panel or Train.
+  let done = false;
+  const finish = () => {
+    if (done) return;
+    done = true;
+    if (target === container) {
+      container.replaceChildren();
+      container.style.opacity = '';
+      container.style.transition = '';
+    } else {
+      target.remove();
+    }
+  };
+  const gone = setTimeout(finish, PANEL_FADE_MS + EXIT_SETTLE_MS);
+  addCleanup(container, () => { clearTimeout(gone); finish(); });
+}
+
+/** Build the panel for `trains`, ease it in, and register its timers. */
+function mountPanel(container, trains, config) {
+  const anchor = document.createElement('div');
+  anchor.style.cssText = `${anchorStyle(config.uppos)};opacity:0;transition:opacity ${PANEL_FADE_MS}ms ease`;
+  const built = config.upstyle === 'ticker'
+    ? { panel: renderTicker(trains, config), cleanup: null }
+    : renderCard(trains, config);
+  anchor.appendChild(built.panel);
+  container.appendChild(anchor);
+  container._rtUpcomingAnchor = anchor;
+  if (built.cleanup) addCleanup(container, built.cleanup);
+  void anchor.offsetWidth; // commit the hidden start state before easing in
+  anchor.style.opacity = '1';
+}
+
+/**
+ * Paint the idle panel into `container`. An empty `trains` list paints
+ * nothing — the overlay stays fully transparent. `config` is the parsed
+ * Overlay config (`t`, `locale`, and the up* knobs).
  *
- * The panel's whole lifecycle is faded, never cut: it eases in on mount,
- * eases out when the horizon empties, and — the key one — a repaint whose
- * inputs haven't changed is a no-op, so the Live Link's resolve tick never
- * blinks a card that is already right (and never resets its page cycle).
+ * The lifecycle is faded end to end: the panel eases in on mount, eases out
+ * when the horizon empties, changed data crossfades old panel into new, and
+ * a Train left standing in the container dissolves before the panel takes
+ * the stage. A repaint whose inputs haven't changed is a no-op — the Live
+ * Link's resolve tick never blinks a card that is already right (and never
+ * resets its page cycle) — and so is an empty repaint over an exit already
+ * in progress, which would otherwise cut the farewell short.
  */
 export function renderUpcomingCard(container, trains, config) {
   const sig = trains.length === 0 ? null : panelSignature(trains, config);
   const standing = container._rtUpcomingAnchor?.isConnected ?? false;
-  if (standing && container._rtUpcomingSig === sig) return;
+  // No-op when this exact panel is already standing, already on its way out
+  // (empty over empty), or already scheduled behind a dissolving Train.
+  if (container._rtUpcomingSig === sig
+    && (standing || sig === null || container._rtUpcomingPending)) return;
   container._rtUpcomingCleanup?.();
   container._rtUpcomingCleanup = null;
   container._rtUpcomingSig = sig;
+  container._rtUpcomingPending = false;
 
-  if (trains.length === 0) {
-    if (!standing) { container.replaceChildren(); container._rtUpcomingAnchor = null; return; }
-    // The horizon emptied under a standing panel — let it leave, don't cut it.
-    const old = container._rtUpcomingAnchor;
-    container._rtUpcomingAnchor = null;
-    old.style.transition = `opacity ${PANEL_FADE_MS}ms ease`;
-    old.style.opacity = '0';
-    const gone = setTimeout(() => old.remove(), PANEL_FADE_MS + 60);
-    container._rtUpcomingCleanup = () => { clearTimeout(gone); old.remove(); };
+  // What must leave the stage: our own standing panel, or — after a train
+  // ends — the Train's DOM, which we can only fade via the container itself.
+  const leaving = standing ? container._rtUpcomingAnchor
+    : container.childElementCount > 0 ? container : null;
+  container._rtUpcomingAnchor = null;
+
+  if (sig === null) {
+    if (leaving) dissolve(container, leaving);
     return;
   }
   ensureStyles(container.ownerDocument ?? document);
+  if (leaving === container) {
+    // A Train holds the stage: mounting now would ride the container's own
+    // exit fade, so let it dissolve fully, then enter on the empty stage.
+    dissolve(container, leaving);
+    container._rtUpcomingPending = true;
+    const mountTimer = setTimeout(() => {
+      container._rtUpcomingPending = false;
+      mountPanel(container, trains, config);
+    }, PANEL_FADE_MS + AFTER_EXIT_MS);
+    addCleanup(container, () => {
+      container._rtUpcomingPending = false;
+      clearTimeout(mountTimer);
+    });
+    return;
+  }
+  if (leaving) dissolve(container, leaving); // changed data: crossfade old panel into new
+  mountPanel(container, trains, config);
+}
 
-  const anchor = document.createElement('div');
-  anchor.style.cssText = `${anchorStyle(config.uppos)};opacity:0;transition:opacity ${PANEL_FADE_MS}ms ease`;
-  anchor.appendChild(config.upstyle === 'ticker'
-    ? renderTicker(trains, config)
-    : renderCard(container, trains, config));
-  container.replaceChildren(anchor);
-  container._rtUpcomingAnchor = anchor;
-  void anchor.offsetWidth; // commit the hidden start state before easing in
-  anchor.style.opacity = '1';
+/**
+ * The shell's pre-Train hook: a train is about to render into `container`.
+ * Cancels every pending idle-transition timer — an in-flight dissolve or
+ * deferred mount would otherwise fire AFTER the Train renders and wipe or
+ * cover it — and starts the exit fade of a standing panel. Returns how long
+ * the Train render should wait for that farewell (0 when nothing stands).
+ * Never touches foreign content: the Train's own render is its entrance.
+ */
+export function retireUpcomingCard(container) {
+  const anchor = container._rtUpcomingAnchor?.isConnected ? container._rtUpcomingAnchor : null;
+  container._rtUpcomingCleanup?.();
+  container._rtUpcomingCleanup = null;
+  container._rtUpcomingAnchor = null;
+  container._rtUpcomingPending = false;
+  container._rtUpcomingSig = undefined; // pristine — the next idle paints fresh
+  if (!anchor) return 0;
+  dissolve(container, anchor);
+  return PANEL_FADE_MS + AFTER_EXIT_MS;
 }

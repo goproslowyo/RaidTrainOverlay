@@ -227,6 +227,7 @@ export default {
   'configurator.llUpOnlyCopy': 'Kopieer link voor komende treinen',
   'configurator.llIdleCardTitle': 'De kaart met komende treinen',
   'configurator.idleSharedNote': 'Eén kaart, beide links: de Live Link toont hem als er geen trein live is, en de link voor komende treinen toont hem altijd. Stel hem hier één keer in.',
+  'configurator.foldClose': 'Inklappen',
   'configurator.llUpOnlySub': 'Een tweede link voor een aparte OBS-scène (zo beginnen we, ben zo terug): toont altijd je komende treinen — ook terwijl er één live is — en nooit de trein zelf. Zelfde instellingen als de kaart hierboven.',
   'configurator.llUpOnlyAria': 'URL voor komende treinen',
   'configurator.horizon3': 'Volgende 3 treinen',
