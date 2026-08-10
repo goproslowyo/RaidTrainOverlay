@@ -25,7 +25,7 @@ test('parseConfig ignores unknown and malformed params', () => {
   const config = parseConfig('?event=trainwreck-lucky-13&bogus=1&%%%');
   assert.equal(config.event, 'trainwreck-lucky-13');
   assert.deepEqual(Object.keys(config), [
-    'event', 'lineup', 'user', 'trains', 'upcoming', 'uppos', 'upop', 'upcycle', 'upscroll', 'upstyle', 'uponly',
+    'event', 'lineup', 'user', 'trains', 'upcoming', 'uppos', 'upop', 'upcycle', 'upscroll', 'upstyle', 'uponly', 'upgap',
     'lang', 'mode', 'interval', 'speed', 'track', 'trackfadein', 'trackfadeout', 'scale',
     'openslots', 'spotlight', 'tz', 'height', 'hidefinished', 'enginedim', 'refresh', 'theme',
   ]);
@@ -471,4 +471,23 @@ test('serialize∘parse round-trips the idle-card params', () => {
     const parsed = parseConfig(query);
     assert.deepEqual(parseConfig(serializeConfig(parsed)), parsed, `round-trip failed for: ${query}`);
   }
+});
+
+// upgap: the between-Pass occasion's single opt-out. Default ON wherever the
+// card is on — the streamer already asked for upcoming trains during dead air.
+test('upgap defaults on and reads its opt-out', () => {
+  assert.equal(parseConfig('?user=goproflowyo').upgap, true);
+  assert.equal(parseConfig('?user=goproflowyo&upgap=0').upgap, false);
+});
+
+test('upgap=1 stays truthy, reserving upgap=<minutes> for a future cadence override', () => {
+  assert.equal(parseConfig('?user=goproflowyo&upgap=1').upgap, true);
+  assert.equal(parseConfig('?user=goproflowyo&upgap=5').upgap, true);
+});
+
+test('upgap serializes only as the opt-out', () => {
+  const on = serializeConfig(parseConfig('?user=goproflowyo'));
+  assert.ok(!on.includes('upgap'), 'the default never bloats the URL');
+  const off = serializeConfig(parseConfig('?user=goproflowyo&upgap=0'));
+  assert.ok(off.includes('upgap=0'));
 });

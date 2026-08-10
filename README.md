@@ -73,6 +73,7 @@ instead of `event`, plus its own params — all written by the Configurator:
 | `upcycle` | Seconds each page of three is held (default `12`). |
 | `upscroll` | Seconds per ticker lap (default `34`; higher is slower). |
 | `uponly` | Upcoming-trains-only source for a separate OBS scene: always the listing, never the train — even while one is live. |
+| `upgap` | On by default: while a train is live, the listing also pops up briefly in the pauses — between passes, or in a marquee's breathers — never over the train itself. `upgap=0` turns that off, leaving the listing to appear only between trains. |
 
 ## Self-hosting on GitHub Pages
 

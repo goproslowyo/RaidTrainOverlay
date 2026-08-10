@@ -63,7 +63,7 @@ const okEvent = (title) => () => ({ ok: true, status: 200, json: async () => mak
 
 function harness({ query, clockMs, routes, log, storage }) {
   const timers = manualTimers();
-  const calls = { switches: [], events: [], idles: [], errors: [] };
+  const calls = { switches: [], events: [], idles: [], horizons: [], errors: [] };
   const clock = { ms: clockMs };
   const feed = startLiveLinkFeed(query, {
     fetchImpl: routedFetch(routes, log),
@@ -75,6 +75,7 @@ function harness({ query, clockMs, routes, log, storage }) {
     onSwitch: (slug, config) => calls.switches.push({ slug, config }),
     onEvent: (event) => calls.events.push(event),
     onIdle: (idle) => calls.idles.push(idle),
+    onHorizon: (horizon) => calls.horizons.push(horizon),
     onError: (err) => calls.errors.push(err),
   });
   return { timers, calls, clock, feed };
@@ -92,6 +93,69 @@ test('a live train renders: onSwitch with its slug, then the lineup flows via on
   assert.equal(calls.events.length, 1);
   assert.equal(calls.events[0].title, 'LUNA');
   assert.deepEqual(calls.idles, []);
+});
+
+// The between-Pass card (#61) lists OTHER trains while one is live, so the
+// horizon has to reach the live path — until now it only ever reached onIdle.
+test('a live train also delivers the horizon: onHorizon lists the OTHER upcoming trains', async () => {
+  const { calls, feed } = harness({
+    query: '?user=goproflowyo',
+    clockMs: DURING_LUNA,
+    routes: { [userUrl]: okUser, [eventUrl('luna-hao8')]: okEvent('LUNA') },
+  });
+  await feed.ready;
+  assert.equal(calls.switches.length, 1, 'the Train still renders');
+  assert.ok(calls.horizons.length >= 1, 'the live path delivers a horizon');
+  // luna is LIVE at this clock, so it is never in its own horizon.
+  assert.deepEqual(
+    calls.horizons.at(-1).upcoming.map((e) => e.slug),
+    ['trainwreck-lucky-13', 'my-own-train'],
+  );
+  assert.deepEqual(calls.idles, [], 'a live train is not idle');
+});
+
+test('the live horizon is annotated like the idle one: cached lineups carry mySlotAt', async () => {
+  // The live horizon must not be a less-informed second class: its rows say
+  // when the streamer PLAYS, exactly as the idle card's rows do.
+  const lineup = (slotIso) => ({
+    payload: makeEventPayload({
+      time_table: [{
+        starttime: slotIso, slot_occupied: true, broadcaster_display_name: 'GoProFlowYo',
+        broadcaster_image: '', broadcaster_live: false, broadcaster_id: 7,
+      }],
+    }),
+    savedAt: DURING_LUNA - 1000,
+  });
+  const storage = fakeStorage({
+    [eventCacheKey('trainwreck-lucky-13')]: JSON.stringify(lineup('2026-08-10T21:00:00Z')),
+    [eventCacheKey('my-own-train')]: JSON.stringify(lineup('2026-08-20T19:30:00Z')),
+  });
+  const { calls, feed } = harness({
+    query: '?user=goproflowyo',
+    clockMs: DURING_LUNA,
+    routes: { [userUrl]: okUser, [eventUrl('luna-hao8')]: okEvent('LUNA') },
+    storage,
+  });
+  await feed.ready;
+  assert.deepEqual(
+    calls.horizons.at(-1).upcoming.map((e) => e.mySlotAt?.toISOString() ?? null),
+    ['2026-08-10T21:00:00.000Z', '2026-08-20T19:30:00.000Z'],
+  );
+});
+
+test('the horizon stays fresh while the SAME train keeps running', async () => {
+  // The re-resolve tick used to do nothing at all when the slug was unchanged,
+  // so a card listing other trains would go stale over a long broadcast.
+  const { calls, feed, timers } = harness({
+    query: '?user=goproflowyo',
+    clockMs: DURING_LUNA,
+    routes: { [userUrl]: okUser, [eventUrl('luna-hao8')]: okEvent('LUNA') },
+  });
+  await feed.ready;
+  const before = calls.horizons.length;
+  await timers.tick();
+  assert.equal(calls.switches.length, 1, 'the same train never re-switches');
+  assert.ok(calls.horizons.length > before, 're-resolving re-delivers the horizon');
 });
 
 test('uponly: even a LIVE train resolves to the idle card — never onSwitch, never a lineup fetch', async () => {

@@ -4,6 +4,37 @@ All notable changes to RaidTrainOverlay are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and the project follows
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- **The Upcoming card now appears while a train is live**, filling the downtime
+  the overlay used to spend empty. In `pass` mode it pulses into the true-empty
+  middle of each gap between Passes; in `marquee`, which has no gap, the cycle
+  manufactures one — a **Breather**, in which the Train and the Track clear the
+  stage together (by a fade, never a slide) and return afterwards. The card and
+  a visible Train are never on screen at once. Live Link sources only, listing
+  the *other* upcoming trains; `uponly=1` sources are unaffected.
+  Appearances are one generated CSS keyframe sharing the Train's own period —
+  no per-frame JavaScript, no timers, and no drift over a long stream — with
+  whole pages (or whole ticker laps) only, and a deterministic sit-out when a
+  gap is too short to hold even one. (wayfinder map #53, spec #59)
+- **`upgap`** — one boolean, on by default wherever the card is on, meaning the
+  same thing in both modes: `upgap=0` says never interrupt a live train.
+- **The Configurator's "Between trains" toggle is now a three-way** — *Never* /
+  *Between trains* / *Between trains, and while one is live* (the default),
+  translated across every locale.
+
+### Changed
+- `prefers-reduced-motion` extends to the new behaviour: the Breather is
+  suppressed (the Train stays put) and the between-Pass card does not pulse.
+- **A manual prototype of the Upcoming card's between-Pass choreography**
+  (`test/manual/upcoming-gap-prototype.html`, dev-facing, not shipped to the
+  overlay): the card pulsing in the true-empty middle of a pass-mode gap on
+  one gap-synced CSS keyframe — preset gap scenarios, time compression, a
+  click-to-seek period timeline, and a readout of the derived appearance
+  windows. The approved choreography feeds the between-Passes spec
+  (wayfinder map #53, ticket #56).
+
 ## [0.9.1] - 2026-08-09
 
 A standards pass over the v2 theme roster: the OBS-perf rule ("no filter
@@ -403,6 +434,8 @@ for an OBS browser source. Static hosting on GitHub Pages, no build step.
 - A cache-first RaidPal client resilient to transient fetch failures, and a GitHub
   Pages landing page with a live deployed-commit stamp in the footer.
 
+[Unreleased]: https://github.com/goproslowyo/RaidTrainOverlay/compare/v0.9.1...HEAD
+[0.9.1]: https://github.com/goproslowyo/RaidTrainOverlay/releases/tag/v0.9.1
 [0.9.0]: https://github.com/goproslowyo/RaidTrainOverlay/releases/tag/v0.9.0
 [0.8.0]: https://github.com/goproslowyo/RaidTrainOverlay/releases/tag/v0.8.0
 [0.7.2]: https://github.com/goproslowyo/RaidTrainOverlay/releases/tag/v0.7.2

@@ -176,3 +176,24 @@ test('buildOverlayQuery manual mode with no usable DJs emits neither lineup nor 
   assert.equal(buildOverlayQuery({ source: 'manual', manual: { djs: [] }, theme: 'tron' }), 'theme=tron');
   assert.equal(buildOverlayQuery({ source: 'manual', manual: { djs: [{ handle: '   ', slots: 1 }] } }), '');
 });
+
+// The "when the card appears" three-way. Its three positions map onto the URL
+// as: card absent / card + upgap=0 / card alone.
+test('the three-way maps onto the URL in all three positions', () => {
+  const off = buildOverlayQuery({ user: 'goproflowyo' });
+  assert.ok(!off.includes('upcoming'), 'Never: no card at all');
+  assert.ok(!off.includes('upgap'));
+
+  const idleOnly = buildOverlayQuery({ user: 'goproflowyo', upcoming: '3', upgap: '0' });
+  assert.ok(idleOnly.includes('upcoming=3'));
+  assert.ok(idleOnly.includes('upgap=0'), 'Between trains only: the occasion is opted out');
+
+  const both = buildOverlayQuery({ user: 'goproflowyo', upcoming: '3' });
+  assert.ok(both.includes('upcoming=3'));
+  assert.ok(!both.includes('upgap'), 'the default never bloats the URL');
+});
+
+test('upgap only ever rides with a Live Link', () => {
+  const q = buildOverlayQuery({ source: 'event', event: 'trainwreck-lucky-13', upgap: '0' });
+  assert.ok(!q.includes('upgap'), 'without a Live Link there is no other-trains card to gate');
+});

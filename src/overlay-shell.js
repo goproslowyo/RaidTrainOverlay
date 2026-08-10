@@ -8,10 +8,13 @@
 import { parseConfig } from './config.js';
 import { startEventFeed } from './event-feed.js';
 import { startLiveLinkFeed } from './live-link-feed.js';
-import { filterUpcoming, shouldSelfReload } from './live-link.js';
+import { filterUpcoming, shouldSelfReload, upcomingPages } from './live-link.js';
 import { renderUpcomingCard, retireUpcomingCard } from './upcoming-card.js';
+import { gapSchedule, windowKeyframes } from './gap-choreography.js';
 import { buildTrain } from './lineup-engine.js';
-import { renderTrain, SHIPPED_THEMES } from './train-renderer.js';
+import {
+  renderTrain, SHIPPED_THEMES, currentPassGeometry, currentBreatherCycle, setBreather,
+} from './train-renderer.js';
 import { DEMO_SLUG, DEMO_SPOTLIGHT, makeDemoEvent } from './demo-event.js';
 import { decodeLineup } from './lineup-codec.js';
 import { makeManualEvent } from './manual-lineup.js';
@@ -35,6 +38,16 @@ async function applyLocale(locale) {
   document.documentElement.lang = locale;
 }
 const container = document.getElementById('train');
+// The between-Pass card shares the canvas with a rendered Train, so it cannot
+// mount into #train: the card's own render dissolves whatever else holds that
+// container, which is the Train. It gets a sibling layer instead — the same
+// full-canvas positioning context the anchor grammar expects, never touched by
+// the renderer. "Never on stage together" then becomes a timing guarantee
+// (the choreography) rather than a lifecycle one (unmounting).
+const gapLayer = document.createElement('div');
+gapLayer.id = 'gap-card';
+gapLayer.style.cssText = 'position:absolute;inset:0;pointer-events:none';
+container.insertAdjacentElement('afterend', gapLayer);
 // Vertical placement (height param): --train-pos is the height as a
 // 0..1 fraction; the renderer's .rt-stage clamps the Train within the canvas so
 // it stays fully on-screen (0 = top-flush, 1 = bottom-flush, 0.5 = centred).
@@ -50,6 +63,8 @@ if (!config.event && !config.lineup && !config.user) {
   // change; the time tick re-derives from it; theme=shuffle re-renders with a
   // fresh Theme each cycle.
   let current = null;
+  // The other trains, while one is running — the between-Pass card's material.
+  let liveHorizon = [];
 
   // theme=shuffle: cycle the roster pseudo-randomly. A shuffle bag draws every
   // Theme once before any repeat, reshuffles when empty, and never repeats across
@@ -68,7 +83,80 @@ if (!config.event && !config.lineup && !config.user) {
       ? { ...config, theme: shownTheme, shuffleRoll: true }
       : config;
     current.view = renderTrain(buildTrain(current.event, new Date(), cfg), container, cfg);
+    renderGapCard({ restart: true });
   };
+  // The between-Pass card: while a train is live, the Upcoming card pulses into
+  // the empty stage between Passes. Presence is ONE generated opacity keyframe
+  // on the card's own layer, sharing the Pass period — synchronised with the
+  // Train by construction, so it cannot drift over a stream that runs for days,
+  // and costing no per-frame JavaScript. Re-applied on every render because a
+  // re-render restarts the Train's own keyframe, and the two must stay in phase.
+  const clearGapCard = () => {
+    retireUpcomingCard(gapLayer);
+    gapLayer.classList.remove('rt-gap-card--on');
+    // A Breather with nothing to put in it is just the Train vanishing for no
+    // reason, so the empty stretch is suppressed whenever the card is not
+    // actually going to appear in it.
+    setBreather(container, false);
+  };
+  // `restart` re-seeds the card's keyframe from 0%. Only a render does that,
+  // because only a render restarts the Train's own keyframe — restarting the
+  // card on its own would slide it out of phase with the Pass it is timed
+  // against, and it could then appear ON a Train. A horizon refresh therefore
+  // repaints the card's contents and leaves the running animation alone; a
+  // changed schedule reaches it through the keyframe text, which CSS re-reads
+  // without restarting.
+  const renderGapCard = ({ restart = false } = {}) => {
+    const spec = config.upcoming;
+    // Live Link only (nothing else knows other trains), never on an
+    // upcoming-only source (that scene shows the card outright), never while
+    // nothing is running, and never when the streamer opted out.
+    if (!config.user || config.uponly || !spec || !config.upgap
+      || !current || liveHorizon.length === 0) return clearGapCard();
+    // A Pass gap, or — in marquee, which has none — the Breather the cycle
+    // manufactures instead. Same choreography either way; only the source of
+    // the empty stretch differs. A Breather holds exactly one page, and the
+    // card's free-running pager is what walks the horizon across successive
+    // Breathers.
+    const geometry = currentPassGeometry() ?? currentBreatherCycle();
+    if (!geometry) return clearGapCard();
+    const breather = geometry === currentBreatherCycle();
+    const schedule = gapSchedule({
+      periodSec: geometry.periodSec,
+      emptyFromSec: geometry.emptyFromSec,
+      emptyToSec: geometry.emptyToSec,
+      pageCount: breather ? 1 : upcomingPages(liveHorizon),
+      upcycleSec: config.upcycle,
+      style: config.upstyle,
+      upscrollSec: config.upscroll,
+    });
+    // A gap too short for one whole page: the card sits this one out entirely
+    // rather than flashing a partial page.
+    if (schedule.windows.length === 0) return clearGapCard();
+    let style = document.getElementById('rt-gap-card-style');
+    if (!style) {
+      style = document.createElement('style');
+      style.id = 'rt-gap-card-style';
+      document.head.appendChild(style);
+    }
+    style.textContent = `
+      @keyframes rt-gap-card { ${windowKeyframes(schedule)} }
+      .rt-gap-card--on { animation: rt-gap-card ${schedule.cycleSec}s linear infinite; }
+      @media (prefers-reduced-motion: reduce) {
+        /* The whole occasion IS the motion: a card that pulses in and out over
+           a live stream. Reduced motion keeps the Train and drops the pulse
+           rather than leaving the card parked over the Train at full opacity. */
+        .rt-gap-card--on { animation: none; opacity: 0; }
+      }`;
+    renderUpcomingCard(gapLayer, liveHorizon, config);
+    setBreather(container, true);
+    if (restart) {
+      gapLayer.classList.remove('rt-gap-card--on');
+      void gapLayer.offsetWidth; // commit, so the restart re-seeds with the Pass
+    }
+    gapLayer.classList.add('rt-gap-card--on');
+  };
+
   const cycle = () => {
     if (config.theme !== 'shuffle') return;
     shownTheme = bag.next();
@@ -145,7 +233,16 @@ if (!config.event && !config.lineup && !config.user) {
         // absent horizon falls back to the next 3 instead of nothing.
         const spec = config.upcoming ?? (config.uponly ? { kind: 'count', n: 3 } : null);
         current = null;
+        liveHorizon = [];
+        clearGapCard(); // the gap card belongs to a running train, and none is running
         renderUpcomingCard(container, filterUpcoming(upcoming, spec, new Date()), config);
+      },
+      onHorizon({ upcoming }) {
+        // A train is running, and these are the OTHER trains — the material the
+        // between-Pass card shows in the gaps. Held here, on the sibling layer,
+        // so the card can be mounted without disturbing the Train.
+        liveHorizon = filterUpcoming(upcoming, config.upcoming ?? null, new Date());
+        renderGapCard();
       },
       onError(err) {
         const state = current ? 'showing the last-good state' : 'nothing rendered yet';
