@@ -1,9 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { anchorStyle } from '../src/upcoming-card.js';
 
 // The DOM half of upcoming-card is verified headless in the browser sweep;
 // the anchor grammar is the pure part, so it gets unit coverage here.
+
+const ANCHORS = ['tl', 'tc', 'tr', 'ml', 'mc', 'mr', 'bl', 'bc', 'br'];
 
 test('anchorStyle places each of the nine anchors on its own edge pair', () => {
   assert.match(anchorStyle('tl'), /top:24px/);
@@ -16,12 +19,87 @@ test('anchorStyle places each of the nine anchors on its own edge pair', () => {
   assert.match(anchorStyle('bc'), /justify-content:center/);
 });
 
-test('anchorStyle always carries a max-width ceiling (the ticker is one long line)', () => {
-  for (const key of ['tl', 'tc', 'tr', 'ml', 'mc', 'mr', 'bl', 'bc', 'br']) {
-    assert.match(anchorStyle(key), /max-width:calc\(100% - 48px\)/, key);
+// The cell rule: the scene is three columns and three rows, the nine anchors
+// are its nine cells, and an item at one anchor must not bleed into another
+// column or row. Both views of the card are budgeted by this one function, so
+// these assertions are the rule's only guard outside a browser.
+
+test('every anchor is ceilinged at one third of the scene, both axes', () => {
+  for (const key of ANCHORS) {
+    const css = anchorStyle(key);
+    assert.match(css, /max-width:calc\(33\.3333vw - 48px\)/, key);
+    assert.match(css, /max-height:calc\(33\.3333vh - 48px\)/, key);
   }
+});
+
+test('the cell comes from viewport units, never a measured scene', () => {
+  // OBS browser sources (and our own tooling) report window.innerWidth as 0 in
+  // places, so a JS-measured cell computes garbage exactly where it matters.
+  for (const key of ANCHORS) {
+    const css = anchorStyle(key);
+    assert.match(css, /max-width:calc\(33\.3333vw/, key);
+    assert.match(css, /max-height:calc\(33\.3333vh/, key);
+  }
+});
+
+test('the pad comes out of the cell, so a bigger inset never widens the box', () => {
+  assert.match(anchorStyle('tl', { pad: 40 }), /max-width:calc\(33\.3333vw - 80px\)/);
+  assert.match(anchorStyle('tl', { pad: 40 }), /max-height:calc\(33\.3333vh - 80px\)/);
+});
+
+test('the minimum width yields to the cell on a narrow scene', () => {
+  // A hard 340px floor is wider than a third of a 960-wide scene, which is
+  // exactly the bleed the rule exists to prevent — so the floor is a min()
+  // against the same budget, not a number that can out-vote it.
+  for (const key of ANCHORS) {
+    assert.match(anchorStyle(key), /min-width:min\(340px, 33\.3333vw - 48px\)/, key);
+  }
+});
+
+test('centre anchors centre by transform, so the ceiling can bind', () => {
+  // left:0;right:0 stretched the box edge to edge and left max-width with
+  // nothing to do — that is how the scrolling view spanned whole screens.
+  for (const key of ['tc', 'mc', 'bc']) {
+    const css = anchorStyle(key);
+    assert.doesNotMatch(css, /right:0/, key);
+    assert.match(css, /left:50%/, key);
+    assert.match(css, /transform:[^;]*translateX\(-50%\)/, key);
+  }
+  assert.match(anchorStyle('ml'), /transform:translateY\(-50%\)/);
+  assert.match(anchorStyle('mc'), /transform:translateX\(-50%\) translateY\(-50%\)/);
+  for (const key of ['tl', 'tr', 'bl', 'br']) {
+    assert.doesNotMatch(anchorStyle(key), /transform:/, key);
+  }
+});
+
+test('every part of the budget is overridable, for the Configurator preview', () => {
+  // The preview's stage is not the viewport, so it passes a stage-relative
+  // cell — one rule, two places (see configurator.html's .up rules).
+  const css = anchorStyle('bl', { pad: 12, cell: { w: '33.3333%', h: '33.3333%' }, floor: '210px' });
+  assert.match(css, /max-width:calc\(33\.3333% - 24px\)/);
+  assert.match(css, /max-height:calc\(33\.3333% - 24px\)/);
+  assert.match(css, /min-width:min\(210px, 33\.3333% - 24px\)/);
 });
 
 test('anchorStyle falls back to bottom-centre for a missing key', () => {
   assert.equal(anchorStyle(undefined), anchorStyle('bc'));
+});
+
+/**
+ * The cell rule lives in two places on purpose — this module, and the
+ * Configurator's preview markup, which has its own CSS and does not import
+ * anything. The ticket asked for it to be flagged loudly in both rather than
+ * abstracted across an HTML file and a JS module; a comment is not a guard, so
+ * this is the guard. It is the same shape as the vocabulary test: grep the
+ * other site for the numbers that have to match.
+ */
+test('the Configurator preview carries the same rule this module does', () => {
+  const preview = readFileSync(new URL('../configurator.html', import.meta.url), 'utf8');
+  assert.match(preview, /PREVIEW_BUDGET = \{ pad: 12, cell: \{ w: '33\.3333%', h: '33\.3333%' \}/,
+    'the preview must budget each anchor at a third of its stage');
+  assert.match(preview, /\.up \{[^}]*flex: 1 1 auto; min-width: 0;/,
+    'both views must fill the budget rather than declare a width of their own');
+  assert.match(preview, /\.up\.ticker \.lbl \{[^}]*max-width: 40%/,
+    'the eyebrow must yield to the trains here too');
+  assert.match(anchorStyle('bl'), /min-width:min\(340px/, 'the floor still yields via min()');
 });

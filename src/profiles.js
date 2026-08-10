@@ -5,7 +5,7 @@
  * case-insensitive) owning: a standing Spotlight list (names always
  * highlighted — self, friends, team members), a default Preset reference
  * (the base look, and the Live Link fallback for unmapped trains), its Live
- * Link preferences (the idle card's horizon), and its
+ * Link preferences (the Upcoming card's Horizon), and its
  * Raid Train Configs keyed by Event slug —
  * `{ presetId, overrides, spotlight, endsAt }` where overrides is a per-field
  * sparse diff against the referenced Preset, spotlight is per-train ADDITIONS
@@ -104,11 +104,11 @@ export function activeProfile(store) {
 }
 
 /**
- * The Profile's Live Link preferences — the idle card's `upcoming` horizon
+ * The Profile's Live Link preferences — the Upcoming card's `upcoming` Horizon
  * (`'3'`, `'2w'`, `'1m'`, `'all'`, or null for "no card") plus the card's own
  * knobs (`uppos`, `upop`, `upcycle`, `upscroll`, `upstyle` — null means "the
  * Overlay's default, omit from the URL"). These are per-Profile, NOT per-train:
- * the idle state exists outside any single raid train, so it never enters the
+ * the card exists outside any single raid train, so it never enters the
  * Preset/override model. They live on the Profile, not in the URL alone, so
  * the Live Link panel regenerates the SAME URL on every visit; a Profile
  * written before a field existed reads as its default.

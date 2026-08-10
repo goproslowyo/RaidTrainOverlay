@@ -35,8 +35,8 @@
     "motion": [
       { "name": "hover-transition", "value": ".14s-.2s ease", "purpose": "Border, background, and color state shifts on controls." },
       { "name": "pop", "value": ".14s ease (opacity + translateY(-4px) in)", "purpose": "Menus and badges appearing." },
-      { "name": "row-in", "value": ".62s cubic-bezier(.22, .61, .36, 1) (opacity + translateY(6px))", "purpose": "Idle-card rows entering; the soft rise that reads as the list moving on." },
-      { "name": "ticker-scroll", "value": "translateX(0 -> -50%) linear, 34s default, infinite", "purpose": "The Upcoming card's one-line ticker; content laid twice so the loop has no seam." },
+      { "name": "row-in", "value": ".62s cubic-bezier(.22, .61, .36, 1) (opacity + translateY(6px))", "purpose": "Upcoming-card rows entering; the soft rise that reads as the list moving on." },
+      { "name": "scrolling-view", "value": "translateX(0 -> -50%) linear, 34s default, infinite", "purpose": "The Upcoming card's one-line scrolling view; content laid twice so the loop has no seam." },
       { "name": "reduced-motion", "value": "@media (prefers-reduced-motion: reduce) { animation: none }", "purpose": "Every animation opts out; mandatory." }
     ],
     "breakpoints": [
@@ -76,7 +76,7 @@
       "kind": "card",
       "refersTo": "card",
       "description": "The resting container: surface slate, hairline, sodium eyebrow header, no shadow.",
-      "html": "<div class=\"ds-card\"><h2 class=\"ds-card-h\">Idle state</h2><p class=\"ds-card-p\">What the Live Link shows <b>between trains</b>.</p></div>",
+      "html": "<div class=\"ds-card\"><h2 class=\"ds-card-h\">Between trains</h2><p class=\"ds-card-p\">What the Live Link shows <b>between trains</b>.</p></div>",
       "css": ".ds-card { background: var(--rt-surface, #141A22); border: 1px solid var(--rt-line, #242D39); border-radius: 14px; padding: 18px 20px; min-width: 0; } .ds-card-h { font: 700 12.5px/1.3 'Public Sans', system-ui, sans-serif; text-transform: uppercase; letter-spacing: .07em; color: var(--rt-sodium-300, #FFC578); margin: 0 0 12px; } .ds-card-p { margin: 0; color: var(--rt-ink-2, #9BA7B8); font: 400 13.5px/1.5 'Public Sans', system-ui, sans-serif; } .ds-card-p b { color: var(--rt-ink, #EDF1F7); font-weight: 600; }"
     },
     {
@@ -103,9 +103,9 @@
       "css": ".ds-radio { cursor: pointer; display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; width: 100%; text-align: left; border-radius: 10px; border: 1px solid var(--rt-line, #242D39); background: var(--rt-surface-2, #1C2430); color: var(--rt-ink, #EDF1F7); font: 400 13.5px/1.5 'Public Sans', system-ui, sans-serif; } .ds-radio b { font-weight: 700; } .ds-radio-sub { display: block; color: var(--rt-ink-2, #9BA7B8); font-size: 12.5px; } .ds-radio-mark { width: 16px; height: 16px; flex: none; margin-top: 2px; border-radius: 50%; border: 1px solid var(--rt-line-strong, #38424F); background: var(--rt-surface, #141A22); } .ds-radio[aria-checked=true] { border-color: var(--rt-accent-edge, rgba(255, 157, 46, .34)); background: var(--rt-accent-tint, rgba(255, 157, 46, .10)); } .ds-radio[aria-checked=true] .ds-radio-mark { border: 5px solid var(--rt-accent, #FF9D2E); background: var(--rt-on-accent, #180D01); } .ds-radio:focus-visible { outline: 2px solid var(--rt-focus, #FFC578); outline-offset: 2px; }"
     },
     {
-      "name": "Idle Slab",
+      "name": "Upcoming Slab",
       "kind": "custom",
-      "description": "The overlay-side idle panel: a translucent dark slab built to sit on any OBS scene; deliberately off-token.",
+      "description": "The overlay-side Upcoming card: a translucent dark slab built to sit on any OBS scene; deliberately off-token.",
       "html": "<div class=\"ds-slab\"><div class=\"ds-slab-head\"><span class=\"ds-slab-lbl\">UPCOMING</span><span class=\"ds-slab-count\">1 / 2</span></div><div class=\"ds-slab-row\"><span class=\"ds-slab-tm\">Fri 22:30</span><span class=\"ds-slab-nm\">Friday Night Raid Train</span></div><div class=\"ds-slab-row\"><span class=\"ds-slab-tm\">Sat 19:00</span><span class=\"ds-slab-nm\">Weekend Express</span></div></div>",
       "css": ".ds-slab { border: 1px solid rgba(255, 255, 255, .09); border-radius: 9px; padding: 9px 11px; background: rgba(9, 12, 17, .88); backdrop-filter: blur(8px); color: #EDF1F7; box-shadow: 0 6px 22px rgba(0, 0, 0, .45); min-width: 210px; font-family: 'DM Mono', ui-monospace, monospace; } .ds-slab-head { display: flex; align-items: baseline; gap: 8px; padding-bottom: 6px; margin-bottom: 5px; border-bottom: 1px solid rgba(255, 255, 255, .07); } .ds-slab-lbl { font: 700 8.5px/1 'DM Mono', ui-monospace, monospace; letter-spacing: .2em; text-transform: uppercase; color: #FFC578; } .ds-slab-count { margin-left: auto; font: 500 8.5px/1 'DM Mono', ui-monospace, monospace; color: #71808F; letter-spacing: .06em; } .ds-slab-row { display: flex; align-items: baseline; gap: 9px; font-size: 11.5px; padding: 2.5px 0; font-family: 'Public Sans', system-ui, sans-serif; } .ds-slab-tm { font-family: 'DM Mono', ui-monospace, monospace; color: #FFC578; font-size: 10.5px; flex: none; min-width: 56px; } .ds-slab-nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }"
     }

@@ -184,9 +184,9 @@ test('the three-way maps onto the URL in all three positions', () => {
   assert.ok(!off.includes('upcoming'), 'Never: no card at all');
   assert.ok(!off.includes('upgap'));
 
-  const idleOnly = buildOverlayQuery({ user: 'goproflowyo', upcoming: '3', upgap: '0' });
-  assert.ok(idleOnly.includes('upcoming=3'));
-  assert.ok(idleOnly.includes('upgap=0'), 'Between trains only: the occasion is opted out');
+  const betweenOnly = buildOverlayQuery({ user: 'goproflowyo', upcoming: '3', upgap: '0' });
+  assert.ok(betweenOnly.includes('upcoming=3'));
+  assert.ok(betweenOnly.includes('upgap=0'), 'Between trains only: the occasion is opted out');
 
   const both = buildOverlayQuery({ user: 'goproflowyo', upcoming: '3' });
   assert.ok(both.includes('upcoming=3'));

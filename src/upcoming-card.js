@@ -1,6 +1,6 @@
 /**
- * upcoming-card: the Live Link's opt-in idle state — a compact, localized
- * panel listing the streamer's next raid trains while nothing is live (and
+ * upcoming-card: the Live Link's opt-in **Upcoming card** — a compact,
+ * localized panel listing the next raid trains while nothing is live (and
  * the whole product of an `uponly=1` source). Drawn in the sodium design
  * language the Configurator's "Between trains" preview promises — amber mono
  * departure times and label over a translucent near-black slab — via local
@@ -8,16 +8,26 @@
  * not block on one. Deliberately NOT themed art (it sits on any scene; the
  * per-Theme mini-train treatment is a possible future effort).
  *
- * OBS-perf friendly by construction: the card pages on a slow timer (one
- * batch of row swaps every `upcycle` seconds, animated by one-shot CSS), and
- * the ticker is a single transform-only CSS loop — no per-frame JS.
- * Verified headless on a live Event like the rest of the overlay DOM.
+ * One card, two views (its **Footprint**): the CARD VIEW turns a **Page** of
+ * three trains at a time, the SCROLLING VIEW carries the whole **Horizon**
+ * past on one seamless **Lap**. It scrolls, but it is never named after the
+ * **Mode** that makes the *Train* crawl — see CONTEXT.md's Pitfalls, and the
+ * guard in test/vocabulary.test.js that keeps this file honest about it. The
+ * param value is still `upstyle=ticker`, because it ships inside copied OBS
+ * browser sources; only the words moved, and the DOM class names below shadow
+ * the value rather than the word.
+ *
+ * OBS-perf friendly by construction: the card view turns its Page on a slow
+ * timer (one batch of row swaps every `upcycle` seconds, animated by one-shot
+ * CSS), and the scrolling view is a single transform-only CSS loop — no
+ * per-frame JS. Verified headless on a live Event like the rest of the
+ * overlay DOM.
  *
  * The knobs arrive on `config` (see parseConfig): `uppos` anchors the panel
  * in the scene (nine anchors, decoupled from the Train's own `height` — a
- * webcam or chat box decides where it can sit), `upop` is its opacity,
- * `upcycle` holds each page, and `upstyle`/`upscroll` pick and pace the
- * one-line ticker variant.
+ * webcam or chat box decides where it can sit) and caps it at that anchor's
+ * **Cell**, `upop` is its opacity, `upcycle` holds each Page, and
+ * `upstyle`/`upscroll` pick and pace the scrolling view.
  */
 
 import { visibleUpcoming, upcomingPages, CARD_MAX_ROWS } from './live-link.js';
@@ -94,24 +104,65 @@ function panelSignature(trains, config) {
 }
 
 /**
- * Anchor key → the inset/justify styles that put a shrink-wrapped box there.
- * Exported for tests (and reused by the Configurator's preview): this is the
- * whole uppos grammar in one place. Left/right anchors shrink-to-fit and the
- * ticker's content is one very long line, so the wrapper always carries a
- * max-width ceiling.
+ * The cell rule, in the owner's words: picture the scene as three columns and
+ * three rows. The nine `uppos` anchors are those nine cells, and an item at
+ * one anchor must not bleed into another column or row. So the cell is a
+ * third of the scene on each axis.
+ *
+ * Expressed in VIEWPORT UNITS and never measured in JS: OBS browser sources
+ * and our own tooling both report `window.innerWidth` as `0` in places, so a
+ * measured cell computes garbage exactly where it matters.
  */
-export function anchorStyle(key, pad = 24) {
+/**
+ * The whole box budget, in one place because its three parts are one thing:
+ * the `cell` an anchor may fill, the `pad` holding the panel off the screen
+ * edge (which comes OUT of the cell, never adds to it), and the `floor` below
+ * which the card view stops shrinking — when the cell can afford it.
+ *
+ * Sized for a 1080p OBS scene. The Configurator's preview passes its own,
+ * measured against its stage instead of the viewport.
+ */
+const BUDGET = { cell: { w: '33.3333vw', h: '33.3333vh' }, pad: 24, floor: '340px' };
+
+/**
+ * Anchor key → the whole box budget for a panel at that anchor: where it sits
+ * AND how much room it may take. Exported for tests and reused by the
+ * Configurator's preview, which passes a stage-relative budget (see the `.up`
+ * rules in configurator.html — one rule, two places, and a test holding them
+ * together).
+ *
+ * Placement and size live together on purpose. They used to be three
+ * independent rules — this grammar, plus a `max-width` on the card view and a
+ * `flex:1 1 auto` on the scrolling view — with nothing holding them to each
+ * other, and the scrolling view consequently spanned the whole screen at
+ * every anchor and every scene size. Both views are now flex children that
+ * fill this budget, so there is exactly one place a footprint is decided.
+ */
+export function anchorStyle(key, budget = {}) {
+  const { cell, pad, floor } = { ...BUDGET, ...budget };
   const [v, h] = (key ?? 'bc').split('');
-  const vert = v === 't' ? `top:${pad}px`
-    : v === 'm' ? 'top:50%;transform:translateY(-50%)'
-      : `bottom:${pad}px`;
+  const mid = v === 'm';
+  // Centre columns centre by transform rather than `left:0;right:0`: an edge-
+  // to-edge box leaves a max-width ceiling with nothing to bind against.
+  const centre = h !== 'l' && h !== 'r';
+  const vert = v === 't' ? `top:${pad}px` : mid ? 'top:50%' : `bottom:${pad}px`;
   const horz = h === 'l' ? `left:${pad}px;justify-content:flex-start`
     : h === 'r' ? `right:${pad}px;justify-content:flex-end`
-      : `left:0;right:0;justify-content:center;padding-left:${pad}px;padding-right:${pad}px`;
-  return `position:absolute;display:flex;pointer-events:none;max-width:calc(100% - ${pad * 2}px);${vert};${horz}`;
+      : 'left:50%;justify-content:center';
+  const shift = [centre && 'translateX(-50%)', mid && 'translateY(-50%)'].filter(Boolean);
+  // The inset that holds the panel off the screen edge comes OUT of the cell
+  // rather than adding to it, so no anchor can reach past its column or row.
+  // The floor is a `min()` against that same budget — a hard 340px is wider
+  // than a third of a 960-wide scene, which is the bleed the rule exists to
+  // prevent.
+  const box = `max-width:calc(${cell.w} - ${pad * 2}px)`
+    + `;max-height:calc(${cell.h} - ${pad * 2}px)`
+    + `;min-width:min(${floor}, ${cell.w} - ${pad * 2}px)`;
+  return `position:absolute;display:flex;pointer-events:none;${box};${vert};${horz}`
+    + (shift.length ? `;transform:${shift.join(' ')}` : '');
 }
 
-// The row-entry and ticker animations need keyframes, which cannot live in
+// The row-entry and scrolling animations need keyframes, which cannot live in
 // an inline style. Injected once, lazily, so importing this module in a test
 // runner with no DOM stays safe.
 const STYLE_ID = 'rt-upcoming-style';
@@ -123,6 +174,34 @@ function ensureStyles(doc) {
 @keyframes rt-upcoming-rowin { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: none; } }
 .rt-upcoming-row-enter { animation: rt-upcoming-rowin ${ROW_ENTER_MS}ms cubic-bezier(.22,.61,.36,1) both; }
 @keyframes rt-upcoming-ticker { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+.rt-upcoming-ticker-wrap {
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 26px, #000 calc(100% - 26px), transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 26px, #000 calc(100% - 26px), transparent);
+}
+/*
+ * The cell rule leaves the scrolling view a third of the scene, and inside
+ * that the eyebrow is a fixed ~209px caption competing with the trains it
+ * captions. Capping it at 40% only bought a truncated caption — "UPCOMING
+ * RAI…" over a window too narrow to hold a name — so below the width where it
+ * fits whole, it does not appear at all: no caption reads better than half of
+ * one. The secondary UTC stamp goes with it, and the edge fade narrows, both
+ * for the same reason. A third of the scene must clear 522px for the English
+ * eyebrow plus a readable remainder, which puts the scene at 1710px.
+ *
+ * The breakpoint is the VIEWPORT, not the panel: the cell is CSS viewport
+ * units precisely because OBS browser sources report window.innerWidth as 0,
+ * so a JS measurement of the panel is not available to branch on. It is tuned
+ * to the English eyebrow; the 40% cap stays as the fallback for locales whose
+ * label runs longer at scene widths above the breakpoint.
+ */
+@media (max-width: 1709px) {
+  .rt-upcoming-ticker-label,
+  .rt-upcoming-ticker-utc { display: none; }
+  .rt-upcoming-ticker-wrap {
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 14px, #000 calc(100% - 14px), transparent);
+    mask-image: linear-gradient(90deg, transparent, #000 14px, #000 calc(100% - 14px), transparent);
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   .rt-upcoming-row-enter { animation: none; }
   .rt-upcoming-ticker-run { animation: none !important; }
@@ -173,12 +252,16 @@ function timePair(train, config) {
   return [when, utc];
 }
 
-/** The 3-row paging card. Returns `{ panel, cleanup }` — the caller owns
+/** The card view: three rows, turning a Page. Returns `{ panel, cleanup }` — the caller owns
  *  attaching the cleanup, so the container handshake lives in one place. */
 function renderCard(trains, config) {
   const card = document.createElement('div');
   card.className = 'rt-upcoming-card';
-  card.style.cssText = `${panelCss(config)};max-width:min(72vw, 680px);min-width:340px;padding:14px 18px`;
+  // No width of its own: `anchorStyle` owns the box budget for both views, and
+  // the panel is the flex child that fills it. `overflow:hidden` makes the
+  // cell's height a real ceiling on a short scene rather than a nominal one —
+  // rows are clipped by the slab instead of spilling out of it.
+  card.style.cssText = `${panelCss(config)};flex:1 1 auto;min-width:0;overflow:hidden;padding:14px 18px`;
 
   const head = document.createElement('div');
   head.style.cssText = 'display:flex;align-items:baseline;gap:14px;padding-bottom:9px;margin-bottom:7px;border-bottom:1px solid rgba(255,255,255,0.07)';
@@ -258,18 +341,31 @@ function renderCard(trains, config) {
   return { panel: card, cleanup };
 }
 
-/** The one-line ticker: the whole horizon on a seamless transform-only loop. */
-function renderTicker(trains, config) {
-  const ticker = document.createElement('div');
-  ticker.className = 'rt-upcoming-ticker';
-  ticker.style.cssText = `${panelCss(config)};border-radius:999px;padding:11px 22px;display:flex;align-items:center;gap:16px;flex:1 1 auto;min-width:0`;
+/** The scrolling view: the whole Horizon on a seamless transform-only Lap. */
+function renderScrollingView(trains, config) {
+  const panel = document.createElement('div');
+  panel.className = 'rt-upcoming-ticker';
+  // `flex:1 1 auto;min-width:0` is the same fill rule the card view uses: the
+  // panel takes the budget `anchorStyle` set and no more. It used to be the
+  // whole width rule, which is why one line spanned whole screens — its
+  // content is one very long line, so with no ceiling above it there was
+  // nothing to shrink against.
+  panel.style.cssText = `${panelCss(config)};border-radius:999px;padding:11px 22px;display:flex;align-items:center;gap:16px;flex:1 1 auto;min-width:0`;
 
   const label = panelLabel(config);
-  label.style.flex = 'none';
-  ticker.appendChild(label);
+  // The eyebrow yields to the trains. It is a fixed ~209px at every scene size
+  // (13px mono, wide tracking), so inside a cell it is a caption eating the
+  // content's room: 35% of the budget at 1920, 55% at 1280, and everything at
+  // a 960-wide scene. Below 1710px it is hidden outright by the stylesheet —
+  // see the note there — and the 40% cap remains only as the longer-locale
+  // fallback above that width.
+  label.className = 'rt-upcoming-ticker-label';
+  label.style.cssText += ';flex:0 1 auto;max-width:40%;min-width:0;overflow:hidden;text-overflow:ellipsis';
+  panel.appendChild(label);
 
   const wrap = document.createElement('span');
-  wrap.style.cssText = 'overflow:hidden;flex:1;min-width:0;display:block;-webkit-mask-image:linear-gradient(90deg,transparent,#000 26px,#000 calc(100% - 26px),transparent);mask-image:linear-gradient(90deg,transparent,#000 26px,#000 calc(100% - 26px),transparent)';
+  wrap.className = 'rt-upcoming-ticker-wrap';
+  wrap.style.cssText = 'overflow:hidden;flex:1;min-width:0;display:block';
 
   const run = document.createElement('span');
   run.className = 'rt-upcoming-ticker-run';
@@ -281,6 +377,9 @@ function renderTicker(trains, config) {
     const [when, utc] = timePair(train, config);
     when.style.fontSize = '13.5px';
     utc.style.fontSize = '11.5px';
+    // Sheds below the eyebrow's breakpoint: the UTC anchor is the least of the
+    // three parts, and dropping it buys the name ~80px of the scroll window.
+    utc.className = 'rt-upcoming-ticker-utc';
     const name = document.createElement('span');
     name.textContent = train.title;
     name.style.textShadow = '0 1px 2px rgba(0,0,0,0.85), 0 0 8px rgba(0,0,0,0.5)';
@@ -305,8 +404,8 @@ function renderTicker(trains, config) {
   };
   run.append(lap(), lap());
   wrap.appendChild(run);
-  ticker.appendChild(wrap);
-  return ticker;
+  panel.appendChild(wrap);
+  return panel;
 }
 
 /** Chain a cleanup onto the container's without losing what's already there. */
@@ -350,7 +449,7 @@ function mountPanel(container, trains, config) {
   const anchor = document.createElement('div');
   anchor.style.cssText = `${anchorStyle(config.uppos)};opacity:0;transition:opacity ${PANEL_FADE_MS}ms ease`;
   const built = config.upstyle === 'ticker'
-    ? { panel: renderTicker(trains, config), cleanup: null }
+    ? { panel: renderScrollingView(trains, config), cleanup: null }
     : renderCard(trains, config);
   anchor.appendChild(built.panel);
   container.appendChild(anchor);
@@ -361,7 +460,7 @@ function mountPanel(container, trains, config) {
 }
 
 /**
- * Paint the idle panel into `container`. An empty `trains` list paints
+ * Paint the card into `container`. An empty `trains` list paints
  * nothing — the overlay stays fully transparent. `config` is the parsed
  * Overlay config (`t`, `locale`, and the up* knobs).
  *
@@ -417,7 +516,7 @@ export function renderUpcomingCard(container, trains, config) {
 
 /**
  * The shell's pre-Train hook: a train is about to render into `container`.
- * Cancels every pending idle-transition timer — an in-flight dissolve or
+ * Cancels every pending card-transition timer — an in-flight dissolve or
  * deferred mount would otherwise fire AFTER the Train renders and wipe or
  * cover it — and starts the exit fade of a standing panel. Returns how long
  * the Train render should wait for that farewell (0 when nothing stands).
@@ -429,7 +528,7 @@ export function retireUpcomingCard(container) {
   container._rtUpcomingCleanup = null;
   container._rtUpcomingAnchor = null;
   container._rtUpcomingPending = false;
-  container._rtUpcomingSig = undefined; // pristine — the next idle paints fresh
+  container._rtUpcomingSig = undefined; // pristine — the next card paints fresh
   if (!anchor) return 0;
   dissolve(container, anchor);
   return PANEL_FADE_MS + AFTER_EXIT_MS;

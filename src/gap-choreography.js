@@ -28,7 +28,7 @@ const MIN_CRAWL_SEC = 60;
 
 /**
  * How long one appearance lasts: the hold plus a fade each way. The hold is
- * always WHOLE units — whole pages, or whole ticker laps — because a partial
+ * always WHOLE units — whole **Page**s, or whole **Lap**s — because a partial
  * page teases rather than informs.
  */
 function stintFor(units, unitSec) {
@@ -67,10 +67,10 @@ export function gapSchedule({
   const usableTo = emptyToSec - LEAD_SEC;
   const usable = usableTo - usableFrom;
 
-  // The ticker's unit is a whole scroll lap; the paged card's is a whole page.
-  const ticker = style === 'ticker';
-  const unitSec = ticker ? upscrollSec : upcycleSec;
-  const maxUnits = ticker ? 1 : Math.max(1, pageCount);
+  // The scrolling view's unit is a whole Lap; the card view's is a whole Page.
+  const scrolling = style === 'ticker';
+  const unitSec = scrolling ? upscrollSec : upcycleSec;
+  const maxUnits = scrolling ? 1 : Math.max(1, pageCount);
 
   // A Breather sizes its gap to hold exactly one unit, so this comparison sits
   // right on the knife edge and binary rounding alone could send it to sit-out
@@ -104,7 +104,7 @@ export function gapSchedule({
     });
   }
 
-  const rung = ticker ? 'full'
+  const rung = scrolling ? 'full'
     : units === maxUnits ? 'full'
       : units === 1 ? 'one-page' : 'capped';
 
@@ -144,7 +144,7 @@ export function breatherCycle({
   // Breathers RECUR every cycle, so it is the CYCLE that must be the cadence:
   // making the crawl the cadence would push each Breather a whole Breather's
   // length further apart than asked. The crawl is what is left over — floored,
-  // so a very slow ticker lap shortens the gap between Breathers rather than
+  // so a very slow Lap shortens the gap between Breathers rather than
   // inverting it.
   const crawlSec = Math.max(MIN_CRAWL_SEC, cadenceSec - breatherSec);
   const cycleSec = crawlSec + breatherSec;

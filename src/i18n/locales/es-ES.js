@@ -36,7 +36,7 @@ export default {
   'configurator.llUrlAria': 'URL del Enlace en Directo',
   'configurator.llCopy': 'Copiar Enlace en Directo',
   'configurator.llSub': 'Pega esta <b>única URL</b> en OBS una sola vez. Siempre muestra tu raid train <b>en directo</b> — o el siguiente — usando los ajustes guardados de cada tren.',
-  'configurator.llIdleToggle': 'Mostrar una tarjeta de próximos trenes mientras no haya ninguno en directo',
+  'configurator.llUpcomingToggle': 'Mostrar una tarjeta de próximos trenes mientras no haya ninguno en directo',
   'configurator.noTrains': 'No hay raid trains en directo ni próximos. Únete a uno en RaidPal y aparecerá aquí.',
   'configurator.profileMenuHint': 'Un Perfil es simplemente un nombre de usuario de Twitch. Cada Perfil guarda sus propios raid trains, sus Configs de raid train y su Enlace en Directo.',
   'configurator.cfgLinkHint': 'Un enlace directo solo para este tren. Tu Enlace en Directo recoge estos ajustes automáticamente — este solo hace falta para una fuente fijada a este tren concreto.',
@@ -44,8 +44,8 @@ export default {
   'configurator.defaultPresetHint': 'Las nuevas Configs de raid train y tu Enlace en Directo parten de este Preajuste. Es lo mismo que la estrella en la <a href="#" data-act="goto-presets">Biblioteca de Preajustes</a>.',
   'configurator.oneOffSub': 'Crea un único enlace de overlay para cualquier evento de RaidPal — o escribe una programación a mano. Nada de esto toca tu Perfil, tus Preajustes ni tu Enlace en Directo.',
   'configurator.toastLiveLinkCopied': 'Enlace en Directo copiado — pégalo en OBS',
-  'configurator.toastIdleOn': 'Tarjeta de espera activada — vuelve a copiar tu Enlace en Directo',
-  'configurator.toastIdleOff': 'Tarjeta de espera desactivada — vuelve a copiar tu Enlace en Directo',
+  'configurator.toastUpcomingOn': 'Tarjeta de espera activada — vuelve a copiar tu Enlace en Directo',
+  'configurator.toastUpcomingOff': 'Tarjeta de espera desactivada — vuelve a copiar tu Enlace en Directo',
   'configurator.toastHorizonUpdated': 'Horizonte actualizado — vuelve a copiar tu Enlace en Directo',
 
   // "transmisión" (LatAm) → "emisión" (Spain)

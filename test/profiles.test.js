@@ -102,7 +102,7 @@ const DEFAULT_PREFS = {
   upcoming: null, uppos: null, upop: null, upcycle: null, upscroll: null, upstyle: null,
 };
 
-test('liveLinkPrefs round-trips the idle-card horizon, and defaults to no card', () => {
+test('liveLinkPrefs round-trips the Upcoming card Horizon, and defaults to no card', () => {
   let store = addProfile(EMPTY, 'alpha');
   assert.deepEqual(liveLinkPrefs(store, 'alpha'), DEFAULT_PREFS);
   store = setLiveLinkPrefs(store, 'alpha', { upcoming: '2w' });
@@ -116,7 +116,7 @@ test('liveLinkPrefs round-trips the idle-card horizon, and defaults to no card',
   assert.equal(setLiveLinkPrefs(legacy, 'beta', { upcoming: 'all' }).profiles.beta.liveLink.upcoming, 'all');
 });
 
-test('liveLinkPrefs carries the idle-card knobs, merged per-key', () => {
+test('liveLinkPrefs carries the Upcoming card knobs, merged per-key', () => {
   let store = addProfile(EMPTY, 'alpha');
   store = setLiveLinkPrefs(store, 'alpha', { upcoming: '3', uppos: 'tr', upop: '0.6' });
   store = setLiveLinkPrefs(store, 'alpha', { upstyle: 'ticker', upscroll: '44' });

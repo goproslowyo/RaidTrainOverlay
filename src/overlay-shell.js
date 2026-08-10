@@ -209,7 +209,7 @@ if (!config.event && !config.lineup && !config.user) {
       },
       onEvent(event) {
         current = { event, view: null };
-        // Retire any idle-card state FIRST, every time: it cancels pending
+        // Retire any Upcoming-card state FIRST, every time: it cancels pending
         // dissolve/mount timers (which would wipe or cover the Train after it
         // renders) and starts a standing panel's exit fade — the same manners
         // as the Train dissolving before the panel (upcoming-card.js). The

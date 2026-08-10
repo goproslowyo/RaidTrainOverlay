@@ -65,9 +65,16 @@ export function decodeTrainMap(str) {
  *   lead — the next upcoming train departs within `leadMs` (full render early,
  *          so viewers see the lineup as departure approaches)
  *   idle — nothing to render; `upcoming` carries the future trains for the
- *          opt-in card (#15)
+ *          opt-in **Upcoming card** (#15)
  *
  * Returns `{ state, train, upcoming }`.
+ *
+ * `idle` here names THE LINK having no train to show, which is the one sense
+ * of the word this project keeps. It is not a name for the card that fills
+ * that silence — CONTEXT.md's **Upcoming card** entry lists "idle card" under
+ * _Avoid_, and the code no longer says it. Leave `idle`, `onIdle` and
+ * `IDLE_RELOAD_MS` alone; they are about the Live Link and the page, not the
+ * panel.
  */
 export function resolveLiveTrain(events, now, leadMs = LEAD_MS) {
   const byStart = [...events].sort((a, b) => a.starttime - b.starttime);
@@ -86,7 +93,7 @@ const WEEK_MS = 7 * 24 * 60 * 60_000;
 const MONTH_MS = 30 * 24 * 60 * 60_000; // a card horizon, not a calendar — 30d is plenty
 
 /**
- * The trains the idle card lists, per the `upcoming=` spec (config.upcoming):
+ * The trains the Upcoming card lists — its Horizon, per the `upcoming=` spec:
  * null = card off (empty), `count` = next n, `weeks`/`months` = departing
  * within the window, `all` = everything upcoming.
  */
@@ -106,14 +113,14 @@ export function shouldSelfReload({ loadedAt, now }) {
   return now - loadedAt > IDLE_RELOAD_MS;
 }
 
-/** The idle card never grows past this many rows — it must not creep up a stream. */
+/** A Page never grows past this many rows — the card must not creep up a stream. */
 export const CARD_MAX_ROWS = 3;
 
 /**
  * The streamer's own slot in an Event's lineup, or null. `names` are the
  * candidate identities (login, display name — RaidPal's lineup only carries
  * display names), matched case-insensitively against occupied slots. This is
- * what lets the idle card say when the streamer actually PLAYS rather than
+ * what lets the Upcoming card say when the streamer actually PLAYS rather than
  * when the train departs — the reading everyone assumes anyway.
  */
 export function mySlot(event, names) {

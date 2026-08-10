@@ -31,7 +31,7 @@ export function userCacheKey(login) {
   return USER_CACHE_PREFIX + login.toLowerCase();
 }
 
-// The idle card re-reads a lineup this often at most (per slug); between
+// The Upcoming card re-reads a lineup this often at most (per slug); between
 // reads the Overlay's own event cache answers. Lineups shift, but slot times
 // rarely move within hours — and the resolve tick re-runs this every cycle.
 const SLOT_FRESH_MS = 6 * 60 * 60_000;

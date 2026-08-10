@@ -72,7 +72,7 @@ test('per-train Spotlights ride as additions only, deduped against the standing 
   assert.deepEqual(parseConfig(effectiveQuery(query, map['lucky-13'])).spotlight, ['dj_nova', 'guest_kai']);
 });
 
-test('the query carries user, the base settings, the blob and the idle horizon', () => {
+test('the query carries user, the base settings, the blob and the Horizon', () => {
   const { library, presetId, store } = fixture();
   let s = setLiveLinkPrefs(store, 'gostreamcore', { upcoming: '2w' });
   s = upsertTrainConfig(s, 'gostreamcore', 'lucky-13', { presetId, overrides: { theme: 'tron' } });
@@ -86,12 +86,12 @@ test('the query carries user, the base settings, the blob and the idle horizon',
   assert.deepEqual(decodeTrainMap(config.trains)['lucky-13'].overrides, { theme: 'tron' });
 });
 
-test('no idle preference means no upcoming param — the card stays off', () => {
+test('no Horizon preference means no upcoming param — the card stays off', () => {
   const { library, store } = fixture();
   assert.ok(!new URLSearchParams(buildLiveLinkQuery(library, store, 'gostreamcore')).has('upcoming'));
 });
 
-test('the idle-card knobs ride the Live Link when set, and vanish at defaults', () => {
+test('the Upcoming card\'s knobs ride the Live Link when set, and vanish at defaults', () => {
   const { library, store } = fixture();
   let s = setLiveLinkPrefs(store, 'gostreamcore', {
     upcoming: '5', uppos: 'tr', upop: '0.6', upcycle: '8', upscroll: '44', upstyle: 'ticker',

@@ -66,12 +66,12 @@ instead of `event`, plus its own params — all written by the Configurator:
 |---|---|
 | `user` | Twitch login; the overlay resolves your live (or next) train from RaidPal at load. |
 | `trains` | Per-train settings blob (each train's saved differences from your base look). |
-| `upcoming` | Between trains, list what's coming up: `3` (next 3), `2w` (2 weeks), `1m`, `all`. Omitted = fully transparent when idle. |
+| `upcoming` | Between trains, list what's coming up: `3` (next 3), `2w` (2 weeks), `1m`, `all`. Omitted = fully transparent between trains. |
 | `upstyle` | How much room the listing takes: `card` (default, three rows, pages through longer lists) or `ticker` (one line, scrolling the whole list on a loop). Independent of `mode` — this is the listing's shape, not the train's. |
 | `uppos` | Where it sits in your scene: nine anchors, `tl`/`tc`/`tr`/`ml`/`mc`/`mr`/`bl`/`bc` (default)/`br`. |
 | `upop` | Its opacity, `0.3`–`1` (default `0.88`). |
 | `upcycle` | Seconds each page of three is held (default `12`). |
-| `upscroll` | Seconds per ticker lap (default `34`; higher is slower). |
+| `upscroll` | Seconds for one full lap of the scrolling view (default `34`; higher is slower). |
 | `uponly` | Upcoming-trains-only source for a separate OBS scene: always the listing, never the train — even while one is live. |
 | `upgap` | On by default: while a train is live, the listing also pops up briefly in the pauses — between passes, or in a marquee's breathers — never over the train itself. `upgap=0` turns that off, leaving the listing to appear only between trains. |
 

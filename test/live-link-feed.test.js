@@ -114,9 +114,9 @@ test('a live train also delivers the horizon: onHorizon lists the OTHER upcoming
   assert.deepEqual(calls.idles, [], 'a live train is not idle');
 });
 
-test('the live horizon is annotated like the idle one: cached lineups carry mySlotAt', async () => {
+test('the live Horizon is annotated like the between-trains one: cached lineups carry mySlotAt', async () => {
   // The live horizon must not be a less-informed second class: its rows say
-  // when the streamer PLAYS, exactly as the idle card's rows do.
+  // when the streamer PLAYS, exactly as the Upcoming card's rows do.
   const lineup = (slotIso) => ({
     payload: makeEventPayload({
       time_table: [{
@@ -158,7 +158,7 @@ test('the horizon stays fresh while the SAME train keeps running', async () => {
   assert.ok(calls.horizons.length > before, 're-resolving re-delivers the horizon');
 });
 
-test('uponly: even a LIVE train resolves to the idle card — never onSwitch, never a lineup fetch', async () => {
+test('uponly: even a LIVE train resolves to the Upcoming card — never onSwitch, never a lineup fetch', async () => {
   // The upcoming-only Live Link (a second URL for a separate OBS scene):
   // whatever resolveLiveTrain says, this source renders the upcoming card.
   const log = [];
@@ -180,7 +180,7 @@ test('uponly: even a LIVE train resolves to the idle card — never onSwitch, ne
   assert.deepEqual(log, [userUrl, eventUrl('trainwreck-lucky-13'), eventUrl('my-own-train')]);
 });
 
-test('the idle card learns when the streamer actually plays: cached lineups annotate mySlotAt', async () => {
+test('the Upcoming card learns when the streamer actually plays: cached lineups annotate mySlotAt', async () => {
   // The user payload's display name is 'GoProFlowYo'; seed both upcoming
   // events' lineups (the Overlay's own event cache) with a slot of theirs.
   const lineup = (slotIso) => ({

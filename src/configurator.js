@@ -71,11 +71,11 @@ export function buildOverlayQuery(formState = {}) {
   // (?event=). Only one is ever emitted; everything else (the knobs below) is shared.
   if (formState.user) {
     // Live Link: a Profile login, not an Event — the Overlay resolves the live/next
-    // train itself. Its per-train mapping blob and idle-card horizon ride along.
+    // train itself. Its per-train mapping blob and Upcoming-card Horizon ride along.
     params.set('user', String(formState.user));
     if (formState.trains) params.set('trains', String(formState.trains));
     if (formState.upcoming) params.set('upcoming', String(formState.upcoming));
-    // The idle card's own knobs (per-Profile Live Link prefs, never per-train).
+    // The Upcoming card's own knobs (per-Profile Live Link prefs, never per-train).
     if (formState.uppos) params.set('uppos', String(formState.uppos));
     if (formState.upstyle) params.set('upstyle', String(formState.upstyle));
     if (formState.uponly) params.set('uponly', '1');

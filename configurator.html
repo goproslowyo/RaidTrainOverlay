@@ -325,9 +325,9 @@
     .url-row.stacked .btn { flex: 1 1 0; min-width: 0; justify-content: center; }
     /* Collapsed, the settings fold wears the sodium edge — a closed grey box
        reads as a label; the border says "this opens". */
-    .ll-idle-fold:not([open]) { border-color: var(--rt-sodium-edge); }
-    .ll-idle-fold:not([open]) > summary:hover { background: var(--rt-accent-tint); }
-    .ll-idle-fold:not([open]) .g-chev { color: var(--rt-sodium-300); }
+    .ll-upcoming-fold:not([open]) { border-color: var(--rt-sodium-edge); }
+    .ll-upcoming-fold:not([open]) > summary:hover { background: var(--rt-accent-tint); }
+    .ll-upcoming-fold:not([open]) .g-chev { color: var(--rt-sodium-300); }
     /* The re-copy rule (`configurator.llWarn`): settings ARE the URL, so it
        gets a visible row, not a footnote. */
     .ll-note {
@@ -342,10 +342,10 @@
       color: var(--rt-ink); border-color: var(--rt-danger-edge); background: var(--rt-danger-tint);
     }
     .ll-note.bad .w { color: var(--rt-danger); }
-    .ll-idle-fold { margin-top: 13px; margin-bottom: 0; background: var(--rt-well); }
+    .ll-upcoming-fold { margin-top: 13px; margin-bottom: 0; background: var(--rt-well); }
     .ll-meta { color: var(--rt-ink-2); font-size: 12.5px; margin-top: 10px; }
 
-    /* ── The idle-card fields (shared by Simple and the Live Link card) ── */
+    /* ── The Upcoming-card fields (shared by Simple and the Live Link card) ── */
     .sfield { display: grid; gap: 7px; padding: 13px 0; border-bottom: 1px solid var(--rt-line); }
     .sfield:last-child { border-bottom: 0; padding-bottom: 4px; }
     .sfield .flabel { display: flex; align-items: center; gap: 9px; font: 600 13.5px/1.2 var(--rt-font-ui); }
@@ -389,7 +389,7 @@
     .posdot[aria-checked=true]::after { background: var(--rt-accent); width: 9px; height: 6px; box-shadow: var(--rt-glow-sodium); }
     .posdot:disabled { opacity: .4; }
 
-    /* ── The idle-state mock preview (checkerboard = OBS transparency) ── */
+    /* ── The Upcoming-card mock preview (checkerboard = OBS transparency) ── */
     .pf { position: relative; border: 1px solid var(--rt-line); border-radius: var(--rt-radius-lg); overflow: hidden; background: var(--rt-well); min-width: 0; }
     .pf .stage {
       position: relative; height: 240px;
@@ -399,7 +399,7 @@
         linear-gradient(45deg, rgba(255,255,255,.028) 25%, transparent 25%, transparent 75%, rgba(255,255,255,.028) 75%);
       background-size: 22px 22px; background-position: 0 0, 11px 11px;
     }
-    /* The idle preview's stage plays a stand-in STREAM SCENE rather than the
+    /* The card preview's stage plays a stand-in STREAM SCENE rather than the
        transparency checkerboard: the card's whole point between trains is how
        it sits over a scene, and near-black-on-checkerboard makes the opacity
        and blur controls read as broken (nothing visibly changes). Soft glows +
@@ -422,14 +422,21 @@
       position: absolute; top: 9px; left: 11px; font: 500 10px/1 var(--rt-font-mono); letter-spacing: .14em;
       text-transform: uppercase; color: var(--rt-ink-3);
     }
-    /* The mock idle card itself — the same skin the Overlay paints. */
+    /* The mock card itself — the same skin the Overlay paints.
+
+       ⚠ THE CELL RULE LIVES IN TWO PLACES. Both views take exactly the box the
+       anchor wrapper budgets them (a third of the stage, from PREVIEW_BUDGET in
+       the script below) — the same `flex: 1 1 auto; min-width: 0` fill rule
+       upcoming-card.js gives renderCard and renderTicker. No width of their
+       own: an independent width here is what let the Overlay's one-line view
+       span whole screens at every anchor. Change one place, change the other. */
     .up {
       border: 1px solid rgba(255, 255, 255, .09); border-radius: 9px; padding: 9px 11px;
       background: rgba(9, 12, 17, var(--upop, .88)); backdrop-filter: blur(8px); color: #EDF1F7;
-      box-shadow: 0 6px 22px rgba(0, 0, 0, .45); min-width: 210px;
-      /* Never wider than the anchor allows — a long train name ellipsises
-         inside the card (see .row .nm), it must not stretch the card. */
-      max-width: 100%;
+      box-shadow: 0 6px 22px rgba(0, 0, 0, .45);
+      /* A long train name ellipsises inside the card (see .row .nm); it must
+         not stretch the card, and the card must not out-vote its cell. */
+      flex: 1 1 auto; min-width: 0; overflow: hidden;
     }
     .up .uphead { display: flex; align-items: baseline; gap: 8px; padding-bottom: 6px; margin-bottom: 5px; border-bottom: 1px solid rgba(255, 255, 255, .07); }
     .up .lbl { font: 700 8.5px/1 var(--rt-font-mono); letter-spacing: .2em; text-transform: uppercase; color: #FFC578; }
@@ -450,11 +457,16 @@
     /* The UTC anchor every row carries on the real card — viewers are
        worldwide, so a local-only time would mean nothing to most of them. */
     .up .row .utc { margin-left: auto; flex: none; font-family: var(--rt-font-mono); font-size: 9px; color: rgba(237, 241, 247, .45); white-space: nowrap; }
-    /* One-line variant: a real ticker, duplicated so the loop has no seam.
-       Sized to take most of the scene's width — a ticker squeezed into a
-       sliver shows one word at a time and reads as broken. */
-    .up.ticker { display: flex; align-items: center; gap: 11px; border-radius: 999px; padding: 8px 16px; flex: 1 1 auto; min-width: 0; }
-    .up.ticker .lbl { flex: none; }
+    /* One-line variant: a real scrolling line, duplicated so the loop has no
+       seam. It takes its anchor's cell and no more — a third of the stage.
+       That is fewer trains on screen at once than the old full-width line, and
+       deliberately so: the content scrolls, so it comes to the viewer, whereas
+       a line that spans the whole scene ignores where the streamer put it. */
+    .up.ticker { display: flex; align-items: center; gap: 11px; border-radius: 999px; padding: 8px 16px; }
+    /* The eyebrow yields to the trains — the same 40% cap upcoming-card.js
+       puts on it. A caption at a fixed width inside a fixed cell starves the
+       content it captions; past 40% of the panel it truncates instead. */
+    .up.ticker .lbl { flex: 0 1 auto; max-width: 40%; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
     .tickwrap { overflow: hidden; flex: 1; min-width: 0; -webkit-mask-image: linear-gradient(90deg, transparent, #000 22px, #000 calc(100% - 22px), transparent); mask-image: linear-gradient(90deg, transparent, #000 22px, #000 calc(100% - 22px), transparent); }
     .tickrun { display: inline-flex; white-space: nowrap; animation: tickscroll var(--tickdur, 34s) linear infinite; }
     /* The gap lives inside each lap (plus a matching trailing pad), never on
@@ -947,7 +959,7 @@
   // preference, so device-level rather than per-Profile.
   const HOMEVIEW_KEY = 'raidtrainoverlay.configurator.homeview.v1';
 
-  // The idle card's horizons, in the `upcoming=` grammar the Overlay parses,
+  // The card's Horizons, in the `upcoming=` grammar the Overlay parses,
   // each pointing at its catalog key rather than an English label.
   const HORIZON_KEYS = {
     '3': 'configurator.horizon3', '5': 'configurator.horizon5', '2w': 'configurator.horizon2w',
@@ -977,16 +989,16 @@
     shuffle: ['#2A2033', '#0C0A12', '#FF9D2E', '#3C6E9F', '#7A3DF0', 3],
   };
 
-  // The idle card's nine scene anchors, in reading order — the same grammar
+  // The card's nine scene anchors, in reading order — the same grammar
   // parseConfig's `uppos` accepts.
   const POSITIONS = [
     ['tl', 'configurator.posTl'], ['tc', 'configurator.posTc'], ['tr', 'configurator.posTr'],
     ['ml', 'configurator.posMl'], ['mc', 'configurator.posMc'], ['mr', 'configurator.posMr'],
     ['bl', 'configurator.posBl'], ['bc', 'configurator.posBc'], ['br', 'configurator.posBr'],
   ];
-  // The Overlay's own defaults for the idle-card knobs (config.js) — what a
+  // The Overlay's own defaults for the card's knobs (config.js) — what a
   // null pref means, and what the controls show before a pref is stored.
-  const IDLE_DEFAULTS = { uppos: 'bc', upop: '0.88', upcycle: '12', upscroll: '34', upstyle: 'card', upgap: '1' };
+  const UPCOMING_DEFAULTS = { uppos: 'bc', upop: '0.88', upcycle: '12', upscroll: '34', upstyle: 'card', upgap: '1' };
   // The scroll-speed slider reads left-slow → right-fast while the value is a
   // DURATION (bigger = slower), so it is stored flipped: value = FLIP − slider.
   // Lap range 24s (fastest — still readable) to 120s (a genuinely lazy crawl);
@@ -1069,8 +1081,8 @@
     copied: false,         // setup stop 3: has the Live Link been copied here
     themesOpen: false,     // Simple/stop 2: theme grid expanded past one row
     justLanded: false,     // show the graduation ribbon once after setup
-    idlePage: 0,           // which page the idle-card mock preview is showing
-    llIdleOpen: false,     // the idle-card settings fold (Simple + Live Link page)
+    upcomingPage: 0,           // which Page the Upcoming-card mock is showing
+    llUpcomingOpen: false,     // the Upcoming-card settings fold (Simple + Live Link page)
     view: 'trains',        // trains | presets | profile | oneoff
     editing: null,         // Event slug — the Raid Train Config editor is open
     editingPreset: null,   // Preset id — the Preset editor is open
@@ -1399,9 +1411,9 @@
   // ── View: My Raid Trains ───────────────────────────────────────────────
   /**
    * The Live Link card — the URL, its copy/preview row and its coverage
-   * facts. The idle-card group is deliberately NOT in here: those settings
+   * facts. The Upcoming-card group is deliberately NOT in here: those settings
    * shape the upcoming-trains card on BOTH links, so the Live Link page
-   * renders them as their own shared section (idleSharedSectionHtml), and
+   * renders them as their own shared section (upcomingSharedSectionHtml), and
    * Simple keeps its "Between trains" stage.
    */
   function liveLinkCardHtml() {
@@ -1453,27 +1465,27 @@
   }
 
   /**
-   * The idle-card settings as their own section: ONE card, shown by BOTH
+   * The Upcoming-card settings as their own section: ONE card, shown by BOTH
    * links (between trains on the Live Link, all the time on the
    * upcoming-trains link) — so the settings sit beside the two links they
    * shape, owned by neither. Inside the Live Link card they read as the Live
    * Link's alone, which is exactly what they aren't.
    */
-  /** The idle card's settings in one glance — every fold summary reads this. */
-  function idleStatusLine() {
-    const v = idleValues();
-    if (v.upcoming == null) return te('configurator.idleOffNote');
-    return [te(v.upstyle === 'ticker' ? 'configurator.footTicker' : 'configurator.footCard'),
+  /** The card's settings in one glance — every fold summary reads this. */
+  function upcomingStatusLine() {
+    const v = upcomingValues();
+    if (v.upcoming == null) return te('configurator.upcomingOffNote');
+    return [te(v.upstyle === 'ticker' ? 'configurator.footScrolling' : 'configurator.footCard'),
       te((POSITIONS.find(([k]) => k === v.uppos) ?? POSITIONS[7])[1]),
       te(HORIZON_KEYS[v.upcoming] ?? 'configurator.horizon3')].join(' · ');
   }
 
-  /** The shared collapsed-by-default fold both surfaces wrap the idle group in. */
-  function idleFoldHtml(label, body) {
-    return `<details class="fgroup ll-idle-fold" id="ll-idle-fold"${state.llIdleOpen ? ' open' : ''}>
+  /** The shared collapsed-by-default fold both surfaces wrap the card group in. */
+  function upcomingFoldHtml(label, body) {
+    return `<details class="fgroup ll-upcoming-fold" id="ll-upcoming-fold"${state.llUpcomingOpen ? ' open' : ''}>
       <summary>
         <span class="g-label">${label}</span>
-        <span class="cap dim" style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${idleStatusLine()}</span>
+        <span class="cap dim" style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${upcomingStatusLine()}</span>
         <span class="g-chev" aria-hidden="true">${icon('chev', 12)}</span>
       </summary>
       <div class="fgroup-body">${body}
@@ -1486,11 +1498,11 @@
     </details>`;
   }
 
-  function idleSharedSectionHtml() {
+  function upcomingSharedSectionHtml() {
     return `<section class="card">
-      <div class="ll-head"><h2>${te('configurator.llIdleCardTitle')}</h2></div>
-      <p class="ll-sub">${te('configurator.idleSharedNote')}</p>
-      ${idleFoldHtml(te('configurator.settings'), idleControlsHtml())}
+      <div class="ll-head"><h2>${te('configurator.llUpcomingTitle')}</h2></div>
+      <p class="ll-sub">${te('configurator.upcomingSharedNote')}</p>
+      ${upcomingFoldHtml(te('configurator.settings'), upcomingControlsHtml())}
     </section>`;
   }
 
@@ -1515,7 +1527,7 @@
           <button type="button" class="btn gold" data-act="copy-uponly">${te('configurator.llUpOnlyCopy')}</button>
         </div>
       </section>
-      ${idleSharedSectionHtml()}
+      ${upcomingSharedSectionHtml()}
       ${obsStepsHtml()}`;
   }
 
@@ -1874,16 +1886,16 @@
   }
 
   // ── Variant D: shared partials for Simple and the setup journey ────────
-  /** The Profile's upcoming trains (soonest first), for the idle mock + counts. */
+  /** The Profile's upcoming trains (soonest first), for the card mock + counts. */
   function upcomingTrains() {
     if (state.feed.status !== 'ready') return [];
     return classifyTrains(state.feed.events, Date.now()).upcoming;
   }
-  /** The effective idle-card knob values: stored prefs over the Overlay defaults. */
-  function idleValues() {
+  /** The effective Upcoming-card knob values: stored prefs over the Overlay defaults. */
+  function upcomingValues() {
     const prefs = me() ? liveLinkPrefs(profiles, me()) : {};
-    const out = { ...IDLE_DEFAULTS, upcoming: prefs.upcoming ?? null };
-    for (const key of Object.keys(IDLE_DEFAULTS)) {
+    const out = { ...UPCOMING_DEFAULTS, upcoming: prefs.upcoming ?? null };
+    for (const key of Object.keys(UPCOMING_DEFAULTS)) {
       if (prefs[key] != null) out[key] = String(prefs[key]);
     }
     return out;
@@ -1918,7 +1930,7 @@
   }
 
   /**
-   * Rows for the idle mock: the real feed, or labeled examples before it
+   * Rows for the card mock: the real feed, or labeled examples before it
    * loads. Example departures are synthesized as real near-future instants and
    * run through the same formatter as real rows, so they localize; only the
    * train names are literals (proper nouns, like the demo lineup's).
@@ -1933,7 +1945,7 @@
     return mySlot(detail, [me(), state.feed.displayName])?.starttime ?? e.starttime;
   }
 
-  function idleMockRows() {
+  function upcomingMockRows() {
     const asRow = (date, title) => [fmtDep(date), title, fmtDepUtc(date)];
     const real = upcomingTrains();
     if (real.length > 0) return { rows: real.map((e) => asRow(mockWhen(e), e.title)), example: false };
@@ -1951,7 +1963,34 @@
 
   /* The mock's anchor styles come from the Overlay's own grammar
      (upcoming-card.js anchorStyle) — one source of truth, so the picker can
-     never promise a position the Overlay doesn't paint. */
+     never promise a position the Overlay doesn't paint.
+
+     ⚠ THE CELL RULE LIVES IN TWO PLACES. The Overlay budgets each anchor at a
+     third of the SCENE (33.3333vw/vh); this stage is a preview panel, not the
+     viewport, so it passes the same third measured against the STAGE and a
+     floor at the mock's own scale. Change one and you must change the other,
+     or the preview promises a footprint OBS will not deliver. There is no
+     abstraction spanning an HTML file and a JS module — there is this note,
+     and its twin on the `.up` rules in the stylesheet above. */
+  const PREVIEW_BUDGET = { pad: 12, cell: { w: '33.3333%', h: '33.3333%' }, floor: '210px' };
+  /**
+   * The mock is a legible cartoon, not a scale model: its type is roughly
+   * three times the size a true 1:1 miniature of a 1080p card would have at
+   * this stage's ~440px. That was harmless while the mock could take the whole
+   * stage, and fatal the moment it had to fit a third of one — at 1:1 the card
+   * clipped to a row and a half and the one-line variant showed no trains at
+   * all.
+   *
+   * `zoom` on the anchor wrapper resolves it in one property. Percentages
+   * inside a zoomed box resolve against the containing block divided by the
+   * zoom, so the wrapper's `33.3333%` cell PAINTS at exactly a third of the
+   * stage whatever this number is — the footprint is unchanged — while the
+   * mock's authored pixels get 1/zoom as much room to lay out in. The value is
+   * the smallest exaggeration at which nothing clips and every column still
+   * has width; measured against the Overlay, the painted card comes out at 31%
+   * of the scene's width, which is what OBS renders at 1920 (592 of 1920).
+   */
+  const PREVIEW_ZOOM = 0.45;
 
   /**
    * The [time, name] rows the mock actually shows for a horizon — the
@@ -1959,24 +1998,24 @@
    * hint derives its page math from THIS list, so the hint can never
    * contradict the mock's own page badge beside it.
    */
-  function idleMockList(horizon) {
-    const { rows, example } = idleMockRows();
+  function upcomingMockList(horizon) {
+    const { rows, example } = upcomingMockRows();
     const matched = example ? rows : horizonTrains(horizon).map((e) => [fmtDep(mockWhen(e)), e.title, fmtDepUtc(mockWhen(e))]);
     return matched.length > 0 ? matched : rows;
   }
 
-  /** The idle-card mock itself (the same skin the Overlay paints). */
-  function idleMockHtml() {
-    const v = idleValues();
+  /** The Upcoming-card mock itself (the same skin the Overlay paints). */
+  function upcomingMockHtml() {
+    const v = upcomingValues();
     const horizon = v.upcoming ?? '3';
-    const list = idleMockList(horizon);
+    const list = upcomingMockList(horizon);
     if (v.upstyle === 'ticker') {
       const run = list.map(([tm, nm, utc]) => `<span class="tick"><span class="tm">${esc(tm)}</span>${esc(nm)}<span class="utc">${esc(utc ?? '')}</span></span>`).join('<span class="tsep">•</span>');
       // Two identical LAP spans (each closing with its separator + a matching
       // pad) so the -50% loop is seamless — the same discipline as the real
-      // ticker in upcoming-card.js.
+      // scrolling view in upcoming-card.js.
       const lapHtml = `<span class="ticklap">${run}<span class="tsep">•</span></span>`;
-      return `<div style="${anchorStyle(v.uppos, 12)}">
+      return `<div style="zoom:${PREVIEW_ZOOM};${anchorStyle(v.uppos, PREVIEW_BUDGET)}">
         <div class="up ticker" style="--upop:${esc(v.upop)};--tickdur:${esc(v.upscroll)}s">
           <span class="lbl">${te('overlay.upcoming')}</span>
           <span class="tickwrap"><span class="tickrun">${lapHtml}${lapHtml}</span></span>
@@ -1985,11 +2024,11 @@
     // The same paging the Overlay ships (live-link.js) — the mock must
     // demonstrate the behaviour, not a re-implementation of it.
     const pages = upcomingPages(list);
-    const page = ((state.idlePage % pages) + pages) % pages;
+    const page = ((state.upcomingPage % pages) + pages) % pages;
     const win = visibleUpcoming(list, page);
     const rowsHtml = win.map(([tm, nm, utc]) => `
       <div class="row enter"><span class="tm">${esc(tm)}</span><span class="nm">${esc(nm)}</span><span class="utc">${esc(utc ?? '')}</span></div>`).join('');
-    return `<div style="${anchorStyle(v.uppos, 12)}">
+    return `<div style="zoom:${PREVIEW_ZOOM};${anchorStyle(v.uppos, PREVIEW_BUDGET)}">
       <div class="up" style="--upop:${esc(v.upop)}">
         <div class="uphead">
           <span class="lbl">${te('overlay.upcoming')}</span>
@@ -1999,34 +2038,34 @@
       </div></div>`;
   }
 
-  /** The idle mock inside its stand-in stream-scene stage. */
-  function idleStageHtml() {
-    const v = idleValues();
+  /** The card mock inside its stand-in stream-scene stage. */
+  function upcomingStageHtml() {
+    const v = upcomingValues();
     const on = v.upcoming != null;
-    const caption = !on ? te('configurator.idleCapOff')
-      : v.upstyle === 'ticker' ? te('configurator.idleCapTicker')
-        : te('configurator.idleCapCard', { s: v.upcycle });
-    const example = on && idleMockRows().example
-      ? ` <span class="dim">${te('configurator.idleExample')}</span>` : '';
+    const caption = !on ? te('configurator.upcomingCapOff')
+      : v.upstyle === 'ticker' ? te('configurator.upcomingCapScrollingView')
+        : te('configurator.upcomingCapCardView', { s: v.upcycle });
+    const example = on && upcomingMockRows().example
+      ? ` <span class="dim">${te('configurator.upcomingExample')}</span>` : '';
     return `<div class="pf">
-      <div class="stage scene"><span class="stagelabel">${te('configurator.idleStageLabel')}</span><span id="idle-mock">${on ? idleMockHtml() : ''}</span></div>
+      <div class="stage scene"><span class="stagelabel">${te('configurator.upcomingStageLabel')}</span><span id="upcoming-mock">${on ? upcomingMockHtml() : ''}</span></div>
       <div class="pf-cap">${caption}${example}</div>
     </div>`;
   }
 
   /**
-   * The idle-card controls — the Live Link group. Per-Profile (the idle state
-   * exists outside any single raid train), so these live beside the horizon
+   * The Upcoming-card controls — the Live Link group. Per-Profile (the card
+   * exists outside any single raid train), so these live beside the Horizon
    * toggle, never in the Preset/override model. Shared by Simple's "Between
    * trains" section (as two columns under the preview) and Everything's Live
-   * Link card (as one stack) — `idleControlParts` is the single source.
+   * Link card (as one stack) — `upcomingControlParts` is the single source.
    */
-  function idleControlParts() {
-    const v = idleValues();
+  function upcomingControlParts() {
+    const v = upcomingValues();
     const on = v.upcoming != null;
     // The three-way: Never / Between trains / Between trains and while one is
     // live. `upgap` is the opt-out, so its ABSENCE is the third position.
-    const occ = !on ? 'off' : (String(v.upgap) === '0' ? 'idle' : 'both');
+    const occ = !on ? 'off' : (String(v.upgap) === '0' ? 'between' : 'both');
     const dis = on ? '' : ' disabled';
     const horizon = v.upcoming ?? '3';
     const options = Object.entries(HORIZON_KEYS)
@@ -2034,39 +2073,39 @@
     const matches = horizonTrains(horizon).length;
     const matchNote = on
       ? (state.feed.status === 'ready'
-        ? esc(plural(matches, 'configurator.idleMatchesOne', 'configurator.idleMatchesMany'))
+        ? esc(plural(matches, 'configurator.upcomingMatchesOne', 'configurator.upcomingMatchesMany'))
         : '')
-      : te('configurator.idleOffNote');
+      : te('configurator.upcomingOffNote');
     const cycleHint = (() => {
-      const n = on ? idleMockList(horizon).length : 0;
+      const n = on ? upcomingMockList(horizon).length : 0;
       if (n <= CARD_MAX_ROWS) return te('configurator.cycleHintFits');
-      const pages = upcomingPages(idleMockList(horizon));
+      const pages = upcomingPages(upcomingMockList(horizon));
       const s = Number(v.upcycle);
       return t('configurator.cycleHintPages', { pages, s, n, total: `<b>${pages * s}</b>` });
     })();
     const posLabel = POSITIONS.find(([k]) => k === v.uppos);
     const main = `
       <div class="sfield">
-        <span class="flabel">${te('configurator.idleWhenLabel')}</span>
+        <span class="flabel">${te('configurator.upcomingOccasionLabel')}</span>
         <div class="seg wide" style="margin-top:2px">
-          <button type="button" data-act="idleocc" data-id="off" aria-pressed="${occ === 'off'}">${te('configurator.idleOccOff')}</button>
-          <button type="button" data-act="idleocc" data-id="idle" aria-pressed="${occ === 'idle'}">${te('configurator.idleOccIdle')}</button>
-          <button type="button" data-act="idleocc" data-id="both" aria-pressed="${occ === 'both'}">${te('configurator.idleOccBoth')}</button>
+          <button type="button" data-act="occasion" data-id="off" aria-pressed="${occ === 'off'}">${te('configurator.upcomingOccNever')}</button>
+          <button type="button" data-act="occasion" data-id="between" aria-pressed="${occ === 'between'}">${te('configurator.upcomingOccBetween')}</button>
+          <button type="button" data-act="occasion" data-id="both" aria-pressed="${occ === 'both'}">${te('configurator.upcomingOccBoth')}</button>
         </div>
-        ${occ === 'both' ? `<span class="fhint">${te('configurator.idleOccBothHint')}</span>` : ''}
+        ${occ === 'both' ? `<span class="fhint">${te('configurator.upcomingOccBothHint')}</span>` : ''}
         <div class="rangerow" style="margin-top:8px">
           <select id="ll-horizon"${dis} style="max-width:190px" aria-label="${te('configurator.llHorizonAria')}">${options}</select>
           <span class="cap dim">${matchNote}</span>
         </div>
-        <span class="fhint">${te('configurator.idleHint')}</span>
+        <span class="fhint">${te('configurator.upcomingHint')}</span>
       </div>
       <div class="sfield">
         <span class="flabel">${te('configurator.footLabel')}</span>
         <div class="seg wide" style="margin-top:2px">
           <button type="button" data-act="foot" data-id="card" aria-pressed="${v.upstyle === 'card'}"${dis}>${te('configurator.footCard')}</button>
-          <button type="button" data-act="foot" data-id="ticker" aria-pressed="${v.upstyle === 'ticker'}"${dis}>${te('configurator.footTicker')}</button>
+          <button type="button" data-act="foot" data-id="ticker" aria-pressed="${v.upstyle === 'ticker'}"${dis}>${te('configurator.footScrolling')}</button>
         </div>
-        <span class="fhint">${v.upstyle === 'ticker' ? te('configurator.footTickerHint') : te('configurator.footCardHint')}</span>
+        <span class="fhint">${v.upstyle === 'ticker' ? te('configurator.footScrollingHint') : te('configurator.footCardHint')}</span>
       </div>`;
     const tune = `
       <div class="sfield">
@@ -2114,31 +2153,31 @@
   }
 
   /** The full stack, for Everything's Live Link card. */
-  function idleControlsHtml() {
-    const parts = idleControlParts();
+  function upcomingControlsHtml() {
+    const parts = upcomingControlParts();
     return parts.main + parts.tune;
   }
 
   /**
    * The "Between trains" section: the scene preview at full width — big
-   * enough that placement, opacity and the ticker actually read — with the
+   * enough that placement, opacity and the scrolling view actually read — with the
    * controls in two columns beneath it.
    */
-  function idleSectionHtml() {
+  function upcomingSectionHtml() {
     const next = nextTrain();
-    const parts = idleControlParts();
+    const parts = upcomingControlParts();
     // Simple stays simple: the whole between-trains group — stage preview and
     // its knobs — lives behind one collapsed fold whose summary says the
     // current shape. These read as Everything-grade settings; a first-timer
     // only needs to know they exist.
-    return `<section class="card" id="idle-section" style="padding:16px 18px">
+    return `<section class="card" id="upcoming-section" style="padding:16px 18px">
       <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:4px;flex-wrap:wrap">
-        <div class="eyebrow">${te('configurator.idleTitle')}</div>
-        ${next ? `<span class="cap dim">${te('configurator.idleNextIs', { when: fmtDep(next.starttime) })}</span>` : ''}
+        <div class="eyebrow">${te('configurator.upcomingTitle')}</div>
+        ${next ? `<span class="cap dim">${te('configurator.upcomingNextIs', { when: fmtDep(next.starttime) })}</span>` : ''}
       </div>
-      ${idleFoldHtml(te('configurator.settings'), `
-        <p class="sm dim" style="margin:0 0 14px">${te('configurator.idleLede')}</p>
-        ${idleStageHtml()}
+      ${upcomingFoldHtml(te('configurator.settings'), `
+        <p class="sm dim" style="margin:0 0 14px">${te('configurator.upcomingLede')}</p>
+        ${upcomingStageHtml()}
         <div class="duo" style="margin-top:16px">
           <div>${parts.main}</div>
           <div>${parts.tune}</div>
@@ -2333,7 +2372,7 @@
           <p class="sm dim" style="margin:4px 0 0">${te('configurator.stop2Lede')}</p>
         </section>
         ${lookCardHtml()}
-        ${idleSectionHtml()}
+        ${upcomingSectionHtml()}
         <section class="card" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
           <span class="sm dim" style="flex:1;min-width:220px">${te('configurator.obsPointer')}</span>
           <button type="button" class="btn" data-act="goto-obs">${te('configurator.navObs')} ›</button>
@@ -2425,7 +2464,7 @@
           <p class="dim" style="margin-top:8px">${te('configurator.stop2Lede')}</p>
         </div>
         ${lookCardHtml()}
-        ${idleSectionHtml()}
+        ${upcomingSectionHtml()}
         <div class="navrow">
           <button type="button" class="btn" data-act="stop" data-id="1">← ${te('configurator.stop2Back')}</button>
           <button type="button" class="btn primary push" data-act="stop" data-id="3">${te('configurator.stop2Next')} →</button>
@@ -2470,14 +2509,14 @@
         </div>
       </div>
       <div class="railcol sticky">
-        ${idleStageHtml()}
+        ${upcomingStageHtml()}
         <section class="card" style="padding:16px 18px;margin-bottom:0">
           <div class="eyebrow" style="margin-bottom:8px">${te('configurator.whatNextTitle')}</div>
           <p class="sm dim" style="margin:0">${(() => {
             const next = nextTrain();
             if (!next) return te('configurator.whatNextNoTrains');
             const when = `<b style="color:var(--rt-ink)">${esc(fmtDep(next.starttime))}</b>`;
-            return t(idleValues().upcoming != null ? 'configurator.whatNextBody' : 'configurator.whatNextBodyOff', { when });
+            return t(upcomingValues().upcoming != null ? 'configurator.whatNextBody' : 'configurator.whatNextBodyOff', { when });
           })()}</p>
         </section>
       </div>
@@ -2488,34 +2527,34 @@
     return `<div style="padding-top:4px">${state.stop === 1 ? stopOneHtml() : state.stop === 2 ? stopTwoHtml() : stopThreeHtml()}</div>`;
   }
 
-  // The idle mock's page clock. Runs only while a paging card mock is on
+  // The card mock's Page clock. Runs only while a paging card mock is on
   // screen; render() re-arms it so the hold time tracks the setting live.
   // Page turns crossfade exactly like the real card (upcoming-card.js): ease
   // out, swap while invisible, ease back in — the mock must demonstrate the
   // Overlay's manners, not just its skin.
   // Matches upcoming-card.js pageFadeMs: a quarter of the hold, capped at 1.1s.
-  const mockPageFadeMs = () => Math.min(1100, (Number(idleValues().upcycle) * 1000) / 4);
-  let idleMockTimer = null;
-  function scheduleIdleMock() {
-    clearTimeout(idleMockTimer);
-    const v = idleValues();
+  const mockPageFadeMs = () => Math.min(1100, (Number(upcomingValues().upcycle) * 1000) / 4);
+  let upcomingMockTimer = null;
+  function scheduleUpcomingMock() {
+    clearTimeout(upcomingMockTimer);
+    const v = upcomingValues();
     if (v.upcoming == null || v.upstyle !== 'card') return;
-    const mock = document.getElementById('idle-mock');
+    const mock = document.getElementById('upcoming-mock');
     if (!mock) return;
     // Inside a closed fold the mock is invisible — don't page it in the dark.
     // The fold's toggle handler re-arms this when it opens.
     if (mock.closest('details:not([open])')) return;
-    idleMockTimer = setTimeout(() => {
-      const panel = document.querySelector('#idle-mock .up');
+    upcomingMockTimer = setTimeout(() => {
+      const panel = document.querySelector('#upcoming-mock .up');
       if (panel) {
         panel.style.transition = `opacity ${mockPageFadeMs()}ms ease-in-out`;
         panel.style.opacity = '0';
       }
-      idleMockTimer = setTimeout(() => {
-        state.idlePage += 1;
-        const el = document.getElementById('idle-mock');
+      upcomingMockTimer = setTimeout(() => {
+        state.upcomingPage += 1;
+        const el = document.getElementById('upcoming-mock');
         if (el) {
-          el.innerHTML = idleMockHtml();
+          el.innerHTML = upcomingMockHtml();
           const fresh = el.querySelector('.up');
           if (fresh) {
             fresh.style.cssText += `;opacity:0;transition:opacity ${mockPageFadeMs()}ms ease-in-out`;
@@ -2523,7 +2562,7 @@
             fresh.style.opacity = '1';
           }
         }
-        scheduleIdleMock();
+        scheduleUpcomingMock();
       }, mockPageFadeMs());
     }, Number(v.upcycle) * 1000);
   }
@@ -2552,13 +2591,13 @@
    * Repaint just the "Between trains" section (or, where it isn't on screen —
    * Everything's Live Link view — the whole main). renderMain would rebuild
    * the preview IFRAME too, which reloads the overlay and reads as a flicker
-   * on every idle-knob commit.
+   * on every card-knob commit.
    */
-  function repaintIdle() {
-    const section = $('#idle-section');
+  function repaintUpcoming() {
+    const section = $('#upcoming-section');
     if (section) {
-      section.outerHTML = idleSectionHtml();
-      scheduleIdleMock();
+      section.outerHTML = upcomingSectionHtml();
+      scheduleUpcomingMock();
     } else {
       renderMain();
     }
@@ -2573,8 +2612,8 @@
     renderChrome(); // the setup stop rail's subtitle carries the look
   }
 
-  /** Idle-knob write path: per-Profile Live Link prefs, never the Preset. */
-  function writeIdlePref(key, value) {
+  /** Card-knob write path: per-Profile Live Link prefs, never the Preset. */
+  function writeUpcomingPref(key, value) {
     if (!me()) { toast(t('configurator.toastAddProfileFirst')); return; }
     profiles = setLiveLinkPrefs(profiles, me(), { [key]: value });
     saveProfiles();
@@ -2655,12 +2694,12 @@
     if (rename) { rename.focus(); rename.select(); }
     if (state.stage === 'setup') {
       if (state.stop === 2) { preview = mountPreview(); refreshSimpleChrome(); }
-      scheduleIdleMock();
+      scheduleUpcomingMock();
       return;
     }
     if (state.editing) wireConfigEditor();
     else if (state.editingPreset) wirePresetEditor();
-    else if (state.homeView === 'simple') { preview = mountPreview(); refreshSimpleChrome(); scheduleIdleMock(); }
+    else if (state.homeView === 'simple') { preview = mountPreview(); refreshSimpleChrome(); scheduleUpcomingMock(); }
     else if (state.view === 'oneoff') wireOneOff();
   }
 
@@ -2990,13 +3029,13 @@
 
   // ── Main-content actions (delegated: the views are re-rendered wholesale) ──
   $('#main').addEventListener('click', async (e) => {
-    // The Live Link page's idle fold: record where the user put it BEFORE the
+    // The Live Link page's card fold: record where the user put it BEFORE the
     // default toggle runs, so a settings repaint reopens it where it was.
-    if (e.target.closest('#ll-idle-fold > summary')) {
-      state.llIdleOpen = !$('#ll-idle-fold').open;
+    if (e.target.closest('#ll-upcoming-fold > summary')) {
+      state.llUpcomingOpen = !$('#ll-upcoming-fold').open;
       // The open flag flips after this handler; re-arm the mock's page clock
       // once it has, so opening the fold starts the demo (and closing parks it).
-      setTimeout(scheduleIdleMock, 0);
+      setTimeout(scheduleUpcomingMock, 0);
     }
     const el = e.target.closest('[data-act]');
     if (!el) return;
@@ -3007,32 +3046,32 @@
     if (act === 'themesmore') { state.themesOpen = !state.themesOpen; repaintLook(); return; }
     if (act === 'dispmode') { writeBaseSetting('mode', el.dataset.id); repaintLook(); return; }
     if (act === 'played') { writeBaseSetting('hidefinished', el.dataset.id === 'hide'); repaintLook(); return; }
-    if (act === 'idleocc') {
+    if (act === 'occasion') {
       // Three positions, two params: the card's horizon, and the between-Pass
       // opt-out. `both` is the default, so it clears upgap rather than setting
       // it — the third position is the ABSENCE of the param.
       const pick = el.dataset.id;
       if (pick === 'off') {
-        writeIdlePref('upcoming', null);
+        writeUpcomingPref('upcoming', null);
       } else {
-        if (!idleValues().upcoming) writeIdlePref('upcoming', $('#ll-horizon')?.value ?? '3');
-        writeIdlePref('upgap', pick === 'idle' ? '0' : null);
+        if (!upcomingValues().upcoming) writeUpcomingPref('upcoming', $('#ll-horizon')?.value ?? '3');
+        writeUpcomingPref('upgap', pick === 'between' ? '0' : null);
       }
-      toast(t(pick === 'off' ? 'configurator.toastIdleOff' : 'configurator.toastIdleOn'));
-      repaintIdle();
+      toast(t(pick === 'off' ? 'configurator.toastUpcomingOff' : 'configurator.toastUpcomingOn'));
+      repaintUpcoming();
       return;
     }
     if (act === 'foot') {
       // `card` is the Overlay default — stored as null so the URL stays lean.
-      writeIdlePref('upstyle', el.dataset.id === 'ticker' ? 'ticker' : null);
-      toast(t('configurator.toastIdleUpdated'));
-      repaintIdle();
+      writeUpcomingPref('upstyle', el.dataset.id === 'ticker' ? 'ticker' : null);
+      toast(t('configurator.toastUpcomingUpdated'));
+      repaintUpcoming();
       return;
     }
     if (act === 'uppos') {
-      writeIdlePref('uppos', el.dataset.id === 'bc' ? null : el.dataset.id);
-      toast(t('configurator.toastIdleUpdated'));
-      repaintIdle();
+      writeUpcomingPref('uppos', el.dataset.id === 'bc' ? null : el.dataset.id);
+      toast(t('configurator.toastUpcomingUpdated'));
+      repaintUpcoming();
       return;
     }
     if (act === 'stop') {
@@ -3064,15 +3103,15 @@
       return;
     }
     if (act === 'fold-close') {
-      const fold = $('#ll-idle-fold');
-      state.llIdleOpen = false;
+      const fold = $('#ll-upcoming-fold');
+      state.llUpcomingOpen = false;
       if (fold) {
         fold.open = false;
         // Collapsing from the bottom leaves the reader stranded mid-page —
         // bring the whole section back to a neutral, centred position.
         (fold.closest('section') ?? fold).scrollIntoView({ block: 'center', behavior: 'smooth' });
       }
-      setTimeout(scheduleIdleMock, 0);
+      setTimeout(scheduleUpcomingMock, 0);
       return;
     }
     if (act === 'goto-obs') { goToObsSteps(); return; }
@@ -3283,7 +3322,7 @@
     }
   });
 
-  // Simple/stop-2 look edits + idle-knob drags. Ranges refresh chrome in
+  // Simple/stop-2 look edits + card-knob drags. Ranges refresh chrome in
   // place on `input` (a re-render mid-drag would eat the thumb); the commit
   // toast and any layout-changing rebuild wait for `change` below.
   $('#main').addEventListener('input', (e) => {
@@ -3308,16 +3347,16 @@
       return;
     }
     if (el.id === 'll-op') {
-      writeIdlePref('upop', el.value);
+      writeUpcomingPref('upop', el.value);
       const out = el.closest('.rangerow')?.querySelector('output');
       if (out) out.textContent = `${Math.round(Number(el.value) * 100)}%`;
       // Live, without rebuilding the mock — a rebuild would replay the row
       // animation on every tick of the drag.
-      $('#idle-mock .up')?.style.setProperty('--upop', el.value);
+      $('#upcoming-mock .up')?.style.setProperty('--upop', el.value);
       return;
     }
     if (el.id === 'll-cycle') {
-      writeIdlePref('upcycle', el.value);
+      writeUpcomingPref('upcycle', el.value);
       const out = el.closest('.rangerow')?.querySelector('output');
       if (out) out.textContent = `${el.value}s`;
       return;
@@ -3325,29 +3364,29 @@
     if (el.id === 'll-scroll') {
       // The slider is inverted (right = faster), so convert back to a duration.
       const duration = String(UPSCROLL_FLIP - Number(el.value));
-      writeIdlePref('upscroll', duration);
+      writeUpcomingPref('upscroll', duration);
       const out = el.closest('.rangerow')?.querySelector('output');
       if (out) out.textContent = `${duration}s`;
-      $('#idle-mock .up.ticker')?.style.setProperty('--tickdur', `${duration}s`);
+      $('#upcoming-mock .up.ticker')?.style.setProperty('--tickdur', `${duration}s`);
       return;
     }
   });
 
-  // Live Link idle-card controls (change events, so they live on their own).
+  // Live Link Upcoming-card controls (change events, so they live on their own).
   $('#main').addEventListener('change', (e) => {
 
     if (e.target.id === 'll-horizon') {
-      writeIdlePref('upcoming', e.target.value);
+      writeUpcomingPref('upcoming', e.target.value);
       toast(t('configurator.toastHorizonUpdated'));
-      repaintIdle();
+      repaintUpcoming();
       return;
     }
     // The knob drags above commit here: repaint the section so the derived
     // hints (page math, cycle caption) catch up, and say the URL changed —
     // never renderMain, which would reload the preview iframe (a flicker).
     if (['ll-op', 'll-cycle', 'll-scroll'].includes(e.target.id)) {
-      toast(t('configurator.toastIdleUpdated'));
-      repaintIdle();
+      toast(t('configurator.toastUpcomingUpdated'));
+      repaintUpcoming();
       return;
     }
     if (e.target.dataset?.act === 'interval') { repaintLook(); return; }

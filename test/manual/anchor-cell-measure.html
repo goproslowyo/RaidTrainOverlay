@@ -1,0 +1,164 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>anchor cell measurement — the upcoming raid trains card</title>
+<!--
+  Measures both views of the upcoming raid trains card against THE CELL RULE:
+  picture the scene as three columns and three rows; the nine `uppos` anchors
+  are those nine cells, and an item at one anchor must not bleed into another
+  column or row. At 1920x1080 a cell is 640x360.
+
+  Serve the repo and open http://localhost:8321/test/manual/anchor-cell-measure.html
+  (there is a `.claude/launch.json` entry named `overlay` on port 8321). Not
+  file:// — the overlay is ES modules.
+
+  Two gotchas this harness exists to route around, both of which cost an hour
+  the first time:
+
+  * The cell is expressed in `vw`/`vh`, so it only resolves correctly when the
+    page's own viewport IS the scene. A fixed-size <div> stage is not a
+    viewport. So each scene size gets a SAME-ORIGIN IFRAME sized to it, and the
+    measurement runs inside.
+  * Some browser panes load pages with `window.innerWidth === 0`, so anything
+    that measures the viewport in JS computes garbage. Nothing here does: the
+    cell is read back from `getBoundingClientRect` against the iframe's own
+    known size, which is set by this page, not discovered by the page inside.
+
+  Each iframe also leaves two live panels standing after it has measured — a
+  card view at top-left and a scrolling view at bottom-centre — because whether
+  a cell-width scrolling line still READS is a judgement, not a number.
+-->
+<body style="margin:0;background:#0E1420;color:#EDF1F7;font:13px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace">
+<h1 style="font:600 15px/1.4 system-ui;margin:14px 16px 4px">anchor cell measurement</h1>
+<p style="margin:0 16px 12px;color:#8494A6;max-width:70ch">
+  Every row must read <b>PASS</b>: no view, at any anchor, wider than a third of
+  the scene or taller than a third of it.
+</p>
+<pre id="out" style="margin:0 16px 18px;white-space:pre">measuring…</pre>
+<div id="scenes" style="display:flex;flex-wrap:wrap;gap:24px;padding:0 16px 24px;align-items:flex-start"></div>
+
+<script type="module">
+// 960 is not a scene anyone streams at — it is the width where a third of the
+// scene is NARROWER than the card view's 340px floor, so it is the only one of
+// the three that exercises the `min()` making that floor yield. Without it the
+// harness cannot see the case the floor exists for.
+const SCENES = [[1920, 1080], [1280, 720], [960, 540]];
+
+// The measuring page, run inside an iframe whose viewport IS the scene. It
+// imports the real module — no re-implementation, or the harness would measure
+// itself rather than the overlay.
+const FRAME = (origin) => `<!doctype html><meta charset="utf-8">
+<body style="margin:0;overflow:hidden;background:linear-gradient(160deg,#1A2231,#0E1420)">
+<script type="module">
+import { renderUpcomingCard, retireUpcomingCard } from '${origin}/src/upcoming-card.js';
+
+const day = 86400000;
+// Long titles on purpose: the card view's old ceiling only failed once names
+// were long enough to reach it, which is why short fixtures read as "inside
+// its cell" while real streamer names bled.
+const trains = [1, 2, 3, 4, 5].map((n) => ({
+  slug: 'train-' + n, title: 'Streamer Number ' + n + ' Raid Train Extravaganza',
+  starttime: new Date(1786000000000 + n * day), mySlotAt: null,
+}));
+// The REAL English eyebrow, not a key. Its width is the whole question for the
+// scrolling view: it is a fixed ~209px at every scene size, so inside a cell it
+// competes with the trains for room. A stub label understates it and the
+// harness would report a scrolling window nobody will ever see.
+const LABEL = 'UPCOMING RAID TRAINS';
+const config = (view, pos) => ({
+  upstyle: view, upscroll: 34, upcycle: 12, uppos: pos, upop: 0.88,
+  locale: 'en', t: () => LABEL,
+});
+
+// A fresh viewport-sized stage per measurement: retireUpcomingCard leaves the
+// retiring panel in the DOM for its farewell fade, and a reused stage would
+// therefore defer the next mount behind that exit and measure nothing.
+function measure(view, pos) {
+  const stage = document.createElement('div');
+  stage.style.cssText = 'position:fixed;inset:0;visibility:hidden';
+  document.body.appendChild(stage);
+  renderUpcomingCard(stage, trains, config(view, pos));
+  const el = stage.querySelector('.rt-upcoming-card, .rt-upcoming-ticker');
+  const r = el.getBoundingClientRect();
+  // For the scrolling view, how much of the panel is left for the trains once
+  // the eyebrow has taken its share, and how much of one entry that is. The
+  // readable-or-broken judgement lives on this number, not on the box.
+  const run = el.querySelector('.rt-upcoming-ticker-run');
+  const window_ = run ? run.parentElement.getBoundingClientRect().width : null;
+  const entry = run ? run.firstElementChild.firstElementChild.getBoundingClientRect().width : null;
+  retireUpcomingCard(stage);
+  stage.remove();
+  return {
+    w: Math.round(r.width), h: Math.round(r.height),
+    run: window_ === null ? null : Math.round(window_),
+    entries: entry ? +(window_ / entry).toFixed(2) : null,
+  };
+}
+
+const rows = [];
+for (const view of ['card', 'ticker']) {
+  for (const pos of ['tl', 'tc', 'tr', 'ml', 'mc', 'mr', 'bl', 'bc', 'br']) {
+    rows.push({ view, pos, ...measure(view, pos) });
+  }
+}
+
+// Two live panels to eyeball, at anchors that cannot overlap.
+for (const [view, pos] of [['card', 'tl'], ['ticker', 'bc']]) {
+  const stage = document.createElement('div');
+  stage.style.cssText = 'position:fixed;inset:0';
+  document.body.appendChild(stage);
+  renderUpcomingCard(stage, trains, config(view, pos));
+}
+
+parent.postMessage({ rows, w: innerWidth, h: innerHeight }, '*');
+<\/script>`;
+
+const out = document.getElementById('out');
+const scenes = document.getElementById('scenes');
+const results = new Map();
+
+// Each scene is rendered at full size and scaled down for viewing — scaling the
+// frame after layout, so the page inside still lays out at 1920 or 1280.
+for (const [w, h] of SCENES) {
+  const shell = document.createElement('div');
+  const scale = 480 / w;
+  shell.style.cssText = `width:${Math.round(w * scale)}px`;
+  shell.innerHTML = `<div style="font:600 12px/1.6 system-ui;color:#8494A6">${w}x${h} — cell ${Math.round(w / 3)}x${Math.round(h / 3)}</div>`;
+  const box = document.createElement('div');
+  box.style.cssText = `width:${Math.round(w * scale)}px;height:${Math.round(h * scale)}px;overflow:hidden;border:1px solid #2A3547;border-radius:8px`;
+  const frame = document.createElement('iframe');
+  frame.style.cssText = `width:${w}px;height:${h}px;border:0;transform:scale(${scale});transform-origin:0 0`;
+  frame.srcdoc = FRAME(location.origin);
+  box.appendChild(frame);
+  shell.appendChild(box);
+  scenes.appendChild(shell);
+}
+
+addEventListener('message', (e) => {
+  if (!e.data?.rows) return;
+  results.set(`${e.data.w}x${e.data.h}`, e.data.rows);
+  if (results.size < SCENES.length) return;
+  const lines = [];
+  let failures = 0;
+  for (const [w, h] of SCENES) {
+    const cellW = w / 3;
+    const cellH = h / 3;
+    for (const r of results.get(`${w}x${h}`) ?? []) {
+      const overW = r.w / cellW;
+      const overH = r.h / cellH;
+      // 1.001 tolerance: a cell of 33.3333vw is a rounding hair under a third.
+      const pass = overW <= 1.001 && overH <= 1.001;
+      if (!pass) failures += 1;
+      const reads = r.run === null ? '' : `  scroll window ${String(r.run).padStart(4)}px = ${r.entries} trains`;
+      lines.push(`${w}x${h}  ${r.view.padEnd(7)} ${r.pos}  `
+        + `${String(r.w).padStart(5)}x${String(r.h).padStart(4)}`
+        + `  cell ${Math.round(cellW)}x${Math.round(cellH)}`
+        + `  ${overW.toFixed(2)}x wide, ${overH.toFixed(2)}x tall  ${pass ? 'PASS' : 'BLEEDS'}${reads}`);
+    }
+  }
+  lines.push('', failures === 0
+    ? 'PASS — every view at every anchor stays inside its cell.'
+    : `${failures} row(s) BLEED into a neighbouring column or row.`);
+  out.textContent = lines.join('\n');
+  out.style.color = failures === 0 ? '#7BD88F' : '#FF8A8A';
+});
+</script>

@@ -102,9 +102,9 @@ function zoneList(value) {
 }
 
 /**
- * The Live Link idle card's horizon grammar: `N` (next N trains), `Nw`
+ * The Upcoming card's Horizon grammar: `N` (next N trains), `Nw`
  * (N weeks), `Nm` (N months), `all`. Anything else — including absence, the
- * default — is null: card off, an idle Live Link renders nothing.
+ * default — is null: card off, and a Live Link with no train renders nothing.
  */
 function upcomingSpec(raw) {
   const value = (raw ?? '').trim().toLowerCase();
@@ -117,7 +117,7 @@ function upcomingSpec(raw) {
 
 const UPCOMING_SUFFIX = { count: '', weeks: 'w', months: 'm' };
 
-/** The idle card's nine scene anchors: [top|middle|bottom] × [left|centre|right]. */
+/** The Upcoming card's nine scene anchors: [top|middle|bottom] × [left|centre|right]. */
 const UPPOS_ANCHORS = ['tl', 'tc', 'tr', 'ml', 'mc', 'mr', 'bl', 'bc', 'br'];
 
 /** Old Theme keys that map to a current one (the mockup's `neon` → `synthwave`). */
@@ -142,7 +142,7 @@ export function parseConfig(queryString) {
     user: user === '' ? null : user,
     trains: trains === '' ? null : trains,
     upcoming: upcomingSpec(params.get('upcoming')),
-    // The idle card's own knobs (Live Link only, like `upcoming`). `uppos`
+    // The Upcoming card's own knobs (Live Link only, like `upcoming`). `uppos`
     // anchors the card in the scene — deliberately decoupled from the Train's
     // `height`: a webcam, chat box or alert layer decides where it can sit.
     // Default bottom-centre, the closest anchor to the shipped placement.
@@ -150,18 +150,19 @@ export function parseConfig(queryString) {
     // Card opacity. Floor 0.3: below that the card is unreadable-but-present,
     // which reads on stream as a rendering bug rather than a choice.
     upop: boundedNumber(params.get('upop'), 0.3, 1, 0.88),
-    // Seconds each page of rows is held before paging on (card style only).
+    // Seconds each Page of rows is held before turning (card view only).
     upcycle: boundedNumber(params.get('upcycle'), 3, 120, 12),
-    // Seconds for one full ticker lap (ticker style only); higher is slower.
+    // Seconds for one full Lap (scrolling view only); higher is slower.
     upscroll: boundedNumber(params.get('upscroll'), 10, 120, 34),
-    // The card's footprint: a 3-row card, or a one-line ticker for scenes
-    // with no room for a card.
+    // The card's Footprint: the 3-row card view, or the one-line scrolling
+    // view for scenes with no room for a card. The VALUE stays `ticker` — it
+    // ships inside copied OBS browser sources — where the word for it has not.
     upstyle: oneOf(params.get('upstyle'), ['card', 'ticker'], 'card'),
     // Upcoming-only mode: this Live Link never renders the Train — it always
     // shows the upcoming card, even while a train is live. A second URL for a
     // separate OBS scene (starting soon / be right back).
     uponly: boolean(params.get('uponly')),
-    // The between-Pass occasion: while a train is live, the card also pulses
+    // The card's **Occasion**: while a train is live, the card also pulses
     // into the empty stage between Passes (and into marquee's Breathers).
     // On by default wherever the card is on — opt-out, not opt-in, since the
     // streamer already asked for upcoming trains during dead air. Only `0`
@@ -233,8 +234,8 @@ export function serializeConfig(config) {
     if (config.upcoming) {
       params.set('upcoming', config.upcoming.kind === 'all' ? 'all' : `${config.upcoming.n}${UPCOMING_SUFFIX[config.upcoming.kind]}`);
     }
-    // The idle-card knobs ride only with a Live Link — without `user=` there
-    // is no idle state for them to describe.
+    // The Upcoming card's knobs ride only with a Live Link — without `user=`
+    // there is no card for them to describe.
     if (config.uppos !== 'bc') params.set('uppos', config.uppos);
     if (config.upop !== 0.88) params.set('upop', String(config.upop));
     if (config.upcycle !== 12) params.set('upcycle', String(config.upcycle));

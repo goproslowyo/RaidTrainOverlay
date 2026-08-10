@@ -251,10 +251,10 @@ Softly rounded, never round-cornered-to-mush: a six-step radius scale (4/7/10/
 14/20/999). Cards and modals sit at `lg` (14px); controls, inputs, and buttons
 at `sm` (7px); grouped panels at `md` (10px); inline value wells at `xs` (4px).
 The pill (`999px`) is a first-class shape — profile switcher, every chip and
-badge, nav counts, the toast, preview buttons, and the ticker variant of the
-idle card are all pills. Borders are 1px hairlines with no exception worth
+badge, nav counts, the toast, preview buttons, and the scrolling view of the
+upcoming card are all pills. Borders are 1px hairlines with no exception worth
 naming; dashed hairlines mark "collapsed/optional" seams (the past-trains
-divider, the idle-state fold, open mini-train slots). The recurring silhouette
+divider, the upcoming-card fold, open mini-train slots). The recurring silhouette
 is the mini-train: small rounded rectangles in a row, engine slightly larger,
 drawn in CSS.
 
@@ -300,11 +300,11 @@ universal "this part is transparent" — with a mono uppercase stage label in
 Inline stroke SVG, drawn in-page: 2px stroke at the 24 viewBox, 1.4px at the
 compact 16 viewBox; `stroke-linecap/join: round`; `fill: none`;
 `currentColor` so icons inherit the button's ink. Never icon fonts, never
-emoji-as-icon. The character marks that remain (● pulse dots, • ticker
+emoji-as-icon. The character marks that remain (● pulse dots, • scrolling-view
 separators) are typographic, not icons.
 
-### The Idle Slab (signature, overlay-side)
-The Live Link's idle panel (`src/upcoming-card.js`) and its mock in the
+### The Upcoming Slab (signature, overlay-side)
+The Live Link's **Upcoming card** (`src/upcoming-card.js`) and its mock in the
 Configurator share one design, at two scales: a translucent dark slab —
 `rgba(9,12,17, .88)` (opacity is the streamer's `upop` knob), 1px
 `rgba(255,255,255,.09)` border, 9–12px radius, `backdrop-filter: blur(8px)`,
@@ -315,7 +315,7 @@ of amber mono local time → bold name (ellipsising) → dim mono UTC anchor
 The Overlay side renders through local font stacks only (`'DM Mono',
 ui-monospace, …` / `'Public Sans', system-ui, …` — an OBS source must never
 block on a webfont); the Configurator's mock is a legible miniature of the
-same design over a stand-in stream scene. Ticker variant is a full pill with
+same design over a stand-in stream scene. The scrolling view is a full pill with
 mask-faded edges and a seamless −50% transform loop (two identical lap
 spans, gap inside the lap).
 
