@@ -114,12 +114,20 @@ Plain ES modules and the DOM — no framework, no bundler. `overlay.html` wires
 config → a resilient RaidPal feed → the lineup model → the theme renderer. The domain
 vocabulary and core concepts are in [`CONTEXT.md`](CONTEXT.md).
 
-Run the unit tests (the DOM-free logic — config, the RaidPal client, the lineup engine)
-with Node's built-in runner:
+The tests need one dev dependency — `linkedom`, which gives the DOM-touching modules a
+Document to mount into. Nothing ships: it is a test-only install, and the Overlay still
+loads as bare files. Install it once, then run the tests with Node's built-in runner:
 
 ```
+npm ci
 node --test
 ```
+
+That covers the pure logic (config, the RaidPal client, the lineup engine) and the
+structure of the DOM modules — which rows render, how a Page turns, how a mount is
+retired. It does not cover anything measured: no DOM implementation has a layout engine,
+so `offsetWidth` and `getBoundingClientRect()` read 0. The Cell rule and the Train's art
+are browser questions, and a green suite is not evidence about either.
 
 The renderer's art is verified visually via the manual harness at
 [`test/manual/harness.html`](test/manual/harness.html) (e.g. `#theme=tron&now=…&bg=checker`).

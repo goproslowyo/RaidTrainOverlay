@@ -43,7 +43,7 @@ export default { key, ensureStyles, build, buildTrack, foot };
 
 | Member | Required | What it does |
 |---|---|---|
-| `key` | ✅ | The Theme's id. Must match its registry slot and the config enum (section 8). |
+| `key` | ✅ | The Theme's id. Must match its registry slot (section 8) — the config enum derives from the registry, so there is no second list to keep it in step with. |
 | `ensureStyles()` | ✅ | Inject the Theme's CSS once (guard by a style-id so re-renders don't duplicate it). |
 | `build(train, opts)` | ✅ | Build the train art once; return a **handle** `{ node, update, afterAttach }`. |
 | `foot` | ✅ | The Theme's **baseline** — where its floor sits, as a fraction of the train height, or a function of `{ maxTimeLines }` when the box height is content-driven (section 5). Omitting it falls back to `1` (the pre-baseline behaviour), which is a silent per-Theme drift — every shipped Theme declares one. |

@@ -419,8 +419,16 @@ function applyMode(doc, track, config, buildCopy) {
  */
 export function renderTrain(train, container, config) {
   const theme = resolveTheme(config?.theme);
-  // The Document comes from the mount, once, and is used throughout — the
-  // Stage must be buildable in a document that is not the global one.
+  // The Document comes from the mount, once, and is used throughout this module.
+  //
+  // The seam stops here, and honestly: `ensureStyles`/`build` are not part of the
+  // Theme contract's Document awareness (docs/authoring-a-theme.md), so a Theme
+  // reaches for the global document for its own stylesheet and all its Car art.
+  // Mounting a Train into a foreign document would therefore split it — the base
+  // stylesheet into `doc`, the Theme's into the global page. So this resolution
+  // makes the Theme-agnostic shell mount-correct, and NOT the Train as a whole.
+  // Closing it means widening the Theme contract across all 15 Themes, which is
+  // its own ticket; until then, do not read this as "renderTrain mounts anywhere".
   const doc = container.ownerDocument ?? document;
   ensureBaseStyles(doc);
   theme.ensureStyles();
