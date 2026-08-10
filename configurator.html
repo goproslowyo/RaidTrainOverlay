@@ -2003,9 +2003,6 @@
   function idleStageHtml() {
     const v = idleValues();
     const on = v.upcoming != null;
-    // The three-way: Never / Between trains / Between trains and while one is
-    // live. `upgap` is the opt-out, so its ABSENCE is the third position.
-    const occ = !on ? 'off' : (String(v.upgap) === '0' ? 'idle' : 'both');
     const caption = !on ? te('configurator.idleCapOff')
       : v.upstyle === 'ticker' ? te('configurator.idleCapTicker')
         : te('configurator.idleCapCard', { s: v.upcycle });
@@ -2027,6 +2024,9 @@
   function idleControlParts() {
     const v = idleValues();
     const on = v.upcoming != null;
+    // The three-way: Never / Between trains / Between trains and while one is
+    // live. `upgap` is the opt-out, so its ABSENCE is the third position.
+    const occ = !on ? 'off' : (String(v.upgap) === '0' ? 'idle' : 'both');
     const dis = on ? '' : ' disabled';
     const horizon = v.upcoming ?? '3';
     const options = Object.entries(HORIZON_KEYS)
