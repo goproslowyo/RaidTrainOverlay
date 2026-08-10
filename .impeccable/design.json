@@ -36,7 +36,7 @@
       { "name": "hover-transition", "value": ".14s-.2s ease", "purpose": "Border, background, and color state shifts on controls." },
       { "name": "pop", "value": ".14s ease (opacity + translateY(-4px) in)", "purpose": "Menus and badges appearing." },
       { "name": "row-in", "value": ".62s cubic-bezier(.22, .61, .36, 1) (opacity + translateY(6px))", "purpose": "Idle-card rows entering; the soft rise that reads as the list moving on." },
-      { "name": "ticker-marquee", "value": "translateX(0 -> -50%) linear, 34s default, infinite", "purpose": "Seamless one-line marquee; content laid twice so the loop has no seam." },
+      { "name": "ticker-scroll", "value": "translateX(0 -> -50%) linear, 34s default, infinite", "purpose": "The Upcoming card's one-line ticker; content laid twice so the loop has no seam." },
       { "name": "reduced-motion", "value": "@media (prefers-reduced-motion: reduce) { animation: none }", "purpose": "Every animation opts out; mandatory." }
     ],
     "breakpoints": [

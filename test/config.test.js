@@ -417,7 +417,7 @@ test('parseConfig reads upcycle as seconds per page 3..120, defaulting to 12', (
   assert.equal(parseConfig('?user=x&upcycle=forever').upcycle, 12);
 });
 
-test('parseConfig reads upscroll as marquee lap seconds 10..120, defaulting to 34', () => {
+test('parseConfig reads upscroll as ticker lap seconds 10..120, defaulting to 34', () => {
   assert.equal(parseConfig('?user=x').upscroll, 34);
   assert.equal(parseConfig('?user=x&upscroll=20').upscroll, 20);
   assert.equal(parseConfig('?user=x&upscroll=10').upscroll, 10);

@@ -152,7 +152,7 @@ export function parseConfig(queryString) {
     upop: boundedNumber(params.get('upop'), 0.3, 1, 0.88),
     // Seconds each page of rows is held before paging on (card style only).
     upcycle: boundedNumber(params.get('upcycle'), 3, 120, 12),
-    // Seconds for one full marquee lap (ticker style only); higher is slower.
+    // Seconds for one full ticker lap (ticker style only); higher is slower.
     upscroll: boundedNumber(params.get('upscroll'), 10, 120, 34),
     // The card's footprint: a 3-row card, or a one-line ticker for scenes
     // with no room for a card.

@@ -25,6 +25,16 @@ All notable changes to RaidTrainOverlay are documented here. The format follows
   translated across every locale.
 
 ### Changed
+- **"Marquee" now names one thing only: a Mode.** The word described both the
+  Train's continuous crawl (`mode=marquee`) and the Upcoming card's one-line
+  footprint — which sent at least one streamer to `mode=` hunting for a control
+  that lives two fields away, under *How much room it takes → One line*. The
+  card's one-line variant is a **Ticker** throughout: `CONTEXT.md` gains
+  **Upcoming card** and **Footprint** entries, **Mode** now says it governs the
+  Train alone, and the internal identifiers followed (`rt-upcoming-marquee` →
+  `rt-upcoming-ticker`, the Configurator's `tickmarquee` → `tickscroll`).
+  **No URL param changed** — `mode=marquee` and `upstyle=ticker` are baked into
+  copied OBS browser sources, so existing sources keep working. (#67)
 - `prefers-reduced-motion` extends to the new behaviour: the Breather is
   suppressed (the Train stays put) and the between-Pass card does not pulse.
 - **A manual prototype of the Upcoming card's between-Pass choreography**

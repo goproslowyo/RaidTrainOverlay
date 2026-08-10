@@ -70,7 +70,8 @@ _Avoid_: now playing, live highlight
 One traversal of the Train across the screen in periodic mode.
 
 **Mode**:
-The display behavior of the overlay: `pass` (train rolls across every N minutes) or `marquee` (continuous always-on scroll). Selected per browser source via query param.
+How the **Train** moves, and nothing else: `pass` (the Train rolls across every N minutes) or `marquee` (a continuous always-on scroll). Selected per browser source via query param. It governs the Train alone — it does not touch the **Upcoming card**, whose shape is that card's **Footprint** (`upstyle`) and whose presence is `upcoming`. So with no Train live, changing Mode changes nothing on screen at all.
+_Avoid_: reading `marquee` as a card style — see **Footprint**
 
 **Track**:
 The rails the Train rides on — a stationary, full-screen layer. The Train moves along the Track; the Track itself never moves. Styled per Theme (steel rail and ties, neon grid, wooden sleepers, etc.).
@@ -81,6 +82,14 @@ Whether the Track is shown *periodically* (the default) or *always*. Periodic vi
 
 **Breather**:
 The empty stretch a marquee cycle manufactures for itself, so the **Upcoming card** has somewhere to appear while a train is live. Marquee is a seamless crawl with no **Pass** gap, so roughly every three minutes the whole stage clears — Train *and* Track together, by a fade, never a slide — the card takes it alone for one page, and both return. Deliberately not called a Pass (nothing traverses) nor a gap (that is the `pass`-Mode word), so "Pass gaps and marquee Breathers" reads unambiguously. Its length is chosen rather than imposed, so it stays short and constant; a longer horizon rotates across successive Breathers instead of stretching any one of them.
+
+**Upcoming card**:
+The panel that lists what raid trains are coming up. What the Overlay shows when no Train is live — a **Live Link** concept, since resolving "next" needs a **Profile** — and it also takes the pauses while one is running: the gap between **Passes**, or a marquee **Breather**. Deliberately unthemed: a sodium departure-board slab that sits on any scene, never the active **Theme**'s art. Distinct from **Upcoming**, the Train lifecycle state: that is a Train waiting at the station, this is the card on screen when there is no Train at all.
+_Avoid_: idle card, next-up widget, banner (the code's `idle*` naming is older and inconsistent; the domain word is the card)
+
+**Footprint**:
+How much room the **Upcoming card** takes: a `card` (the default — a small slab showing three trains at a time, paging through a longer horizon) or a **Ticker** (`ticker` — a single line scrolling the whole horizon on one seamless lap). The param is `upstyle`; the Configurator calls the axis *How much room it takes → Card / One line*. The Ticker's one-line variant is never "a marquee", even though it scrolls: that word names a **Mode**, which is the *Train*'s axis and not the card's. `mode=marquee` does not turn the card into a Ticker, and `upstyle=ticker` does not change how the Train moves.
+_Avoid_: marquee (for the card), style, size
 
 **Baseline**:
 Where a Theme's **floor** sits — the lowest resting art of its Train (wheels, a ground shadow, a name/time line hanging below them) — expressed as a fraction of the Train height, measured down from the top of the Theme's box. Declared per Theme as `foot`. The Overlay's `height` param drops the Baseline onto the bottom edge rather than the Theme's layout box, so every Theme bottoms out identically and a Preset never needs per-Theme height compensation. Effects that bleed on purpose (smoke, glows, the Now Marker, a departed stamp) are excluded — the Baseline must not move with live state. Two Themes take their Baseline from the **Track** instead of the Train, because there the Track paints the ground the Train rests on: jazz (the console deck the records sit on) and lava (the lounge floor line the lamp stands on). Decorative Track bands that merely run downward — tie strips, receding grids, translucent backing — are scenery and may bleed off the bottom edge.
@@ -157,6 +166,7 @@ _Avoid_: skin, style (style is the CSS/code sense), look, art (in code; fine in 
 - "Conductor" was used for the Organiser's engine role; canonical split: the *person* is the **Organiser**, the *vehicle* is the **Engine**.
 - **Spotlight** vs **Now Marker**: Spotlight is user-configured emphasis; Now Marker is time-derived. A Car can have both.
 - **"Animation"** is overloaded: the macro screen traversal is a **Pass** (a Mode behavior); the per-Theme idle motion (wheels, smoke, undulation) is **Ambient animation**. Always say which — never a bare "animation".
+- **"Marquee"** names a **Mode** and only a Mode. The **Upcoming card**'s one-line **Footprint** is a **Ticker** (`upstyle=ticker`); it scrolls, but calling it a marquee is what sent a streamer to `mode=` looking for a control that was two fields away (#67). Neither param value is renamed — both ship inside copied OBS sources — so the discipline lives in the words: docs, comments and identifiers say *ticker*.
 - **Does renaming a RaidPal Event change its slug?** Unknown, and it decides whether "renamed" is a real cause of an Orphaned Config or a phantom. `raidpal_link` looks title-and-date derived (`…/event/house-is-a-feeling-raid-train-27-aug-8-9`), which suggests yes, but that is inference — the API exposes no id field to check against (`docs/research/raidpal-user-endpoint-edge-cases.md`). Only an actual rename of a real Event would settle it. **Cleanup** does not depend on the answer: its `endsAt` guard protects renamed upcoming trains either way.
 
 ## Example dialogue

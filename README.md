@@ -48,7 +48,7 @@ All optional, set as query params (the Configurator writes these for you):
 | `event` | **Required.** RaidPal event slug. |
 | `lang` | Overlay language: `en`, `es-ES`, `es-MX`, `pt-BR`, `it`, `de`, `nl`, `da`, `lt`, `fr`. Localizes the on-screen words (NOW, OPEN, PLAYED, statuses) and uses a locale-aware clock. When omitted, the overlay intentionally uses Auto/browser detection. |
 | `theme` | `classic` (default), `flat`, `synthwave`, `ticket`, `wood`, `comic`, `departures`, `paper`, `tron`, `pixel`, `highvibes`, `jazz`, `bullet`, `lava`, `pride`; or `shuffle` to cycle the whole roster. |
-| `mode` | `pass` (one pass every `interval`) or `marquee` (continuous loop). |
+| `mode` | How the *train* moves: `pass` (one pass every `interval`) or `marquee` (continuous loop). Train only — the between-trains listing has its own shape knob, `upstyle`. |
 | `speed`, `interval` | Traversal speed; minutes between passes. |
 | `track` | `periodic` (default) fades the rails/scenery out between passes so the overlay goes fully empty until the next one rolls in — nothing lingers with no train; `always` keeps them on screen the whole time (a persistent lower-third). Pass mode only. |
 | `trackfadein`, `trackfadeout` | Fade durations in seconds for `track=periodic` (default `15` / `10`; `0` = instant; long values are trimmed to fit short intervals). |
@@ -67,7 +67,7 @@ instead of `event`, plus its own params — all written by the Configurator:
 | `user` | Twitch login; the overlay resolves your live (or next) train from RaidPal at load. |
 | `trains` | Per-train settings blob (each train's saved differences from your base look). |
 | `upcoming` | Between trains, list what's coming up: `3` (next 3), `2w` (2 weeks), `1m`, `all`. Omitted = fully transparent when idle. |
-| `upstyle` | The idle listing's footprint: `card` (default, three rows, pages through longer lists) or `ticker` (a one-line marquee). |
+| `upstyle` | How much room the listing takes: `card` (default, three rows, pages through longer lists) or `ticker` (one line, scrolling the whole list on a loop). Independent of `mode` — this is the listing's shape, not the train's. |
 | `uppos` | Where it sits in your scene: nine anchors, `tl`/`tc`/`tr`/`ml`/`mc`/`mr`/`bl`/`bc` (default)/`br`. |
 | `upop` | Its opacity, `0.3`–`1` (default `0.88`). |
 | `upcycle` | Seconds each page of three is held (default `12`). |

@@ -10,7 +10,7 @@
  *
  * OBS-perf friendly by construction: the card pages on a slow timer (one
  * batch of row swaps every `upcycle` seconds, animated by one-shot CSS), and
- * the ticker is a single transform-only CSS marquee — no per-frame JS.
+ * the ticker is a single transform-only CSS loop — no per-frame JS.
  * Verified headless on a live Event like the rest of the overlay DOM.
  *
  * The knobs arrive on `config` (see parseConfig): `uppos` anchors the panel
@@ -111,7 +111,7 @@ export function anchorStyle(key, pad = 24) {
   return `position:absolute;display:flex;pointer-events:none;max-width:calc(100% - ${pad * 2}px);${vert};${horz}`;
 }
 
-// The row-entry and marquee animations need keyframes, which cannot live in
+// The row-entry and ticker animations need keyframes, which cannot live in
 // an inline style. Injected once, lazily, so importing this module in a test
 // runner with no DOM stays safe.
 const STYLE_ID = 'rt-upcoming-style';
@@ -122,7 +122,7 @@ function ensureStyles(doc) {
   style.textContent = `
 @keyframes rt-upcoming-rowin { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: none; } }
 .rt-upcoming-row-enter { animation: rt-upcoming-rowin ${ROW_ENTER_MS}ms cubic-bezier(.22,.61,.36,1) both; }
-@keyframes rt-upcoming-marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+@keyframes rt-upcoming-ticker { from { transform: translateX(0); } to { transform: translateX(-50%); } }
 @media (prefers-reduced-motion: reduce) {
   .rt-upcoming-row-enter { animation: none; }
   .rt-upcoming-ticker-run { animation: none !important; }
@@ -258,7 +258,7 @@ function renderCard(trains, config) {
   return { panel: card, cleanup };
 }
 
-/** The one-line ticker: the whole horizon on a seamless transform-only marquee. */
+/** The one-line ticker: the whole horizon on a seamless transform-only loop. */
 function renderTicker(trains, config) {
   const ticker = document.createElement('div');
   ticker.className = 'rt-upcoming-ticker';
@@ -273,7 +273,7 @@ function renderTicker(trains, config) {
 
   const run = document.createElement('span');
   run.className = 'rt-upcoming-ticker-run';
-  run.style.cssText = `display:inline-flex;white-space:nowrap;animation:rt-upcoming-marquee ${config.upscroll ?? 34}s linear infinite`;
+  run.style.cssText = `display:inline-flex;white-space:nowrap;animation:rt-upcoming-ticker ${config.upscroll ?? 34}s linear infinite`;
 
   const entry = (train) => {
     const item = document.createElement('span');

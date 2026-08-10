@@ -316,7 +316,7 @@ The Overlay side renders through local font stacks only (`'DM Mono',
 ui-monospace, …` / `'Public Sans', system-ui, …` — an OBS source must never
 block on a webfont); the Configurator's mock is a legible miniature of the
 same design over a stand-in stream scene. Ticker variant is a full pill with
-mask-faded edges and a seamless −50% transform marquee (two identical lap
+mask-faded edges and a seamless −50% transform loop (two identical lap
 spans, gap inside the lap).
 
 ## Do's and Don'ts
