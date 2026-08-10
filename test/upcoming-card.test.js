@@ -1,10 +1,18 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { anchorStyle } from '../src/upcoming-card.js';
+import { parseHTML } from 'linkedom';
+import { anchorStyle, renderUpcomingCard } from '../src/upcoming-card.js';
 
-// The DOM half of upcoming-card is verified headless in the browser sweep;
-// the anchor grammar is the pure part, so it gets unit coverage here.
+// The anchor grammar is the pure part and gets unit coverage here. The DOM
+// half is now reachable too: the module takes its Document from the mount, so
+// a test can hand it one and read the painted panel back. What that buys is
+// structure — which rows, in which order, with which text — and it stops at
+// the edge of layout: no DOM implementation has a layout engine, so
+// `offsetWidth` and `getBoundingClientRect()` read 0 here. The geometry lock
+// in the card view, the **Cell** rule as painted, and everything measured
+// (`pinLeadBadges`, `fitAll`, the scrolling view's copy count) stay with the
+// headless browser sweep. A green suite is not evidence about the Cell rule.
 
 const ANCHORS = ['tl', 'tc', 'tr', 'ml', 'mc', 'mr', 'bl', 'bc', 'br'];
 
@@ -102,4 +110,37 @@ test('the Configurator preview carries the same rule this module does', () => {
   assert.match(preview, /\.up\.ticker \.lbl \{[^}]*max-width: 40%/,
     'the eyebrow must yield to the trains here too');
   assert.match(anchorStyle('bl'), /min-width:min\(340px/, 'the floor still yields via min()');
+});
+
+/**
+ * The seam: the module resolves its Document from the container it is handed,
+ * so a mount in a document that is not the global one paints correctly. This
+ * is the one test that proves it — the card's own coverage arrives with the
+ * tickets that need it.
+ */
+const CONFIG = { t: (key) => key, locale: 'en-US', uppos: 'bc', upcycle: 12, upstyle: 'card' };
+const TRAINS = [
+  { slug: 'first', title: 'House Is A Feeling', starttime: new Date('2026-08-14T20:00:00Z') },
+  { slug: 'second', title: 'Trainwreck Lucky 13', starttime: new Date('2026-08-15T20:00:00Z') },
+  { slug: 'third', title: 'Midnight Yard', starttime: new Date('2026-08-16T20:00:00Z') },
+];
+
+test('the card mounts into the Document its container came from, and lays a row per train', () => {
+  const { document: page } = parseHTML('<!doctype html><html><head></head><body><div id="train"></div></body></html>');
+  const container = page.getElementById('train');
+
+  renderUpcomingCard(container, TRAINS, CONFIG);
+
+  // The keyframes go into THAT document's head, not a global one.
+  assert.ok(page.getElementById('rt-upcoming-style'), 'the stylesheet never reached the mount document');
+
+  const card = container.querySelector('.rt-upcoming-card');
+  assert.ok(card, 'no card view was painted into the mount');
+  // The list is one grid of [time, name, UTC] cells per train, in order.
+  const cells = [...card.lastElementChild.children];
+  assert.equal(cells.length, TRAINS.length * 3);
+  assert.deepEqual(
+    cells.filter((_, i) => i % 3 === 1).map((cell) => cell.textContent),
+    TRAINS.map((train) => train.title),
+  );
 });

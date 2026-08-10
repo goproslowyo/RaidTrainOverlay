@@ -226,8 +226,8 @@ function panelCss(config) {
 }
 
 /** The amber mono eyebrow both footprints open with. */
-function panelLabel(config) {
-  const label = document.createElement('span');
+function panelLabel(doc, config) {
+  const label = doc.createElement('span');
   label.textContent = config.t('overlay.upcoming');
   label.style.cssText = `font-family:${FONT_MONO};font-size:13px;font-weight:700;letter-spacing:0.2em;text-transform:uppercase;color:${AMBER};white-space:nowrap`;
   return label;
@@ -240,13 +240,13 @@ function panelLabel(config) {
  * the card actually answers on stream — falling back to the train's
  * departure while the lineup is unknown or the streamer isn't on it.
  */
-function timePair(train, config) {
+function timePair(doc, train, config) {
   const at = train.mySlotAt ?? train.starttime;
-  const when = document.createElement('span');
+  const when = doc.createElement('span');
   // The streamer's first `tz` zone pins the clock; otherwise the machine's.
   when.textContent = formatDeparture(at, config.locale, config.tz?.[0]?.zone);
   when.style.cssText = `font-family:${FONT_MONO};font-size:15px;color:${AMBER};white-space:nowrap;flex:none`;
-  const utc = document.createElement('span');
+  const utc = doc.createElement('span');
   utc.textContent = formatDepartureUtc(at, config.locale);
   utc.style.cssText = `font-family:${FONT_MONO};font-size:12.5px;color:rgba(237,241,247,0.45);white-space:nowrap;flex:none`;
   return [when, utc];
@@ -254,8 +254,8 @@ function timePair(train, config) {
 
 /** The card view: three rows, turning a Page. Returns `{ panel, cleanup }` — the caller owns
  *  attaching the cleanup, so the container handshake lives in one place. */
-function renderCard(trains, config) {
-  const card = document.createElement('div');
+function renderCard(doc, trains, config) {
+  const card = doc.createElement('div');
   card.className = 'rt-upcoming-card';
   // No width of its own: `anchorStyle` owns the box budget for both views, and
   // the panel is the flex child that fills it. `overflow:hidden` makes the
@@ -263,13 +263,13 @@ function renderCard(trains, config) {
   // rows are clipped by the slab instead of spilling out of it.
   card.style.cssText = `${panelCss(config)};flex:1 1 auto;min-width:0;overflow:hidden;padding:14px 18px`;
 
-  const head = document.createElement('div');
+  const head = doc.createElement('div');
   head.style.cssText = 'display:flex;align-items:baseline;gap:14px;padding-bottom:9px;margin-bottom:7px;border-bottom:1px solid rgba(255,255,255,0.07)';
-  head.appendChild(panelLabel(config));
+  head.appendChild(panelLabel(doc, config));
   let pageMark = null;
   const pages = upcomingPages(trains);
   if (pages > 1) {
-    pageMark = document.createElement('span');
+    pageMark = doc.createElement('span');
     pageMark.style.cssText = `margin-left:auto;font-family:${FONT_MONO};font-size:12.5px;color:#71808F;letter-spacing:0.06em;font-variant-numeric:tabular-nums;white-space:nowrap`;
     head.appendChild(pageMark);
   }
@@ -279,7 +279,7 @@ function renderCard(trains, config) {
   // and UTC land in SHARED columns sized by the widest entry, so the card
   // reads as a table — per-row flex let a long time or name nudge its
   // neighbours out of column.
-  const list = document.createElement('div');
+  const list = doc.createElement('div');
   list.style.cssText = 'display:grid;grid-template-columns:max-content minmax(0,1fr) max-content;column-gap:14px;align-items:baseline';
   card.appendChild(list);
 
@@ -287,8 +287,8 @@ function renderCard(trains, config) {
     if (pageMark) pageMark.textContent = `${(((page % pages) + pages) % pages) + 1} / ${pages}`;
     list.replaceChildren();
     for (const train of visibleUpcoming(trains, page)) {
-      const [when, utc] = timePair(train, config);
-      const name = document.createElement('span');
+      const [when, utc] = timePair(doc, train, config);
+      const name = doc.createElement('span');
       name.textContent = train.title;
       // min-width:0 makes the ellipsis real (a grid item's min-width defaults
       // to its content); the soft shadow lifts the name off any scene behind
@@ -342,8 +342,8 @@ function renderCard(trains, config) {
 }
 
 /** The scrolling view: the whole Horizon on a seamless transform-only Lap. */
-function renderScrollingView(trains, config) {
-  const panel = document.createElement('div');
+function renderScrollingView(doc, trains, config) {
+  const panel = doc.createElement('div');
   panel.className = 'rt-upcoming-ticker';
   // `flex:1 1 auto;min-width:0` is the same fill rule the card view uses: the
   // panel takes the budget `anchorStyle` set and no more. It used to be the
@@ -352,7 +352,7 @@ function renderScrollingView(trains, config) {
   // nothing to shrink against.
   panel.style.cssText = `${panelCss(config)};border-radius:999px;padding:11px 22px;display:flex;align-items:center;gap:16px;flex:1 1 auto;min-width:0`;
 
-  const label = panelLabel(config);
+  const label = panelLabel(doc, config);
   // The eyebrow yields to the trains. It is a fixed ~209px at every scene size
   // (13px mono, wide tracking), so inside a cell it is a caption eating the
   // content's room: 35% of the budget at 1920, 55% at 1280, and everything at
@@ -363,31 +363,31 @@ function renderScrollingView(trains, config) {
   label.style.cssText += ';flex:0 1 auto;max-width:40%;min-width:0;overflow:hidden;text-overflow:ellipsis';
   panel.appendChild(label);
 
-  const wrap = document.createElement('span');
+  const wrap = doc.createElement('span');
   wrap.className = 'rt-upcoming-ticker-wrap';
   wrap.style.cssText = 'overflow:hidden;flex:1;min-width:0;display:block';
 
-  const run = document.createElement('span');
+  const run = doc.createElement('span');
   run.className = 'rt-upcoming-ticker-run';
   run.style.cssText = `display:inline-flex;white-space:nowrap;animation:rt-upcoming-ticker ${config.upscroll ?? 34}s linear infinite`;
 
   const entry = (train) => {
-    const item = document.createElement('span');
+    const item = doc.createElement('span');
     item.style.cssText = 'display:inline-flex;align-items:baseline;gap:9px;font-size:15.5px;font-weight:600';
-    const [when, utc] = timePair(train, config);
+    const [when, utc] = timePair(doc, train, config);
     when.style.fontSize = '13.5px';
     utc.style.fontSize = '11.5px';
     // Sheds below the eyebrow's breakpoint: the UTC anchor is the least of the
     // three parts, and dropping it buys the name ~80px of the scroll window.
     utc.className = 'rt-upcoming-ticker-utc';
-    const name = document.createElement('span');
+    const name = doc.createElement('span');
     name.textContent = train.title;
     name.style.textShadow = '0 1px 2px rgba(0,0,0,0.85), 0 0 8px rgba(0,0,0,0.5)';
     item.append(when, name, utc);
     return item;
   };
   const sep = () => {
-    const dot = document.createElement('span');
+    const dot = doc.createElement('span');
     dot.textContent = '•';
     dot.style.cssText = 'color:#4C5A6B';
     return dot;
@@ -397,7 +397,7 @@ function renderScrollingView(trains, config) {
   // run itself: a gap between two children of the run would sit astride the
   // -50% point and jump the loop by half a gap once per lap.
   const lap = () => {
-    const half = document.createElement('span');
+    const half = doc.createElement('span');
     half.style.cssText = 'display:inline-flex;gap:16px;align-items:baseline;padding-right:16px';
     for (const train of trains) half.append(entry(train), sep());
     return half;
@@ -445,12 +445,12 @@ function dissolve(container, target) {
 }
 
 /** Build the panel for `trains`, ease it in, and register its timers. */
-function mountPanel(container, trains, config) {
-  const anchor = document.createElement('div');
+function mountPanel(doc, container, trains, config) {
+  const anchor = doc.createElement('div');
   anchor.style.cssText = `${anchorStyle(config.uppos)};opacity:0;transition:opacity ${PANEL_FADE_MS}ms ease`;
   const built = config.upstyle === 'ticker'
-    ? { panel: renderScrollingView(trains, config), cleanup: null }
-    : renderCard(trains, config);
+    ? { panel: renderScrollingView(doc, trains, config), cleanup: null }
+    : renderCard(doc, trains, config);
   anchor.appendChild(built.panel);
   container.appendChild(anchor);
   container._rtUpcomingAnchor = anchor;
@@ -473,6 +473,12 @@ function mountPanel(container, trains, config) {
  * in progress, which would otherwise cut the farewell short.
  */
 export function renderUpcomingCard(container, trains, config) {
+  // The Document is resolved from the mount, once, and used throughout: the
+  // card must be able to paint into a document that is not the global one —
+  // the Configurator's preview mounts it inside a frame, and a test mounts it
+  // into a constructed page. Reaching for the global `document` instead made
+  // that an undeclared part of this module's interface.
+  const doc = container.ownerDocument ?? document;
   const sig = trains.length === 0 ? null : panelSignature(trains, config);
   const standing = container._rtUpcomingAnchor?.isConnected ?? false;
   // No-op when this exact panel is already standing, already on its way out
@@ -494,7 +500,7 @@ export function renderUpcomingCard(container, trains, config) {
     if (leaving) dissolve(container, leaving);
     return;
   }
-  ensureStyles(container.ownerDocument ?? document);
+  ensureStyles(doc);
   if (leaving === container) {
     // A Train holds the stage: mounting now would ride the container's own
     // exit fade, so let it dissolve fully, then enter on the empty stage.
@@ -502,7 +508,7 @@ export function renderUpcomingCard(container, trains, config) {
     container._rtUpcomingPending = true;
     const mountTimer = setTimeout(() => {
       container._rtUpcomingPending = false;
-      mountPanel(container, trains, config);
+      mountPanel(doc, container, trains, config);
     }, PANEL_FADE_MS + AFTER_EXIT_MS);
     addCleanup(container, () => {
       container._rtUpcomingPending = false;
@@ -511,7 +517,7 @@ export function renderUpcomingCard(container, trains, config) {
     return;
   }
   if (leaving) dissolve(container, leaving); // changed data: crossfade old panel into new
-  mountPanel(container, trains, config);
+  mountPanel(doc, container, trains, config);
 }
 
 /**

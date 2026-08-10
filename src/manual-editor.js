@@ -64,8 +64,8 @@ function fmtClock(startISO, addMins) {
   return `${h12}:${String(mm).padStart(2, '0')} ${ap}${dayOffset ? ` +${dayOffset}d` : ''}`;
 }
 
-function ensureStyles() {
-  if (document.getElementById('rt-manual-editor-styles')) return;
+function ensureStyles(doc) {
+  if (doc.getElementById('rt-manual-editor-styles')) return;
   const css = `
   .me-fields{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
   .me-fields label{display:block;font-size:.78rem;color:var(--muted,#93a0b4);margin:0 0 3px}
@@ -96,10 +96,10 @@ function ensureStyles() {
   .me-chip-add:hover{color:var(--accent,#6ea8fe)}
   .me-chip-x{border:0;background:transparent;color:var(--muted,#93a0b4);padding:4px 9px 4px 6px;cursor:pointer;font-size:.85rem}
   .me-chip-x:hover{color:var(--bad,#ff6b6b)}`;
-  const el = document.createElement('style');
+  const el = doc.createElement('style');
   el.id = 'rt-manual-editor-styles';
   el.textContent = css;
-  document.head.appendChild(el);
+  doc.head.appendChild(el);
 }
 
 /**
@@ -108,7 +108,10 @@ function ensureStyles() {
  * or after the overlay language changes.
  */
 export function mountManualEditor({ root, state, onChange, t = (k) => k, getStreamers = () => [], onForgetStreamer = () => {}, onAddStreamer = () => {} }) {
-  ensureStyles();
+  // The Document comes from the mount, once, and is used throughout — the
+  // editor must be buildable in a document that is not the global one.
+  const doc = root.ownerDocument ?? document;
+  ensureStyles(doc);
   if (!Array.isArray(state.djs)) state.djs = [];
   if (!state.slotMins) state.slotMins = 60;
   let pasteOpen = false;
@@ -195,7 +198,7 @@ export function mountManualEditor({ root, state, onChange, t = (k) => k, getStre
 
   function refreshTimeline() {
     const old = root.querySelector('.me-tl'); if (!old) return;
-    const tmp = document.createElement('div'); tmp.innerHTML = timelineHTML();
+    const tmp = doc.createElement('div'); tmp.innerHTML = timelineHTML();
     old.replaceWith(tmp.firstChild);
     attachDrag(root.querySelector('.me-tl'));
   }

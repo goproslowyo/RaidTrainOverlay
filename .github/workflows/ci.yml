@@ -16,7 +16,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      # No dependencies to install — the project is dependency-free (node --test).
+      # One devDependency — linkedom, which gives the tests a Document to mount
+      # into. Nothing ships: the Overlay and the Configurator still load as bare
+      # files with no build step, and `npm test` is still plain `node --test`.
+      - name: Install dev dependencies
+        run: npm ci
       - name: Test suite (hard checks)
         run: node --test
       - name: i18n quality lint (advisory)

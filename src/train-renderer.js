@@ -29,9 +29,9 @@ export function resolveTheme(key) {
  * primitives (undulation, wheel spin, smoke, pointer bob) are shared keyframes
  * every Theme's markup hooks into; reduced-motion disables them.
  */
-function ensureBaseStyles() {
-  if (document.getElementById('rt-train-style')) return;
-  const style = document.createElement('style');
+function ensureBaseStyles(doc) {
+  if (doc.getElementById('rt-train-style')) return;
+  const style = doc.createElement('style');
   style.id = 'rt-train-style';
   style.textContent = `
     .rt-stage {
@@ -176,7 +176,7 @@ function ensureBaseStyles() {
       .rt-stage--breather { animation: none !important; }
     }
   `;
-  document.head.appendChild(style);
+  doc.head.appendChild(style);
 }
 
 // The Pass gap's true-empty stretch, published by the last applyMode for the
@@ -209,12 +209,12 @@ export function setBreather(container, on) {
 }
 
 /** Per-render generated keyframes (durations depend on measured track width). */
-function setModeStyle(cssText) {
-  let style = document.getElementById('rt-train-mode-style');
+function setModeStyle(doc, cssText) {
+  let style = doc.getElementById('rt-train-mode-style');
   if (!style) {
-    style = document.createElement('style');
+    style = doc.createElement('style');
     style.id = 'rt-train-mode-style';
-    document.head.appendChild(style);
+    doc.head.appendChild(style);
   }
   style.textContent = cssText;
 }
@@ -242,7 +242,10 @@ const MARQUEE_GAP_VW = 0.04;
  * by exactly one repeating unit (copy + gap) per loop — at the loop point the
  * next copy occupies the first one's start position, so the jump is invisible.
  */
-function applyMode(track, config, buildCopy) {
+function applyMode(doc, track, config, buildCopy) {
+  // The mount's own window: the Mode's geometry is measured against the scene
+  // this Track was built into, not whatever page happens to be global.
+  const view = doc.defaultView ?? window;
   // Preview ROLL (Configurator + preview page): a continuous right-to-left sweep so you
   // can watch the whole Train roll past, looping at once rather than waiting the Pass
   // interval (minutes). A single Theme rolls at the real traversal velocity; Shuffle's
@@ -251,10 +254,10 @@ function applyMode(track, config, buildCopy) {
   if (config?.previewRoll) {
     const rollSpeed = config?.speed > 0 ? config.speed : 1;
     const boost = config?.shuffleRoll ? 3 : 1;
-    const vw = window.innerWidth;
+    const vw = view.innerWidth;
     const rollVelocity = BASE_VELOCITY_VW_PER_SEC * vw * rollSpeed * boost;
     const sweepSec = (track.getBoundingClientRect().width + vw) / rollVelocity;
-    setModeStyle(`
+    setModeStyle(doc, `
       @keyframes rt-preview-roll {
         from { transform: translateX(100vw); }
         to { transform: translateX(-100%); }
@@ -271,7 +274,7 @@ function applyMode(track, config, buildCopy) {
   // (undulation, wheels, smoke) still plays — only the Mode traversal is suppressed.
   if (config?.preview) {
     const trackWidth = track.getBoundingClientRect().width;
-    const tx = Math.max((window.innerWidth - trackWidth) / 2, 8);
+    const tx = Math.max((view.innerWidth - trackWidth) / 2, 8);
     track.style.transform = `translateX(${tx}px)`;
     return;
   }
@@ -281,7 +284,7 @@ function applyMode(track, config, buildCopy) {
   const fadeInSec = Number.isFinite(config?.trackfadein) ? config.trackfadein : 15;
   const fadeOutSec = Number.isFinite(config?.trackfadeout) ? config.trackfadeout : 10;
   const speed = config?.speed > 0 ? config.speed : 1;
-  const viewportWidth = window.innerWidth;
+  const viewportWidth = view.innerWidth;
   const velocity = BASE_VELOCITY_VW_PER_SEC * viewportWidth * speed;
 
   if (config?.mode === 'marquee') {
@@ -336,7 +339,7 @@ function applyMode(track, config, buildCopy) {
       `;
       stage.classList.add('rt-stage--breather');
     }
-    setModeStyle(marqueeCss);
+    setModeStyle(doc, marqueeCss);
     track.classList.add('rt-track--marquee');
     return;
   }
@@ -401,7 +404,7 @@ function applyMode(track, config, buildCopy) {
     `;
     rails.classList.add('rt-rails--periodic');
   }
-  setModeStyle(css);
+  setModeStyle(doc, css);
   // Frame one is off-screen right — a Pass begins immediately on load.
   track.style.transform = 'translateX(100vw)';
   track.classList.add('rt-track--pass');
@@ -416,16 +419,19 @@ function applyMode(track, config, buildCopy) {
  */
 export function renderTrain(train, container, config) {
   const theme = resolveTheme(config?.theme);
-  ensureBaseStyles();
+  // The Document comes from the mount, once, and is used throughout — the
+  // Stage must be buildable in a document that is not the global one.
+  const doc = container.ownerDocument ?? document;
+  ensureBaseStyles(doc);
   theme.ensureStyles();
   container.replaceChildren();
 
   // The Stage fixes vertical position (height param → translateY); the Track
   // carries the Mode's horizontal motion (translateX). The Train never moves
   // within the Track. Two elements so the transforms compose without clobbering.
-  const stage = document.createElement('div');
+  const stage = doc.createElement('div');
   stage.className = 'rt-stage';
-  const track = document.createElement('div');
+  const track = doc.createElement('div');
   track.className = 'rt-track';
 
   // tz zone count reserves vertical room for the stacked time block per Car.
@@ -459,7 +465,7 @@ export function renderTrain(train, container, config) {
   if (rails) stage.appendChild(rails);
   stage.appendChild(track);
   container.appendChild(stage);
-  applyMode(track, config, buildCopy);
+  applyMode(doc, track, config, buildCopy);
   // The post-attach pass — every Theme's shrink-to-fit (fitAll) and the lead badge.
   // NEVER defer this to requestAnimationFrame. rAF only runs at a rendering
   // opportunity, so in a document that is never painted the callback sits queued and
@@ -472,7 +478,7 @@ export function renderTrain(train, container, config) {
   // running synchronously is correct on its own terms, not because applyMode happened
   // to measure first (applyMode writes styles after its last read — layout is dirty here).
   for (const copy of built) copy.afterAttach?.();
-  pinLeadBadges(track, config);
+  pinLeadBadges(doc, track, config);
 
   return {
     /** In-place time-state update: classes and text only, never structure. */
@@ -486,7 +492,7 @@ export function renderTrain(train, container, config) {
  *  streamer reads clearly as the lead on any Theme. It lives in the moving Track
  *  so it rides along, and is measured after layout so it sits over the loco art
  *  whatever shape the Theme drew. */
-function pinLeadBadges(track, config) {
+function pinLeadBadges(doc, track, config) {
   const conductor = config?.t ? config.t('overlay.conductor') : 'CONDUCTOR';
   const trackRect = track.getBoundingClientRect();
   for (const engine of track.querySelectorAll('[data-engine]')) {
@@ -504,7 +510,7 @@ function pinLeadBadges(track, config) {
     const body = engine.querySelector('.rt-lead-anchor') ?? engine.querySelector('[class$="-art"]') ?? engine;
     const rect = body.getBoundingClientRect();
     if (!rect.width) continue;
-    const badge = document.createElement('div');
+    const badge = doc.createElement('div');
     badge.className = 'rt-lead';
     badge.textContent = conductor;
     badge.style.left = `${rect.left - trackRect.left + rect.width / 2}px`;

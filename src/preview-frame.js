@@ -19,7 +19,14 @@
  * A re-render restarts the sweep, so a frozen preview returns to rolling on any knob
  * change — mirroring the live Overlay.
  */
-export function createPreviewFrame({ iframe, rollBtn, stillBtn, overlayBase, origin = window.location.origin, t = (k) => k }) {
+// The default origin comes from the mount — the window the <iframe> element's
+// own document belongs to — so a frame hosted in a document that is not the
+// global one still posts to the right target. An explicit `origin` wins.
+export function createPreviewFrame({
+  iframe, rollBtn, stillBtn, overlayBase,
+  origin = iframe.ownerDocument?.defaultView?.location?.origin ?? window.location.origin,
+  t = (k) => k,
+}) {
   let rollState = 'still';
   let loadedSlug = null; // event currently (re)loaded in the iframe (null = placeholder)
   let baseQuery = '';    // overlay query baked into the iframe's current src
