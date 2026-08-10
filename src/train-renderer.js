@@ -29,6 +29,7 @@ import pride from './themes/pride.js';
 // authoring-guide reference Theme (docs/authoring-a-theme.md), which bundles
 // badge.svg and resolves it via import.meta.url (subpath-safe, no build step).
 import starter from './themes/starter/index.js';
+import { breatherCycle } from './gap-choreography.js';
 
 /** The shipped Theme roster; a key must match config's `theme` enum to be selectable
  *  via the URL/Configurator. Single-file and folder-form Themes register identically.
@@ -194,9 +195,41 @@ function ensureBaseStyles() {
     @media (prefers-reduced-motion: reduce) {
       .rt-car, .rt-wheel, .rt-smoke > *, .rt-now-bob { animation: none !important; }
       .rt-smoke > * { opacity: 0; }
+      /* The Breather clears the stage on a cycle; with reduced motion the
+         Train simply stays put rather than fading away and back. */
+      .rt-stage--breather { animation: none !important; }
     }
   `;
   document.head.appendChild(style);
+}
+
+// The Pass gap's true-empty stretch, published by the last applyMode for the
+// between-Pass card's choreography (gap-choreography.js). Null until a pass-Mode
+// render has measured the Train, and null in every other Mode.
+let passGeometry = null;
+// The marquee Breather's cycle (gap-choreography.breatherCycle), or null when
+// this Mode has no Breather — another Mode, or the streamer opted out.
+let marqueeBreather = null;
+
+/** The last render's Pass geometry, or null when this Mode has no Pass gap. */
+export function currentPassGeometry() {
+  return passGeometry;
+}
+
+/** The last render's marquee Breather cycle, or null when there is none. */
+export function currentBreatherCycle() {
+  return marqueeBreather;
+}
+
+/**
+ * Turn the Breather on or off on an already-rendered Stage. The renderer can
+ * only tell whether a Breather is CONFIGURED; whether there is actually a card
+ * to put in one depends on the horizon, which the shell owns — so the shell
+ * has the last word, and this keeps the DOM detail on this side of the seam.
+ */
+export function setBreather(container, on) {
+  const stage = container?.querySelector('.rt-stage');
+  if (stage && marqueeBreather) stage.classList.toggle('rt-stage--breather', Boolean(on));
 }
 
 /** Per-render generated keyframes (durations depend on measured track width). */
@@ -267,23 +300,67 @@ function applyMode(track, config, buildCopy) {
     return;
   }
 
+  // The Track's fade durations, shared by both Modes: the pass gap fades the
+  // rails, and a marquee Breather fades the whole Stage over the same spans.
+  const fadeInSec = Number.isFinite(config?.trackfadein) ? config.trackfadein : 15;
+  const fadeOutSec = Number.isFinite(config?.trackfadeout) ? config.trackfadeout : 10;
   const speed = config?.speed > 0 ? config.speed : 1;
   const viewportWidth = window.innerWidth;
   const velocity = BASE_VELOCITY_VW_PER_SEC * viewportWidth * speed;
 
   if (config?.mode === 'marquee') {
+    passGeometry = null;
     const gapPx = MARQUEE_GAP_VW * viewportWidth;
     track.style.gap = `${MARQUEE_GAP_VW * 100}vw`;
     const unitWidth = track.getBoundingClientRect().width + gapPx;
     const copies = Math.max(2, Math.ceil(viewportWidth / unitWidth) + 1);
     for (let i = 1; i < copies; i += 1) track.appendChild(buildCopy());
-    setModeStyle(`
+    let marqueeCss = `
       @keyframes rt-marquee {
         from { transform: translateX(0); }
         to { transform: translateX(${-unitWidth}px); }
       }
       .rt-track--marquee { animation: rt-marquee ${unitWidth / velocity}s linear infinite; }
-    `);
+    `;
+    // The Breather: marquee has no gap, so the cycle manufactures one. Every
+    // ~3 minutes the whole Stage — Train AND Track together — clears, the
+    // Upcoming card takes the empty stage alone, and both return.
+    //
+    // It clears by FADING, not by running off. "The Track never moves" rules
+    // out sliding it, and holding the Train off-screen instead would mean
+    // carrying enough Train copies to cover three minutes of crawl (a dozen or
+    // more full SVG Trains on an OBS source) purely to buy an exit. One
+    // opacity animation on the Stage costs nothing per frame and clears the
+    // stage just as completely. The crawl keyframe above is untouched: it
+    // simply carries on, unseen, behind the fade.
+    //
+    // trackvis is deliberately not consulted — it stays a no-op on marquee, so
+    // there is one Breather choreography rather than two.
+    marqueeBreather = breatherCycle({
+      upcycleSec: config?.upcycle,
+      style: config?.upstyle,
+      upscrollSec: config?.upscroll,
+      fadeOutSec,
+      fadeInSec,
+      // Only when there is actually a card to show: a Breather with nothing to
+      // put in it is just the Train vanishing for no reason.
+      enabled: Boolean(config?.user && config?.upcoming && config?.upgap && !config?.uponly),
+    });
+    const stage = track.parentElement;
+    if (marqueeBreather && stage) {
+      const pct = (sec) => (sec / marqueeBreather.cycleSec) * 100;
+      const crawlPct = pct(marqueeBreather.crawlSec);
+      marqueeCss += `
+        @keyframes rt-breather {
+          0%, ${crawlPct}% { opacity: 1; }
+          ${crawlPct + pct(marqueeBreather.fadeOutSec)}%, ${100 - pct(marqueeBreather.fadeInSec)}% { opacity: 0; }
+          100% { opacity: 1; }
+        }
+        .rt-stage--breather { animation: rt-breather ${marqueeBreather.cycleSec}s linear infinite; }
+      `;
+      stage.classList.add('rt-stage--breather');
+    }
+    setModeStyle(marqueeCss);
     track.classList.add('rt-track--marquee');
     return;
   }
@@ -315,14 +392,20 @@ function applyMode(track, config, buildCopy) {
   // so short there's effectively no gap to fade into.
   const rails = track.parentElement?.querySelector('.rt-rails');
   const holdPct = 100 - holdFrom; // the empty gap, as a % of the period
+  // Each fade is clamped to ≤40% of the gap so a sliver of true-empty always
+  // survives even at short intervals (graceful degradation).
+  const fadeOutPct = Math.min((fadeOutSec / periodSec) * 100, 0.4 * holdPct);
+  const fadeInPct = Math.min((fadeInSec / periodSec) * 100, 0.4 * holdPct);
+  // The gap's true-empty stretch, published for the between-Pass card. Computed
+  // whether or not the rails actually fade: the card's choreography is keyed to
+  // the Pass period ALONE, so trackvis=always behaves identically — one rule.
+  marqueeBreather = null;
+  passGeometry = {
+    periodSec,
+    emptyFromSec: ((holdFrom + fadeOutPct) / 100) * periodSec,
+    emptyToSec: ((100 - fadeInPct) / 100) * periodSec,
+  };
   if (config?.track === 'periodic' && rails && holdPct > 1) {
-    // Fade durations (seconds) come from config — trackfadein / trackfadeout,
-    // default 15 in / 10 out — each clamped to ≤40% of the gap so a sliver of
-    // true-empty always survives even at short intervals (graceful degradation).
-    const fadeInSec = Number.isFinite(config?.trackfadein) ? config.trackfadein : 15;
-    const fadeOutSec = Number.isFinite(config?.trackfadeout) ? config.trackfadeout : 10;
-    const fadeOutPct = Math.min((fadeOutSec / periodSec) * 100, 0.4 * holdPct);
-    const fadeInPct = Math.min((fadeInSec / periodSec) * 100, 0.4 * holdPct);
     // The looping keyframe only fades in AHEAD of later Passes (its tail leads into
     // the next Pass), so on load — and on every shuffle re-render — the rails would
     // pop in at full opacity on the FIRST roll. A one-shot intro fades them up as that

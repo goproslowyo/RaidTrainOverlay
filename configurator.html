@@ -986,7 +986,7 @@
   ];
   // The Overlay's own defaults for the idle-card knobs (config.js) — what a
   // null pref means, and what the controls show before a pref is stored.
-  const IDLE_DEFAULTS = { uppos: 'bc', upop: '0.88', upcycle: '12', upscroll: '34', upstyle: 'card' };
+  const IDLE_DEFAULTS = { uppos: 'bc', upop: '0.88', upcycle: '12', upscroll: '34', upstyle: 'card', upgap: '1' };
   // The scroll-speed slider reads left-slow → right-fast while the value is a
   // DURATION (bigger = slower), so it is stored flipped: value = FLIP − slider.
   // Lap range 24s (fastest — still readable) to 120s (a genuinely lazy crawl);
@@ -2003,6 +2003,9 @@
   function idleStageHtml() {
     const v = idleValues();
     const on = v.upcoming != null;
+    // The three-way: Never / Between trains / Between trains and while one is
+    // live. `upgap` is the opt-out, so its ABSENCE is the third position.
+    const occ = !on ? 'off' : (String(v.upgap) === '0' ? 'idle' : 'both');
     const caption = !on ? te('configurator.idleCapOff')
       : v.upstyle === 'ticker' ? te('configurator.idleCapTicker')
         : te('configurator.idleCapCard', { s: v.upcycle });
@@ -2044,11 +2047,13 @@
     const posLabel = POSITIONS.find(([k]) => k === v.uppos);
     const main = `
       <div class="sfield">
-        <span class="flabel">${te('configurator.idleWhileLabel')}</span>
-        <label class="check">
-          <input type="checkbox" id="ll-idle-toggle"${on ? ' checked' : ''}>
-          ${te('configurator.idleToggleShort')}
-        </label>
+        <span class="flabel">${te('configurator.idleWhenLabel')}</span>
+        <div class="seg wide" style="margin-top:2px">
+          <button type="button" data-act="idleocc" data-id="off" aria-pressed="${occ === 'off'}">${te('configurator.idleOccOff')}</button>
+          <button type="button" data-act="idleocc" data-id="idle" aria-pressed="${occ === 'idle'}">${te('configurator.idleOccIdle')}</button>
+          <button type="button" data-act="idleocc" data-id="both" aria-pressed="${occ === 'both'}">${te('configurator.idleOccBoth')}</button>
+        </div>
+        ${occ === 'both' ? `<span class="fhint">${te('configurator.idleOccBothHint')}</span>` : ''}
         <div class="rangerow" style="margin-top:8px">
           <select id="ll-horizon"${dis} style="max-width:190px" aria-label="${te('configurator.llHorizonAria')}">${options}</select>
           <span class="cap dim">${matchNote}</span>
@@ -3002,6 +3007,21 @@
     if (act === 'themesmore') { state.themesOpen = !state.themesOpen; repaintLook(); return; }
     if (act === 'dispmode') { writeBaseSetting('mode', el.dataset.id); repaintLook(); return; }
     if (act === 'played') { writeBaseSetting('hidefinished', el.dataset.id === 'hide'); repaintLook(); return; }
+    if (act === 'idleocc') {
+      // Three positions, two params: the card's horizon, and the between-Pass
+      // opt-out. `both` is the default, so it clears upgap rather than setting
+      // it — the third position is the ABSENCE of the param.
+      const pick = el.dataset.id;
+      if (pick === 'off') {
+        writeIdlePref('upcoming', null);
+      } else {
+        if (!idleValues().upcoming) writeIdlePref('upcoming', $('#ll-horizon')?.value ?? '3');
+        writeIdlePref('upgap', pick === 'idle' ? '0' : null);
+      }
+      toast(t(pick === 'off' ? 'configurator.toastIdleOff' : 'configurator.toastIdleOn'));
+      repaintIdle();
+      return;
+    }
     if (act === 'foot') {
       // `card` is the Overlay default — stored as null so the URL stays lean.
       writeIdlePref('upstyle', el.dataset.id === 'ticker' ? 'ticker' : null);
@@ -3315,13 +3335,7 @@
 
   // Live Link idle-card controls (change events, so they live on their own).
   $('#main').addEventListener('change', (e) => {
-    if (e.target.id === 'll-idle-toggle') {
-      const horizon = $('#ll-horizon');
-      writeIdlePref('upcoming', e.target.checked ? (horizon?.value ?? '3') : null);
-      toast(t(e.target.checked ? 'configurator.toastIdleOn' : 'configurator.toastIdleOff'));
-      repaintIdle();
-      return;
-    }
+
     if (e.target.id === 'll-horizon') {
       writeIdlePref('upcoming', e.target.value);
       toast(t('configurator.toastHorizonUpdated'));

@@ -161,6 +161,13 @@ export function parseConfig(queryString) {
     // shows the upcoming card, even while a train is live. A second URL for a
     // separate OBS scene (starting soon / be right back).
     uponly: boolean(params.get('uponly')),
+    // The between-Pass occasion: while a train is live, the card also pulses
+    // into the empty stage between Passes (and into marquee's Breathers).
+    // On by default wherever the card is on — opt-out, not opt-in, since the
+    // streamer already asked for upcoming trains during dead air. Only `0`
+    // switches it off, which reserves `upgap=<minutes>` as a backwards-
+    // compatible future cadence override (`1` stays truthy).
+    upgap: (params.get('upgap') ?? '') !== '0',
     // The display locale, kept as the raw requested tag (or null). Resolution to
     // a supported locale + the navigator fallback happen in the overlay shell so
     // parseConfig stays pure (no `navigator`); the Configurator's selector sets it.
@@ -234,6 +241,7 @@ export function serializeConfig(config) {
     if (config.upscroll !== 34) params.set('upscroll', String(config.upscroll));
     if (config.upstyle !== 'card') params.set('upstyle', config.upstyle);
     if (config.uponly) params.set('uponly', '1');
+    if (config.upgap === false) params.set('upgap', '0');
   } else if (config.event) params.set('event', config.event);
   else if (config.lineup) params.set('lineup', config.lineup);
   // Locale: emit whenever explicitly set. Even `lang=en` is semantically

@@ -128,6 +128,7 @@ export function startLiveLinkFeed(baseQuery, deps) {
     onSwitch = () => {},
     onEvent = () => {},
     onIdle = () => {},
+    onHorizon = () => {},
     onError = () => {},
   } = deps;
 
@@ -201,13 +202,24 @@ export function startLiveLinkFeed(baseQuery, deps) {
       // paint immediately from whatever the cache knows, then complete the
       // lineups over the network and repaint only if that changed anything.
       const names = [login, r.user.displayName];
-      const paintIdle = async () => {
+      // One annotate-and-paint, two destinations: `onIdle` when nothing is
+      // running, `onHorizon` when a train is. The live path gets the same
+      // cache-first-then-full treatment — the between-Pass card lists other
+      // trains too, so its rows must know when the streamer plays.
+      // `detachFull` is what separates them: idle has nothing else to do, so it
+      // awaits the network refinement, but a live train's resolve tick must not
+      // sit behind slot lookups — it still has to schedule the next poll.
+      const paint = async (emit, { detachFull = false } = {}) => {
         const slotDeps = { fetchImpl, storage, clock, setTimer };
         const first = await annotateMySlots(upcoming, names, { ...slotDeps, cacheOnly: true });
-        onIdle({ upcoming: first });
-        const full = await annotateMySlots(upcoming, names, slotDeps);
-        if (!stopped && slotSignature(full) !== slotSignature(first)) onIdle({ upcoming: full });
+        emit({ upcoming: first });
+        const refine = annotateMySlots(upcoming, names, slotDeps).then((full) => {
+          if (!stopped && slotSignature(full) !== slotSignature(first)) emit({ upcoming: full });
+        });
+        if (detachFull) refine.catch(() => {}); // fail-soft: the rows keep their departure times
+        else await refine;
       };
+      const paintIdle = () => paint(onIdle);
       if (baseConfig.uponly) {
         // Upcoming-only Live Link (?uponly=1): whatever state the resolver
         // found, this source renders the upcoming card and never the Train —
@@ -218,15 +230,21 @@ export function startLiveLinkFeed(baseQuery, deps) {
       } else if (state === 'idle') {
         stopInner();
         await paintIdle();
-      } else if (train.slug !== activeSlug) {
-        stopInner();
-        activeSlug = train.slug;
-        const config = parseConfig(effectiveQuery(baseQuery, map[train.slug]));
-        onSwitch(train.slug, config);
-        innerFeed = startEventFeed(train.slug, config, {
-          fetchImpl, storage, clock, setTimer, clearTimer, rand, onEvent, onError,
-        });
-        await innerFeed.ready;
+      } else {
+        if (train.slug !== activeSlug) {
+          stopInner();
+          activeSlug = train.slug;
+          const config = parseConfig(effectiveQuery(baseQuery, map[train.slug]));
+          onSwitch(train.slug, config);
+          innerFeed = startEventFeed(train.slug, config, {
+            fetchImpl, storage, clock, setTimer, clearTimer, rand, onEvent, onError,
+          });
+          await innerFeed.ready;
+        }
+        // The horizon rides EVERY resolve tick, not just a switch: a broadcast
+        // runs for hours, and the card that lists the other trains during it
+        // would otherwise still be showing the horizon as it looked at sign-on.
+        await paint(onHorizon, { detachFull: true });
       }
     }
     // r.error with no cache: nothing to resolve from — keep the current

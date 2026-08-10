@@ -7,6 +7,26 @@ All notable changes to RaidTrainOverlay are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- **The Upcoming card now appears while a train is live**, filling the downtime
+  the overlay used to spend empty. In `pass` mode it pulses into the true-empty
+  middle of each gap between Passes; in `marquee`, which has no gap, the cycle
+  manufactures one — a **Breather**, in which the Train and the Track clear the
+  stage together (by a fade, never a slide) and return afterwards. The card and
+  a visible Train are never on screen at once. Live Link sources only, listing
+  the *other* upcoming trains; `uponly=1` sources are unaffected.
+  Appearances are one generated CSS keyframe sharing the Train's own period —
+  no per-frame JavaScript, no timers, and no drift over a long stream — with
+  whole pages (or whole ticker laps) only, and a deterministic sit-out when a
+  gap is too short to hold even one. (wayfinder map #53, spec #59)
+- **`upgap`** — one boolean, on by default wherever the card is on, meaning the
+  same thing in both modes: `upgap=0` says never interrupt a live train.
+- **The Configurator's "Between trains" toggle is now a three-way** — *Never* /
+  *Between trains* / *Between trains, and while one is live* (the default),
+  translated across every locale.
+
+### Changed
+- `prefers-reduced-motion` extends to the new behaviour: the Breather is
+  suppressed (the Train stays put) and the between-Pass card does not pulse.
 - **A manual prototype of the Upcoming card's between-Pass choreography**
   (`test/manual/upcoming-gap-prototype.html`, dev-facing, not shipped to the
   overlay): the card pulsing in the true-empty middle of a pass-mode gap on

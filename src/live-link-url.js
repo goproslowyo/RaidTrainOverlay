@@ -170,7 +170,7 @@ export function buildLiveLink(library, store, login, when = {}) {
   // apply and the copy-once URL stays lean.
   const prefs = profile.liveLink ?? {};
   const idleKnobs = {};
-  for (const knob of ['uppos', 'upop', 'upcycle', 'upscroll', 'upstyle']) {
+  for (const knob of ['uppos', 'upop', 'upcycle', 'upscroll', 'upstyle', 'upgap']) {
     if (prefs[knob] != null) idleKnobs[knob] = prefs[knob];
   }
   return {
