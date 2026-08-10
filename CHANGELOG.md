@@ -6,6 +6,12 @@ All notable changes to RaidTrainOverlay are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-08-10
+
+The Upcoming card learned to fill a live train's downtime — and then learned to
+stay in its own corner while doing it. The overlay also settled what to *call*
+the thing: a glossary for the card's anatomy, and the same words in the code.
+
 ### Added
 - **The Upcoming card now appears while a train is live**, filling the downtime
   the overlay used to spend empty. In `pass` mode it pulses into the true-empty
@@ -29,7 +35,7 @@ All notable changes to RaidTrainOverlay are documented here. The format follows
   Train's continuous crawl (`mode=marquee`) and the Upcoming card's one-line
   footprint — which sent at least one streamer to `mode=` hunting for a control
   that lives two fields away, under *How much room it takes → One line*. The
-  card's one-line variant is a **Ticker** throughout: `CONTEXT.md` gains
+  card's one-line variant is the **scrolling view**: `CONTEXT.md` gains
   **Upcoming card** and **Footprint** entries, **Mode** now says it governs the
   Train alone, and the internal identifiers followed (`rt-upcoming-marquee` →
   `rt-upcoming-ticker`, the Configurator's `tickmarquee` → `tickscroll`).
@@ -44,6 +50,36 @@ All notable changes to RaidTrainOverlay are documented here. The format follows
   click-to-seek period timeline, and a readout of the derived appearance
   windows. The approved choreography feeds the between-Passes spec
   (wayfinder map #53, ticket #56).
+- **The card's anatomy has words now, and the code uses them.** `CONTEXT.md`
+  gains **Horizon**, **Stage**, **Page**, **Lap**, **Card view**, **Scrolling
+  view**, **Occasion** and **Cell** — four of which the previous round used
+  without ever defining. "Ticker" is retired as a *word*: on review it was not
+  recognised, and the one-line variant was twice called *the scrolling view*, so
+  that is what the glossary records and what the renderer is named. About 48
+  identifiers, the DOM ids and 25 i18n keys move to one `upcoming*` namespace,
+  and the five English strings that still said "idle" now say **Upcoming card** —
+  the ten translations never said it (they already said a *waiting* card), so
+  this converges on them rather than diverging. `idle` survives in exactly one
+  sense: the Live Link having no train to show.
+
+### Fixed
+- **The Upcoming card stays inside its anchor's cell.** Placement worked but
+  size never followed it: the scrolling view spanned the whole screen at every
+  anchor and every scene size — 2.9× the cell it was anchored in — and the card
+  view's ceiling reached 1.59× at 1280×720, so a card at one corner covered the
+  others. Three rules were deciding one box independently. The anchor grammar
+  now owns the entire budget, placement *and* a ceiling of a third of the scene
+  on each axis, with both views filling it. The cell is expressed in CSS
+  viewport units rather than measured in JavaScript, because OBS browser
+  sources report a window width of 0.
+- **The scrolling view stops captioning itself into illegibility.** Inside a
+  cell its fixed ~209px eyebrow competed with the trains it captions, and
+  capping it merely produced a truncated `UPCOMING RAI…` above a window too
+  narrow to hold a name — at 1280 no point in the cycle ever showed a whole
+  entry. Below the width where the eyebrow fits whole it is now dropped
+  entirely, along with the secondary UTC stamp, and the edge fade narrows: the
+  1280 scroll window goes from 184px to 333px, enough for a full date and a
+  full streamer name. 1920 keeps its caption unchanged.
 
 ## [0.9.1] - 2026-08-09
 
@@ -444,7 +480,8 @@ for an OBS browser source. Static hosting on GitHub Pages, no build step.
 - A cache-first RaidPal client resilient to transient fetch failures, and a GitHub
   Pages landing page with a live deployed-commit stamp in the footer.
 
-[Unreleased]: https://github.com/goproslowyo/RaidTrainOverlay/compare/v0.9.1...HEAD
+[Unreleased]: https://github.com/goproslowyo/RaidTrainOverlay/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/goproslowyo/RaidTrainOverlay/releases/tag/v0.10.0
 [0.9.1]: https://github.com/goproslowyo/RaidTrainOverlay/releases/tag/v0.9.1
 [0.9.0]: https://github.com/goproslowyo/RaidTrainOverlay/releases/tag/v0.9.0
 [0.8.0]: https://github.com/goproslowyo/RaidTrainOverlay/releases/tag/v0.8.0
