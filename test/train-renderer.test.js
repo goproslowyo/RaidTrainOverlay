@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { resolveTheme, THEMES } from '../src/train-renderer.js';
+import { resolveTheme } from '../src/train-renderer.js';
+import { THEMES } from '../src/themes/registry.js';
 import classic from '../src/themes/classic.js';
 import highvibes from '../src/themes/highvibes.js';
 import jazz from '../src/themes/jazz.js';

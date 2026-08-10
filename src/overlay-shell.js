@@ -13,8 +13,9 @@ import { renderUpcomingCard, retireUpcomingCard } from './upcoming-card.js';
 import { gapSchedule, windowKeyframes } from './gap-choreography.js';
 import { buildTrain } from './lineup-engine.js';
 import {
-  renderTrain, SHIPPED_THEMES, currentPassGeometry, currentBreatherCycle, setBreather,
+  renderTrain, currentPassGeometry, currentBreatherCycle, setBreather,
 } from './train-renderer.js';
+import { SHIPPED_THEMES } from './themes/registry.js';
 import { DEMO_SLUG, DEMO_SPOTLIGHT, makeDemoEvent } from './demo-event.js';
 import { decodeLineup } from './lineup-codec.js';
 import { makeManualEvent } from './manual-lineup.js';

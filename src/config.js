@@ -2,6 +2,8 @@
  * The query-param schema: the Overlay's public configuration API.
  * Parses a query string; never reads window.location itself.
  */
+import { THEME_KEYS } from './themes/registry.js';
+
 /** A finite number > 0, or the default — the tolerance contract for numerics. */
 function positiveNumber(value, fallback) {
   const n = Number(value);
@@ -204,14 +206,15 @@ export function parseConfig(queryString) {
     enginedim: oneOf(params.get('enginedim'), ['over', 'finished', 'never'], 'over'),
     // Auto-refresh poll cadence in minutes; 0 = fetch on load only (default).
     refresh: refreshMinutes(params.get('refresh')),
-    // Which Theme paints the Train. Enum over the shipped Theme keys,
-    // plus `shuffle` (cycle the whole roster — the overlay picks the real Theme).
-    // Unknown keys fall back to the default. Aliases (THEME_ALIASES) map friendly
-    // names to canonical keys: `neon`→synthwave, `smoke`→highvibes, `coltrane`→jazz,
-    // `shinkansen`→bullet, `lavalamp`→lava.
+    // Which Theme paints the Train. Enum over the shipped Theme keys, plus
+    // `shuffle` (cycle the whole roster — the overlay picks the real Theme) —
+    // THEME_KEYS, derived from the registry, so a Theme cannot be selectable
+    // here and unpainted there. Unknown keys fall back to the default. Aliases
+    // (THEME_ALIASES) map friendly names to canonical keys: `neon`→synthwave,
+    // `smoke`→highvibes, `coltrane`→jazz, `shinkansen`→bullet, `lavalamp`→lava.
     theme: oneOf(
       THEME_ALIASES[(params.get('theme') ?? '').toLowerCase()] ?? params.get('theme'),
-      ['classic', 'flat', 'synthwave', 'ticket', 'wood', 'comic', 'departures', 'paper', 'tron', 'pixel', 'highvibes', 'jazz', 'bullet', 'lava', 'pride', 'shuffle'],
+      THEME_KEYS,
       'classic',
     ),
   };

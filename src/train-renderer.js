@@ -6,45 +6,21 @@
  * Two motion layers: the Mode traversal here translates the whole
  * Train across a stationary Track; each Theme owns its ambient animation (wheel
  * spin, smoke, per-Car undulation), which the base CSS below provides the shared
- * keyframes for. Adding a Theme touches only src/themes/ and the registry.
+ * keyframes for. This module HOSTS Themes; it does not list them. The roster is
+ * declared once in src/themes/registry.js, and config's enum and the
+ * Configurator's labels derive from it — so adding a Theme in JS means the art
+ * module plus one line of registry. Its name still has to be translated in the
+ * 11 catalogs, and the Configurator's swatch and preview chip are still written
+ * by hand (no build step, by design); test/theme-registry.test.js holds those
+ * honest.
  */
-import classic from './themes/classic.js';
-import flat from './themes/flat.js';
-import synthwave from './themes/synthwave.js';
-import ticket from './themes/ticket.js';
-import wood from './themes/wood.js';
-import comic from './themes/comic.js';
-import departures from './themes/departures.js';
-import paper from './themes/paper.js';
-import tron from './themes/tron.js';
-import pixel from './themes/pixel.js';
-import highvibes from './themes/highvibes.js';
-import jazz from './themes/jazz.js';
-import bullet from './themes/bullet.js';
-import lava from './themes/lava.js';
-import pride from './themes/pride.js';
-// A Theme registers the same way whether it is a single file (./themes/<key>.js) or
-// a folder that bundles its own assets (./themes/<key>/index.js) — both are ES
-// modules with a default export. `starter` is the folder form: the
-// authoring-guide reference Theme (docs/authoring-a-theme.md), which bundles
-// badge.svg and resolves it via import.meta.url (subpath-safe, no build step).
-import starter from './themes/starter/index.js';
+import { THEMES } from './themes/registry.js';
 import { breatherCycle } from './gap-choreography.js';
-
-/** The shipped Theme roster; a key must match config's `theme` enum to be selectable
- *  via the URL/Configurator. Single-file and folder-form Themes register identically.
- *  `starter` is registered (renderable via the manual harness #theme=starter) but
- *  kept out of the user-facing enum — it is the authoring reference, not a roster Theme. */
-export const THEMES = { classic, flat, synthwave, ticket, wood, comic, departures, paper, tron, pixel, highvibes, jazz, bullet, lava, pride, starter };
 
 /** config.theme → Theme, falling back to classic for unknown/unshipped keys. */
 export function resolveTheme(key) {
   return THEMES[key] ?? THEMES.classic;
 }
-
-/** The roster offered for selection + `theme=shuffle` cycling — every Theme
- *  except `starter` (an authoring reference, not a roster Theme). */
-export const SHIPPED_THEMES = Object.keys(THEMES).filter((key) => key !== 'starter');
 
 /**
  * Theme-agnostic CSS, injected once. The Stage owns vertical position

@@ -314,13 +314,20 @@ without lag at 20+ Cars, a departed slot stays legible with its PLAYED stamp, an
 
 ## 8. Register it
 
-To make a Theme selectable, add its key in **three** files (the starter is registered in
-the first one only — it's an authoring reference, not a roster Theme):
+In JS, a Theme is declared **once**: `import` it in **`src/themes/registry.js`** and add it
+to the `THEMES` map. The `theme` enum in `src/config.js` and the label map in
+`src/settings-schema.js` both derive from that map, so a key cannot be selectable in one
+and unknown to the other. (The starter is registered there too and filtered back out of
+the roster — it's an authoring reference, not a roster Theme.)
 
-1. **`src/train-renderer.js`** — `import` it and add it to the `THEMES` map.
-2. **`src/config.js`** — add the key to the `theme` enum (the `oneOf([...])` list).
-3. **`src/settings-schema.js`** — add `key: 'Your Label'` to `THEME_OPTIONS`. That one map
-   feeds the theme `<select>` in both Configurator editors and the Preset summary chips.
+Two things are still written by hand, because the site has no build step:
+
+- its **name**, under `configurator.theme.<key>`, in each of the 11 catalogs
+  (`src/i18n/locales/`). Translation is not drift.
+- its **swatch** in `configurator.html` and its **chip** in `preview.html`.
+  [`test/theme-registry.test.js`](../test/theme-registry.test.js) goes red if either page
+  is missing a roster key, so a forgotten one is a failing build rather than a Theme
+  nobody can find.
 
 Unknown keys fall back to `classic`, so a half-registered Theme degrades gracefully rather
 than blanking the Overlay.

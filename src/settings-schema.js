@@ -23,26 +23,14 @@
  */
 
 import { PRESET_SETTINGS_FIELDS } from './preset-library.js';
+import { THEME_KEYS, optionKeyFor } from './themes/registry.js';
 
-/** Theme key → catalog key for its label. Keys mirror the config schema's Theme enum. */
-export const THEME_OPTION_KEYS = {
-  classic: 'configurator.theme.classic',
-  flat: 'configurator.theme.flat',
-  synthwave: 'configurator.theme.synthwave',
-  ticket: 'configurator.theme.ticket',
-  wood: 'configurator.theme.wood',
-  comic: 'configurator.theme.comic',
-  departures: 'configurator.theme.departures',
-  paper: 'configurator.theme.paper',
-  tron: 'configurator.theme.tron',
-  pixel: 'configurator.theme.pixel',
-  highvibes: 'configurator.theme.highvibes',
-  jazz: 'configurator.theme.jazz',
-  bullet: 'configurator.theme.bullet',
-  lava: 'configurator.theme.lava',
-  pride: 'configurator.theme.pride',
-  shuffle: 'configurator.theme.shuffle',
-};
+/** Theme key → catalog key for its label, over the config schema's Theme enum
+ *  itself rather than a copy of it. Every entry always followed
+ *  `configurator.theme.<key>`, so this derives what was hand-written before:
+ *  a Theme in the registry now arrives here with its label key already right,
+ *  and only the 11 catalogs' translations are left to write. */
+export const THEME_OPTION_KEYS = Object.fromEntries(THEME_KEYS.map((key) => [key, optionKeyFor(key)]));
 
 /**
  * Overlay-language selector values ('' = Auto, follow the browser).
