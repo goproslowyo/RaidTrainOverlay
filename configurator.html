@@ -1922,6 +1922,8 @@
   }
   /** Trains → the `{ when, utc, title }` rows the Overlay would paint for them. */
   const cardRows = (trains) => upcomingRows(trains, { locale: pageLocale, zone: cardZone() });
+  /** One instant in the card's words, for the captions that quote a single time. */
+  const depWhen = (date) => cardRows([{ starttime: date }])[0].when;
 
   /**
    * A feed train, annotated the way the Live Link feed annotates one for the
@@ -2170,7 +2172,7 @@
     return `<section class="card" id="upcoming-section" style="padding:16px 18px">
       <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:4px;flex-wrap:wrap">
         <div class="eyebrow">${te('configurator.upcomingTitle')}</div>
-        ${next ? `<span class="cap dim">${te('configurator.upcomingNextIs', { when: cardRows([next])[0].when })}</span>` : ''}
+        ${next ? `<span class="cap dim">${te('configurator.upcomingNextIs', { when: depWhen(next.starttime) })}</span>` : ''}
       </div>
       ${upcomingFoldHtml(te('configurator.settings'), `
         <p class="sm dim" style="margin:0 0 14px">${te('configurator.upcomingLede')}</p>
@@ -2511,7 +2513,7 @@
           <p class="sm dim" style="margin:0">${(() => {
             const next = nextTrain();
             if (!next) return te('configurator.whatNextNoTrains');
-            const when = `<b style="color:var(--rt-ink)">${esc(cardRows([next])[0].when)}</b>`;
+            const when = `<b style="color:var(--rt-ink)">${esc(depWhen(next.starttime))}</b>`;
             return t(upcomingValues().upcoming != null ? 'configurator.whatNextBody' : 'configurator.whatNextBodyOff', { when });
           })()}</p>
         </section>

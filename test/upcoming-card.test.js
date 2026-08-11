@@ -113,6 +113,7 @@ test('the page-turn crossfade is a quarter of the cycle, capped', () => {
   // default, never most of the hold at the 20s end.
   assert.equal(pageFadeMs(3), 750, 'a quarter of the shortest hold the picker offers');
   assert.equal(pageFadeMs(4), 1000);
+  assert.equal(pageFadeMs(4.4), 1100, 'the exact knee — at 4.4s the quarter meets the cap');
   assert.equal(pageFadeMs(12), 1100, 'the cap, or a page would spend its hold fading');
   assert.equal(pageFadeMs(20), 1100);
 });

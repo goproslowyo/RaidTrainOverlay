@@ -145,7 +145,8 @@ addEventListener('message', (e) => {
     for (const r of results.get(`${w}x${h}`) ?? []) {
       const overW = r.w / cellW;
       const overH = r.h / cellH;
-      // 1.001 tolerance: a cell of 33.3333vw is a rounding hair under a third.
+      // 1.001 tolerance: the cell (upcoming-card.js cellThird) is written to
+      // four decimal places, a rounding hair under an exact third.
       const pass = overW <= 1.001 && overH <= 1.001;
       if (!pass) failures += 1;
       const reads = r.run === null ? '' : `  scroll window ${String(r.run).padStart(4)}px = ${r.entries} trains`;

@@ -289,3 +289,18 @@ test('upcomingRows is a pure mapping: one row per train, in order, nothing mutat
   assert.deepEqual(upcomingRows([], ROW_OPTS), []);
   assert.equal(JSON.stringify(trains), before);
 });
+
+test("upcomingRows with no zone reads the machine's own clock — the fallback the card documents", () => {
+  // The one rule the zone-explicit tests above cannot state: a falsy `zone`
+  // means the machine's zone, for the UTC anchor's weekday as much as for the
+  // zoned reading. Asserted as an equivalence, not a literal, so it holds
+  // wherever the suite runs — no process.env.TZ, no zone-pinned expectations.
+  const trains = [train('same-day', '2026-08-07T20:00:00Z'), train('crosses-midnight', '2026-08-08T04:30:00Z')];
+  const machine = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  assert.deepEqual(
+    upcomingRows(trains, { locale: 'en-US' }),
+    upcomingRows(trains, { locale: 'en-US', zone: machine }),
+  );
+  // And with no options at all — the `= {}` default, which nothing else reaches.
+  assert.deepEqual(upcomingRows(trains), upcomingRows(trains, {}));
+});
