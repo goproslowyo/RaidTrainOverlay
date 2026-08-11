@@ -290,7 +290,7 @@ function flakyFetch(failures, routes, log = []) {
 
 test('loadMyRaidTrains retries a flaky read and comes back VERIFIED, not cached', async () => {
   // The point of #47. Before it, one bad response left `fromCache: true` with
-  // an error, which goodFeedEvents() rejects — so the Live Link stopped pruning
+  // an error, which readVerdict rejects — so the Live Link stopped pruning
   // (#39) and the store stopped cleaning up (#41) until the streamer noticed.
   const storage = fakeStorage({
     [userCacheKey('goproflowyo')]: cacheEntry(makeUserPayload(), NOW - 30 * HOUR),

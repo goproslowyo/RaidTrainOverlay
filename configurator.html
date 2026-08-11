@@ -933,12 +933,12 @@
     parseProfiles, serializeProfiles, addProfile, removeProfile, setActiveProfile, listProfiles,
     activeProfile, setDefaultPreset, addSpotlight, removeSpotlight, upsertTrainConfig, getTrainConfig, deleteTrainConfig,
     resolveTrainSettings, countPresetReferences, materializePreset, liveLinkPrefs, setLiveLinkPrefs,
-    isSetupDone, markSetupDone, pruneOrphanedConfigs, restoreTrainConfigs,
+    isSetupDone, markSetupDone, restoreTrainConfigs,
   } from './src/profiles.js';
   import { filterUpcoming, upcomingPages, visibleUpcoming, upcomingRows, mySlot, CARD_MAX_ROWS } from './src/live-link.js';
   import { anchorStyle } from './src/upcoming-card.js';
   import { loadMyRaidTrains, loadEventDetails, refreshEventDetail, userCacheKey } from './src/my-raid-trains.js';
-  import { readVerdict } from './src/feed-verdict.js';
+  import { readVerdict, planCleanup } from './src/feed-verdict.js';
   import { buildLiveLink, baseSettings } from './src/live-link-url.js';
   import {
     SETTINGS_DEFAULTS, SETTING_FIELDS, THEME_OPTION_KEYS, applySettings, diffSettings, normalizeSettings,
@@ -1173,36 +1173,30 @@
   /**
    * Drop Configs for trains that are over and gone (#41), and offer them back.
    *
-   * Runs on every EXPLICIT refresh and at most once otherwise, so a session
-   * that opens the Configurator repeatedly does not keep re-testing the same
-   * rule against the same feed. The guards that make it safe all live in
-   * pruneOrphanedConfigs; the only judgement here is WHEN to ask it.
+   * The judgement — when to spend a read on a prune, and which removals the
+   * streamer has already overruled — is planCleanup's, in src/feed-verdict.js,
+   * where it is under test. What is left here is what only the page can do:
+   * hold the session-scoped state, write the store, and raise the notice.
    *
-   * `kept` is the session-scoped suppression behind the notice's undo. Without
-   * it the next verified read would delete exactly what the streamer just asked
-   * us to keep — possibly before they finished reading the notice. It lives in
-   * memory and dies with the page, matching the undo's own lifetime: nothing
-   * new is written to disk to remember a decision we believe was already right.
+   * `kept` and `cleanupRan` stay ours and are passed in. The suppression's
+   * whole rule is that it dies with the page, matching the undo's own lifetime,
+   * and a page lifetime is a fact the page owns.
    */
   function cleanUpOrphans({ force = false } = {}) {
-    if (!force && state.cleanupRan) return;
-    const { events, verified } = verdict();
-    if (!verified) return;
-    state.cleanupRan = true;
-    const { store, removed } = pruneOrphanedConfigs(profiles, me(), {
-      events, verified: true, now: Date.now(),
+    const login = me();
+    const plan = planCleanup({
+      feed: state.feed, store: profiles, login, kept: state.kept,
+      now: Date.now(), alreadyRan: state.cleanupRan, force,
     });
-    if (removed.length === 0) return;
-    // The prune is blind to `kept` by design — it answers "is this reachable?",
-    // not "did the streamer overrule us?". So put the held ones straight back.
-    const held = removed.filter((r) => state.kept.has(r.slug));
-    const fresh = removed.filter((r) => !state.kept.has(r.slug));
-    if (fresh.length === 0) return;
-    profiles = held.length ? restoreTrainConfigs(store, me(), held) : store;
+    // A Verified read is what a pass SPENDS, whether or not it found anything —
+    // so the throttle turns on there, not on the plan having work in it.
+    if (verdict().verified) state.cleanupRan = true;
+    if (!plan) return;
+    profiles = plan.store;
     saveProfiles();
     // `login` is what makes the notice safe to leave on screen: everything it
     // offers to undo belongs to ONE Profile, and `me()` can change underneath it.
-    state.cleanup = { removed: fresh, login: me() };
+    state.cleanup = { removed: plan.removed, login };
   }
   /** When the feed says this train ends, as epoch ms — only from a Good read. */
   function feedEndsAt(slug) {
