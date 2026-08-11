@@ -585,7 +585,7 @@ export function build(train, opts = {}) {
   };
 }
 
-// 4) The default export IS the Theme: register it in src/train-renderer.js.
+// 4) The default export IS the Theme.
 /** Baseline (`foot`) — this Theme's FLOOR as a fraction of --rt-th, measured down
  *  from the top of the Train's box; the renderer drops the Train until this line
  *  reaches the bottom edge at height=100 (see --rt-foot in train-renderer.js).

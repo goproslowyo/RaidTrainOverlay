@@ -735,7 +735,7 @@ function nowMarkerSVG(cx, y) {
     `<path d="M ${cx - 7} ${y + 1} L ${cx + 7} ${y + 1} L ${cx} ${y + 12} Z" fill="#5fc54f"/>`;
 }
 
-// 4) The default export IS the Theme: register it in src/train-renderer.js.
+// 4) The default export IS the Theme.
 /** Floor: the names moved from below the soil onto the pot face, so the old
  *  overhanging foot (baseY+112) left a big air gap — the lowest ink is now the
  *  soil-line time caption (~baseY-8 + descenders) and the pot shadow at baseY. */

@@ -177,5 +177,5 @@ export function build(train, opts = {}) {
  *    r = 16), and the viewBox has 24 units of dead space below them. */
 export const foot = (railY + 12 + 16) / VIEW_H;
 
-// 5) The default export IS the Theme: register it in src/train-renderer.js.
+// 5) The default export IS the Theme.
 export default { key: 'starter', ensureStyles, build, buildTrack, foot };
