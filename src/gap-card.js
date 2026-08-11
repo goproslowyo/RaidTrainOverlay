@@ -115,12 +115,19 @@ function setGapStyle(doc, cssText) {
  *   restart(view, horizon)  a render just built a Stage (or, with `null`,
  *                           nothing is running any more) and re-seeded the
  *                           Train's own keyframe — re-seed ours with it.
- *   refresh(horizon)        the Horizon changed. The running animation must NOT
- *                           move: a re-seed here would slide the card out of
- *                           phase with the Pass it is timed against, and it
- *                           could then appear ON a Train. A changed schedule
- *                           reaches it through the keyframe text instead, which
- *                           CSS re-reads without restarting.
+ *   refresh(horizon)        the Horizon changed. A changed schedule reaches the
+ *                           card through the keyframe text, which CSS re-reads
+ *                           without restarting.
+ *
+ * The rule the two of them keep is not "only a render re-seeds" but the one the
+ * glossary states: the card re-seeds exactly when the PERIOD IT IS TIMED
+ * AGAINST re-seeds, and never at any other moment. A render is one such event.
+ * A returning **Breather** is the other, and it arrives through `refresh`:
+ * `rt-stage--breather` carries the `rt-breather` keyframe, so switching the
+ * Breather back on restarts the marquee card's whole period from 0%. Re-seeding
+ * on anything else — or failing to re-seed on either of these — slides the card
+ * out of phase with the Pass or Breather it shares, and it can then appear ON a
+ * Train.
  *
  * `view` is renderTrain's handle. It carries the tagged `timing` and the
  * `setBreather` switch together because both belong to the Stage that render
@@ -139,17 +146,32 @@ export function createGapCard({ container, config }) {
   layer.style.cssText = 'position:absolute;inset:0;pointer-events:none';
   container.insertAdjacentElement('afterend', layer);
 
-  // The Stage the card is currently timed against, and when it was built. The
-  // handle is held rather than the timing alone so the Breather can still be
-  // switched off on the Stage that is on screen at the moment it is dropped.
+  // The Stage the card is currently timed against, and when the period it
+  // shares last started. The handle is held rather than the timing alone so the
+  // Breather can still be switched off on the Stage that is on screen at the
+  // moment it is dropped.
   let view = null;
   let seededAt = 0;
+  // Whether the Breather is currently switched ON, on the Stage `view` built.
+  // Worth tracking because on marquee the Breather IS the period the card
+  // shares: `rt-stage--breather` carries the `rt-breather` keyframe, so the
+  // class landing restarts that period from 0%. Its comings and goings are
+  // therefore re-seeds, and the card's own seed has to move with them.
+  let breatherOn = false;
+
+  /** Throw the Breather switch on the current Stage, and remember which way. */
+  const setBreather = (on) => {
+    view?.setBreather(on);
+    // A Pass Stage has no Breather to be on: its switch is a no-op, and the
+    // period the card shares there is `rt-pass`, which only a render restarts.
+    breatherOn = Boolean(on) && view?.timing?.kind === 'breather';
+  };
 
   const clear = () => {
     retireUpcomingCard(layer);
     layer.classList.remove(ON_CLASS);
     layer.style.animationDelay = '';
-    view?.setBreather(false);
+    setBreather(false);
   };
 
   /**
@@ -171,7 +193,15 @@ export function createGapCard({ container, config }) {
         .${ON_CLASS} { animation: none; opacity: 0; }
       }`);
     renderUpcomingCard(layer, horizon, config);
-    view.setBreather(true);
+    // A Breather that was off and is now on has just restarted `rt-breather`
+    // from 0%, which on marquee is the period the card is timed against. That
+    // is a re-seed of the period, exactly as a render is a re-seed of the Pass,
+    // so the card's seed moves to this instant too. Without it the two are
+    // timed to different epochs — measured at ~2.4s apart on a Horizon that
+    // emptied and refilled — and the card can appear ON a Train.
+    const breatherWasOff = !breatherOn;
+    setBreather(true);
+    if (breatherOn && breatherWasOff) seededAt = Date.now();
     if (reseed) {
       layer.classList.remove(ON_CLASS);
       layer.style.animationDelay = '';
@@ -196,7 +226,7 @@ export function createGapCard({ container, config }) {
       // The Stage being replaced may still be on screen (idle arrives with the
       // last render painted), and its Breather switch dies with its handle, so
       // it is let back up before the handle goes.
-      if (nextView !== view) view?.setBreather(false);
+      if (nextView !== view) setBreather(false);
       view = nextView ?? null;
       seededAt = Date.now();
       apply(horizon, true);

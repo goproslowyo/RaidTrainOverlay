@@ -303,3 +303,86 @@ test('a refresh that brings the card back starts it in phase with the Pass, not 
     'presence started from 0%, which is the Pass the Train is five minutes into',
   );
 });
+
+/** A driven wall clock: the seed is a clock read, so a test has to own the clock. */
+function clock(t) {
+  const real = Date.now;
+  t.after(() => { Date.now = real; });
+  let at = real();
+  Date.now = () => at;
+  return { pass: (ms) => { at += ms; } };
+}
+
+test('a Horizon that empties and refills under a Pass keeps the render as the epoch', (t) => {
+  // `rt-pass` runs on regardless of what the Horizon does, so the period never
+  // restarted and the card's seed must not move: it comes back exactly as far
+  // into the Pass as the Train is.
+  const { gap, layer } = overlay(t);
+  const time = clock(t);
+
+  gap.restart(handle(PASS), HORIZON);
+  time.pass(60_000);
+  gap.refresh([]); // one resolve tick with nothing to list
+  time.pass(30_000);
+  gap.refresh(HORIZON); // and the next has the Horizon back
+
+  assert.ok(layer.classList.contains(ON), 'the card never came back when its Horizon returned');
+  assert.equal(
+    layer.style.animationDelay, '-90.000s',
+    'the card was re-seeded on a period that never restarted — it can now land on a Train',
+  );
+});
+
+test('a returning Breather re-seeds the card, because it re-seeds the card\'s period', (t) => {
+  // The other way the rule bites, and the reason it is written as "the period it
+  // is timed against" rather than "a render". On marquee the card shares the
+  // BREATHER, and `rt-stage--breather` carries that keyframe — so switching the
+  // Breather back on restarts the period from 0%. Hold the card at the old
+  // epoch and the two are timed to different moments (measured in a browser at
+  // ~2.4s apart, #85), which puts the card on screen over a Train that has not
+  // finished fading out.
+  const { gap, layer } = overlay(t);
+  const time = clock(t);
+  const view = handle(BREATHER);
+
+  gap.restart(view, HORIZON);
+  time.pass(40_000);
+  gap.refresh([]);
+  assert.deepEqual(view.breathers.slice(), [true, false], 'the Breather outlived the card it was made for');
+  time.pass(20_000);
+  gap.refresh(HORIZON);
+
+  assert.deepEqual(
+    view.breathers.slice(), [true, false, true],
+    'the Breather never came back for the card',
+  );
+  assert.ok(layer.classList.contains(ON), 'the card never came back when its Horizon returned');
+  assert.equal(
+    layer.style.animationDelay, '-0.000s',
+    'the card kept the old epoch while its Breather started over',
+  );
+});
+
+test('a Horizon change that never empties leaves the Breather, and the card, alone', (t) => {
+  // Nothing restarted, so nothing re-seeds: the shorter Horizon reaches the
+  // running card through the keyframe text alone.
+  const { gap, layer } = overlay(t);
+  const time = clock(t);
+  const view = handle(BREATHER);
+
+  gap.restart(view, HORIZON);
+  time.pass(40_000);
+  gap.refresh(HORIZON.slice(0, 2));
+
+  // The switch is thrown ON again, which `classList.toggle` makes a no-op on a
+  // class already there — so the keyframe underneath never restarts. What would
+  // restart it is an OFF in between, and there is none.
+  assert.equal(
+    view.breathers.filter((on) => on === false).length, 0,
+    'the Breather was let go for a mere Horizon change, restarting the card\'s period',
+  );
+  assert.equal(
+    layer.style.animationDelay, '',
+    'the card was re-seeded although its Breather ran straight through',
+  );
+});
