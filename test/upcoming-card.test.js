@@ -2,7 +2,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { parseHTML } from 'linkedom';
-import { anchorStyle, renderUpcomingCard } from '../src/upcoming-card.js';
+import {
+  anchorStyle, cellThird, pageFadeMs, renderUpcomingCard,
+} from '../src/upcoming-card.js';
 
 // The anchor grammar is the pure part and gets unit coverage here. The DOM
 // half is now reachable too: the module takes its Document from the mount, so
@@ -80,10 +82,21 @@ test('centre anchors centre by transform, so the ceiling can bind', () => {
   }
 });
 
-test('every part of the budget is overridable, for the Configurator preview', () => {
-  // The preview's stage is not the viewport, so it passes a stage-relative
-  // cell — one rule, two places (see configurator.html's .up rules).
-  const css = anchorStyle('bl', { pad: 12, cell: { w: '33.3333%', h: '33.3333%' }, floor: '210px' });
+test('the cell third is stated once, and reads in whichever unit its surface uses', () => {
+  // The Stage measures itself in viewport units — OBS reports innerWidth as 0,
+  // so a measured cell computes garbage. The Configurator's preview stage is a
+  // panel, not the viewport, so the same third reads as a percentage of it.
+  assert.equal(cellThird('vw'), '33.3333vw');
+  assert.equal(cellThird('vh'), '33.3333vh');
+  assert.equal(cellThird('%'), '33.3333%');
+});
+
+test('the anchor grammar composes the third with a per-surface pad and floor', () => {
+  // The preview's stage is not the viewport, so it passes the SAME third in its
+  // own unit alongside its own pad and floor — the two scale-dependent parts.
+  const css = anchorStyle('bl', {
+    pad: 12, cell: { w: cellThird('%'), h: cellThird('%') }, floor: '210px',
+  });
   assert.match(css, /max-width:calc\(33\.3333% - 24px\)/);
   assert.match(css, /max-height:calc\(33\.3333% - 24px\)/);
   assert.match(css, /min-width:min\(210px, 33\.3333% - 24px\)/);
@@ -93,18 +106,32 @@ test('anchorStyle falls back to bottom-centre for a missing key', () => {
   assert.equal(anchorStyle(undefined), anchorStyle('bc'));
 });
 
+test('the page-turn crossfade is a quarter of the cycle, capped', () => {
+  // It takes the cycle LENGTH, not a config: the Configurator's preview turns
+  // its own Page on its own clock, and the crossfade is the one part of that
+  // both surfaces must agree on. Slow enough to read as a dissolve at the 12s
+  // default, never most of the hold at the 20s end.
+  assert.equal(pageFadeMs(3), 750, 'a quarter of the shortest hold the picker offers');
+  assert.equal(pageFadeMs(4), 1000);
+  assert.equal(pageFadeMs(12), 1100, 'the cap, or a page would spend its hold fading');
+  assert.equal(pageFadeMs(20), 1100);
+});
+
 /**
- * The cell rule lives in two places on purpose — this module, and the
- * Configurator's preview markup, which has its own CSS and does not import
- * anything. The ticket asked for it to be flagged loudly in both rather than
- * abstracted across an HTML file and a JS module; a comment is not a guard, so
- * this is the guard. It is the same shape as the vocabulary test: grep the
- * other site for the numbers that have to match.
+ * The Cell third no longer lives in two places: the preview budget calls
+ * `cellThird`, so that half of the rule cannot drift. What remains twinned by
+ * design is the SKIN — the preview draws its own card in its own CSS, at its
+ * own deliberately-oversize scale, and imports nothing for it. So this guard
+ * survives as the weaker backstop it now is: the fill rules that make an
+ * anchor's budget a real ceiling, and the eyebrow cap. Same shape as the
+ * vocabulary test — grep the other site for what has to match.
  */
-test('the Configurator preview carries the same rule this module does', () => {
+test('the Configurator preview fills its budget the same way this module does', () => {
   const preview = readFileSync(new URL('../configurator.html', import.meta.url), 'utf8');
-  assert.match(preview, /PREVIEW_BUDGET = \{ pad: 12, cell: \{ w: '33\.3333%', h: '33\.3333%' \}/,
-    'the preview must budget each anchor at a third of its stage');
+  assert.match(preview, /cell: \{ w: cellThird\('%'\), h: cellThird\('%'\) \}/,
+    'the preview must take its third from this module, not restate it');
+  assert.doesNotMatch(preview, /33\.3333/,
+    'the third is stated once, in this module — a copy here is the drift the export removes');
   assert.match(preview, /\.up \{[^}]*flex: 1 1 auto; min-width: 0;/,
     'both views must fill the budget rather than declare a width of their own');
   assert.match(preview, /\.up\.ticker \.lbl \{[^}]*max-width: 40%/,

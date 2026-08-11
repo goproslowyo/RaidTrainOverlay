@@ -59,10 +59,16 @@ const ROW_ENTER_MS = 620;
 // opacity transitions driven by one-shot timers — nothing per-frame, and
 // fades are the motion vocabulary reduced-motion users are okay with.
 const PANEL_FADE_MS = 450;
-// The page-turn crossfade scales with the hold: a quarter of the cycle,
-// capped — slow enough to read as a dissolve, never most of the hold. At the
-// 12s default that is a 1.1s fade each way; 300ms fixed read as a blink.
-const pageFadeMs = (config) => Math.min(1100, ((config.upcycle ?? 12) * 1000) / 4);
+/**
+ * The page-turn crossfade for a hold of `cycleSeconds`: a quarter of the
+ * cycle, capped — slow enough to read as a dissolve, never most of the hold.
+ * At the 12s default that is a 1.1s fade each way; 300ms fixed read as a blink.
+ *
+ * Takes the cycle LENGTH rather than a config because it has a second caller:
+ * the Configurator's **Preview** turns its own **Page** on its own clock, and
+ * this crossfade is the part of that both surfaces must agree on.
+ */
+export const pageFadeMs = (cycleSeconds) => Math.min(1100, (cycleSeconds * 1000) / 4);
 // A dissolve's finish fires this long after its fade ends; anything that
 // mounts after an exit waits AFTER_EXIT_MS. AFTER_EXIT_MS > EXIT_SETTLE_MS is
 // load-bearing: the mount must always find the finish already run.
@@ -83,25 +89,31 @@ function panelSignature(trains, config) {
 }
 
 /**
- * The cell rule, in the owner's words: picture the scene as three columns and
- * three rows. The nine `uppos` anchors are those nine cells, and an item at
- * one anchor must not bleed into another column or row. So the cell is a
- * third of the scene on each axis.
+ * The **Cell** rule, in the owner's words: picture the scene as three columns
+ * and three rows. The nine `uppos` anchors are those nine cells, and an item at
+ * one anchor must not bleed into another column or row. So the cell is a third
+ * of the scene on each axis — stated here, once, in the whole codebase.
  *
- * Expressed in VIEWPORT UNITS and never measured in JS: OBS browser sources
- * and our own tooling both report `window.innerWidth` as `0` in places, so a
- * measured cell computes garbage exactly where it matters.
+ * The unit is the caller's because the surface is: the **Stage** measures
+ * itself in VIEWPORT units and never in JS, since OBS browser sources and our
+ * own tooling both report `window.innerWidth` as `0` in places and a measured
+ * cell computes garbage exactly where it matters. The Configurator's
+ * **Preview** stage is a panel rather than the viewport, so the same third
+ * reads there as a percentage of it. Same rule, same number, two units.
  */
+export const cellThird = (unit) => `33.3333${unit}`;
+
 /**
  * The whole box budget, in one place because its three parts are one thing:
  * the `cell` an anchor may fill, the `pad` holding the panel off the screen
  * edge (which comes OUT of the cell, never adds to it), and the `floor` below
  * which the card view stops shrinking — when the cell can afford it.
  *
- * Sized for a 1080p OBS scene. The Configurator's preview passes its own,
- * measured against its stage instead of the viewport.
+ * Sized for a 1080p OBS scene. The Configurator's **Preview** shares the cell
+ * and passes its own pad and floor: those two are pixel quantities, so they
+ * are genuinely scale-dependent, and its stage is a fraction of a scene.
  */
-const BUDGET = { cell: { w: '33.3333vw', h: '33.3333vh' }, pad: 24, floor: '340px' };
+const BUDGET = { cell: { w: cellThird('vw'), h: cellThird('vh') }, pad: 24, floor: '340px' };
 
 /**
  * Anchor key → the whole box budget for a panel at that anchor: where it sits
@@ -286,7 +298,9 @@ function renderCard(doc, trains, config) {
 
   let cleanup = null;
   if (pages > 1) {
-    card.style.transition = `opacity ${pageFadeMs(config)}ms ease-in-out`;
+    const cycle = config.upcycle ?? 12;
+    const fade = pageFadeMs(cycle);
+    card.style.transition = `opacity ${fade}ms ease-in-out`;
     let swapTimer = null;
     let locked = false;
     // Page on a slow clock — one batch of DOM swaps per cycle, no per-frame
@@ -310,8 +324,8 @@ function renderCard(doc, trains, config) {
         page += 1;
         paintRows(page);
         card.style.opacity = '1';
-      }, pageFadeMs(config));
-    }, (config.upcycle ?? 12) * 1000);
+      }, fade);
+    }, cycle * 1000);
     cleanup = () => { clearInterval(cycleTimer); clearTimeout(swapTimer); };
   }
   return { panel: card, cleanup };

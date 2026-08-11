@@ -936,7 +936,7 @@
     isSetupDone, markSetupDone, restoreTrainConfigs,
   } from './src/profiles.js';
   import { filterUpcoming, upcomingPages, visibleUpcoming, upcomingRows, mySlot, CARD_MAX_ROWS } from './src/live-link.js';
-  import { anchorStyle } from './src/upcoming-card.js';
+  import { anchorStyle, cellThird, pageFadeMs } from './src/upcoming-card.js';
   import { loadMyRaidTrains, loadEventDetails, refreshEventDetail, userCacheKey } from './src/my-raid-trains.js';
   import { readVerdict, planCleanup } from './src/feed-verdict.js';
   import { buildLiveLink, baseSettings } from './src/live-link-url.js';
@@ -1935,17 +1935,19 @@
   }
 
   /* The mock's anchor styles come from the Overlay's own grammar
-     (upcoming-card.js anchorStyle) — one source of truth, so the picker can
-     never promise a position the Overlay doesn't paint.
+     (upcoming-card.js anchorStyle), and its cell from the Overlay's own rule
+     (cellThird) — one source of truth, so the picker can never promise a
+     position or a footprint the Overlay doesn't paint. The Overlay asks for
+     that third in viewport units because the scene IS the viewport; this stage
+     is a preview panel, so it asks for the same third as a percentage of the
+     stage. Same number, stated once, in whichever unit the surface uses.
 
-     ⚠ THE CELL RULE LIVES IN TWO PLACES. The Overlay budgets each anchor at a
-     third of the SCENE (33.3333vw/vh); this stage is a preview panel, not the
-     viewport, so it passes the same third measured against the STAGE and a
-     floor at the mock's own scale. Change one and you must change the other,
-     or the preview promises a footprint OBS will not deliver. There is no
-     abstraction spanning an HTML file and a JS module — there is this note,
-     and its twin on the `.up` rules in the stylesheet above. */
-  const PREVIEW_BUDGET = { pad: 12, cell: { w: '33.3333%', h: '33.3333%' }, floor: '210px' };
+     ⚠ THE PAD AND THE FLOOR ARE THIS SURFACE'S OWN, and must stay that way:
+     both are pixel quantities, and this stage is a fraction of a 1080p scene,
+     so the Overlay's 24px inset and 340px floor would swallow it. They are the
+     scale-dependent parts of the budget, not a second copy of the cell rule —
+     tune them against the mock, and leave the third alone. */
+  const PREVIEW_BUDGET = { pad: 12, cell: { w: cellThird('%'), h: cellThird('%') }, floor: '210px' };
   /**
    * The mock is a legible cartoon, not a scale model: its type is roughly
    * three times the size a true 1:1 miniature of a 1080p card would have at
@@ -1956,9 +1958,9 @@
    *
    * `zoom` on the anchor wrapper resolves it in one property. Percentages
    * inside a zoomed box resolve against the containing block divided by the
-   * zoom, so the wrapper's `33.3333%` cell PAINTS at exactly a third of the
-   * stage whatever this number is — the footprint is unchanged — while the
-   * mock's authored pixels get 1/zoom as much room to lay out in. The value is
+   * zoom, so the wrapper's cell PAINTS at exactly a third of the stage
+   * whatever this number is — the footprint is unchanged — while the mock's
+   * authored pixels get 1/zoom as much room to lay out in. The value is
    * the smallest exaggeration at which nothing clips and every column still
    * has width; measured against the Overlay, the painted card comes out at 31%
    * of the scene's width, which is what OBS renders at 1920 (592 of 1920).
@@ -2503,11 +2505,11 @@
 
   // The card mock's Page clock. Runs only while a paging card mock is on
   // screen; render() re-arms it so the hold time tracks the setting live.
-  // Page turns crossfade exactly like the real card (upcoming-card.js): ease
-  // out, swap while invisible, ease back in — the mock must demonstrate the
-  // Overlay's manners, not just its skin.
-  // Matches upcoming-card.js pageFadeMs: a quarter of the hold, capped at 1.1s.
-  const mockPageFadeMs = () => Math.min(1100, (Number(upcomingValues().upcycle) * 1000) / 4);
+  // Page turns crossfade exactly like the real card: ease out, swap while
+  // invisible, ease back in — the mock must demonstrate the Overlay's manners,
+  // not just its skin. The crossfade's length is the Overlay's own rule, asked
+  // for by the hold currently in the picker, so the two can never disagree.
+  const mockPageFadeMs = () => pageFadeMs(Number(upcomingValues().upcycle));
   let upcomingMockTimer = null;
   function scheduleUpcomingMock() {
     clearTimeout(upcomingMockTimer);
