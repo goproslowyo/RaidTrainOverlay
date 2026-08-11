@@ -179,34 +179,9 @@ function ensureBaseStyles(doc) {
   doc.head.appendChild(style);
 }
 
-// The Pass gap's true-empty stretch, published by the last applyMode for the
-// between-Pass card's choreography (gap-choreography.js). Null until a pass-Mode
-// render has measured the Train, and null in every other Mode.
-let passGeometry = null;
-// The marquee Breather's cycle (gap-choreography.breatherCycle), or null when
-// this Mode has no Breather — another Mode, or the streamer opted out.
-let marqueeBreather = null;
-
-/** The last render's Pass geometry, or null when this Mode has no Pass gap. */
-export function currentPassGeometry() {
-  return passGeometry;
-}
-
-/** The last render's marquee Breather cycle, or null when there is none. */
-export function currentBreatherCycle() {
-  return marqueeBreather;
-}
-
-/**
- * Turn the Breather on or off on an already-rendered Stage. The renderer can
- * only tell whether a Breather is CONFIGURED; whether there is actually a card
- * to put in one depends on the horizon, which the shell owns — so the shell
- * has the last word, and this keeps the DOM detail on this side of the seam.
- */
-export function setBreather(container, on) {
-  const stage = container?.querySelector('.rt-stage');
-  if (stage && marqueeBreather) stage.classList.toggle('rt-stage--breather', Boolean(on));
-}
+// This render has no empty stretch to choreograph anything into: a preview (no
+// traversal at all), or a marquee whose streamer opted out of the Breather.
+const NO_TIMING = Object.freeze({ kind: 'none' });
 
 /** Per-render generated keyframes (durations depend on measured track width). */
 function setModeStyle(doc, cssText) {
@@ -231,6 +206,9 @@ const MARQUEE_GAP_VW = 0.04;
 /**
  * Start the Mode animation on the track. Reads layout once (one measure, then
  * writes) — keyframes are generated because durations depend on Train length.
+ *
+ * Returns this Mode's TAGGED TIMING — the empty stretch the Upcoming card can be
+ * choreographed into, and which kind of stretch it is (see renderTrain).
  *
  * `mode=pass`: one infinite animation whose period is the Pass interval; the
  * traversal occupies the leading fraction of the keyframes and the Train holds
@@ -266,7 +244,7 @@ function applyMode(doc, track, config, buildCopy) {
     `);
     track.style.transform = 'translateX(100vw)';
     track.classList.add('rt-track--proll');
-    return;
+    return NO_TIMING;
   }
 
   // Preview/showcase (?preview=1): a STILL, centred Train that never traverses, so
@@ -276,7 +254,7 @@ function applyMode(doc, track, config, buildCopy) {
     const trackWidth = track.getBoundingClientRect().width;
     const tx = Math.max((view.innerWidth - trackWidth) / 2, 8);
     track.style.transform = `translateX(${tx}px)`;
-    return;
+    return NO_TIMING;
   }
 
   // The Track's fade durations, shared by both Modes: the pass gap fades the
@@ -288,7 +266,6 @@ function applyMode(doc, track, config, buildCopy) {
   const velocity = BASE_VELOCITY_VW_PER_SEC * viewportWidth * speed;
 
   if (config?.mode === 'marquee') {
-    passGeometry = null;
     const gapPx = MARQUEE_GAP_VW * viewportWidth;
     track.style.gap = `${MARQUEE_GAP_VW * 100}vw`;
     const unitWidth = track.getBoundingClientRect().width + gapPx;
@@ -315,7 +292,7 @@ function applyMode(doc, track, config, buildCopy) {
     //
     // trackvis is deliberately not consulted — it stays a no-op on marquee, so
     // there is one Breather choreography rather than two.
-    marqueeBreather = breatherCycle({
+    const cycle = breatherCycle({
       upcycleSec: config?.upcycle,
       style: config?.upstyle,
       upscrollSec: config?.upscroll,
@@ -325,23 +302,27 @@ function applyMode(doc, track, config, buildCopy) {
       // put in it is just the Train vanishing for no reason.
       enabled: Boolean(config?.user && config?.upcoming && config?.upgap && !config?.uponly),
     });
-    const stage = track.parentElement;
-    if (marqueeBreather && stage) {
-      const pct = (sec) => (sec / marqueeBreather.cycleSec) * 100;
-      const crawlPct = pct(marqueeBreather.crawlSec);
+    if (cycle) {
+      const pct = (sec) => (sec / cycle.cycleSec) * 100;
+      const crawlPct = pct(cycle.crawlSec);
       marqueeCss += `
         @keyframes rt-breather {
           0%, ${crawlPct}% { opacity: 1; }
-          ${crawlPct + pct(marqueeBreather.fadeOutSec)}%, ${100 - pct(marqueeBreather.fadeInSec)}% { opacity: 0; }
+          ${crawlPct + pct(cycle.fadeOutSec)}%, ${100 - pct(cycle.fadeInSec)}% { opacity: 0; }
           100% { opacity: 1; }
         }
-        .rt-stage--breather { animation: rt-breather ${marqueeBreather.cycleSec}s linear infinite; }
+        .rt-stage--breather { animation: rt-breather ${cycle.cycleSec}s linear infinite; }
       `;
-      stage.classList.add('rt-stage--breather');
     }
+    // The keyframes are generated here; the CLASS is not applied. The renderer
+    // can only tell whether a Breather is CONFIGURED — whether there is actually
+    // a card to put in one depends on the Horizon, which the caller owns. Applied
+    // eagerly, the Stage committed to a Breather the caller might switch straight
+    // back off, so it briefly fades for nothing. Only the caller switches it on,
+    // through the handle's setBreather.
     setModeStyle(doc, marqueeCss);
     track.classList.add('rt-track--marquee');
-    return;
+    return cycle ? { kind: 'breather', ...cycle } : NO_TIMING;
   }
 
   const intervalMins = config?.interval > 0 ? config.interval : 15;
@@ -375,11 +356,11 @@ function applyMode(doc, track, config, buildCopy) {
   // survives even at short intervals (graceful degradation).
   const fadeOutPct = Math.min((fadeOutSec / periodSec) * 100, 0.4 * holdPct);
   const fadeInPct = Math.min((fadeInSec / periodSec) * 100, 0.4 * holdPct);
-  // The gap's true-empty stretch, published for the between-Pass card. Computed
+  // The gap's true-empty stretch, handed back for the between-Pass card. Computed
   // whether or not the rails actually fade: the card's choreography is keyed to
   // the Pass period ALONE, so trackvis=always behaves identically — one rule.
-  marqueeBreather = null;
-  passGeometry = {
+  const timing = {
+    kind: 'pass',
     periodSec,
     emptyFromSec: ((holdFrom + fadeOutPct) / 100) * periodSec,
     emptyToSec: ((100 - fadeInPct) / 100) * periodSec,
@@ -408,6 +389,7 @@ function applyMode(doc, track, config, buildCopy) {
   // Frame one is off-screen right — a Pass begins immediately on load.
   track.style.transform = 'translateX(100vw)';
   track.classList.add('rt-track--pass');
+  return timing;
 }
 
 /**
@@ -416,6 +398,10 @@ function applyMode(doc, track, config, buildCopy) {
  * once; the returned handle updates time state in place (per copy) so a timer
  * tick never restarts a running Mode or ambient animation. Structural changes
  * (lineup edits) call renderTrain again — an animation restart is fine there.
+ *
+ * The handle also carries what the caller needs to choreograph the Upcoming card
+ * against this Train: the Mode's tagged `timing`, and the Breather switch bound
+ * to the Stage just built. Both belong to THIS render — nothing here outlives it.
  */
 export function renderTrain(train, container, config) {
   const theme = resolveTheme(config?.theme);
@@ -470,7 +456,7 @@ export function renderTrain(train, container, config) {
   if (rails) stage.appendChild(rails);
   stage.appendChild(track);
   container.appendChild(stage);
-  applyMode(doc, track, config, buildCopy);
+  const timing = applyMode(doc, track, config, buildCopy);
   // The post-attach pass — every Theme's shrink-to-fit (fitAll) and the lead badge.
   // NEVER defer this to requestAnimationFrame. rAF only runs at a rendering
   // opportunity, so in a document that is never painted the callback sits queued and
@@ -489,6 +475,27 @@ export function renderTrain(train, container, config) {
     /** In-place time-state update: classes and text only, never structure. */
     updateTime(nextTrain) {
       for (const copy of built) copy.update(nextTrain);
+    },
+    /**
+     * THIS render's empty stretch, tagged by which kind it is — a `pass` gap, the
+     * `breather` a marquee cycle manufactures, or `none` when this Mode has
+     * neither (a preview, or a marquee whose streamer opted out). Both kinds
+     * carry `{ periodSec, emptyFromSec, emptyToSec }`, which is what
+     * gap-choreography's gapSchedule reads; a `breather` carries the rest of its
+     * cycle too. The caller reads the TAG rather than working the kind back out
+     * from the shape — and reads it off the handle, so it can never be a stale
+     * fact left over from some earlier render on a different Stage.
+     */
+    timing,
+    /**
+     * Turn the Breather on or off, on the Stage this render built. The renderer
+     * can only tell whether a Breather is CONFIGURED; whether there is actually a
+     * card to put in one depends on the Horizon, which the caller owns — so the
+     * caller has the last word, and this keeps the DOM detail on this side of the
+     * seam. A no-op when this render has no Breather.
+     */
+    setBreather(on) {
+      if (timing.kind === 'breather') stage.classList.toggle('rt-stage--breather', Boolean(on));
     },
   };
 }

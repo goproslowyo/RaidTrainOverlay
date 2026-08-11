@@ -12,9 +12,7 @@ import { filterUpcoming, shouldSelfReload, upcomingPages } from './live-link.js'
 import { renderUpcomingCard, retireUpcomingCard } from './upcoming-card.js';
 import { gapSchedule, windowKeyframes } from './gap-choreography.js';
 import { buildTrain } from './lineup-engine.js';
-import {
-  renderTrain, currentPassGeometry, currentBreatherCycle, setBreather,
-} from './train-renderer.js';
+import { renderTrain } from './train-renderer.js';
 import { SHIPPED_THEMES } from './themes/registry.js';
 import { DEMO_SLUG, DEMO_SPOTLIGHT, makeDemoEvent } from './demo-event.js';
 import { decodeLineup } from './lineup-codec.js';
@@ -97,8 +95,9 @@ if (!config.event && !config.lineup && !config.user) {
     gapLayer.classList.remove('rt-gap-card--on');
     // A Breather with nothing to put in it is just the Train vanishing for no
     // reason, so the empty stretch is suppressed whenever the card is not
-    // actually going to appear in it.
-    setBreather(container, false);
+    // actually going to appear in it. The switch rides the render's own handle,
+    // so it always works the Stage that is actually on screen.
+    current?.view?.setBreather(false);
   };
   // `restart` re-seeds the card's keyframe from 0%. Only a render does that,
   // because only a render restarts the Train's own keyframe — restarting the
@@ -113,19 +112,19 @@ if (!config.event && !config.lineup && !config.user) {
     // upcoming-only source (that scene shows the card outright), never while
     // nothing is running, and never when the streamer opted out.
     if (!config.user || config.uponly || !spec || !config.upgap
-      || !current || liveHorizon.length === 0) return clearGapCard();
+      || !current?.view || liveHorizon.length === 0) return clearGapCard();
     // A Pass gap, or — in marquee, which has none — the Breather the cycle
     // manufactures instead. Same choreography either way; only the source of
-    // the empty stretch differs. A Breather holds exactly one page, and the
-    // card's free-running pager is what walks the horizon across successive
-    // Breathers.
-    const geometry = currentPassGeometry() ?? currentBreatherCycle();
-    if (!geometry) return clearGapCard();
-    const breather = geometry === currentBreatherCycle();
+    // the empty stretch differs, and the render that built the Stage says which
+    // it handed back. A Breather holds exactly one page, and the card's
+    // free-running pager is what walks the horizon across successive Breathers.
+    const { timing } = current.view;
+    if (timing.kind === 'none') return clearGapCard();
+    const breather = timing.kind === 'breather';
     const schedule = gapSchedule({
-      periodSec: geometry.periodSec,
-      emptyFromSec: geometry.emptyFromSec,
-      emptyToSec: geometry.emptyToSec,
+      periodSec: timing.periodSec,
+      emptyFromSec: timing.emptyFromSec,
+      emptyToSec: timing.emptyToSec,
       pageCount: breather ? 1 : upcomingPages(liveHorizon),
       upcycleSec: config.upcycle,
       style: config.upstyle,
@@ -150,7 +149,7 @@ if (!config.event && !config.lineup && !config.user) {
         .rt-gap-card--on { animation: none; opacity: 0; }
       }`;
     renderUpcomingCard(gapLayer, liveHorizon, config);
-    setBreather(container, true);
+    current.view.setBreather(true);
     if (restart) {
       gapLayer.classList.remove('rt-gap-card--on');
       void gapLayer.offsetWidth; // commit, so the restart re-seeds with the Pass
@@ -233,9 +232,13 @@ if (!config.event && !config.lineup && !config.user) {
         // An upcoming-only source (?uponly=1) exists to show the card, so an
         // absent horizon falls back to the next 3 instead of nothing.
         const spec = config.upcoming ?? (config.uponly ? { kind: 'count', n: 3 } : null);
+        // The gap card belongs to a running train, and none is running. Cleared
+        // BEFORE `current` is dropped, because the Breather switch rides that
+        // render's handle — it is the Stage still on screen that must be let back
+        // up, and after the drop there is nothing left to switch.
+        clearGapCard();
         current = null;
         liveHorizon = [];
-        clearGapCard(); // the gap card belongs to a running train, and none is running
         renderUpcomingCard(container, filterUpcoming(upcoming, spec, new Date()), config);
       },
       onHorizon({ upcoming }) {
