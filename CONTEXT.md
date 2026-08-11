@@ -91,6 +91,10 @@ Whether the Track is shown *periodically* (the default) or *always*. Periodic vi
 **Breather**:
 The empty stretch a marquee cycle manufactures for itself, so the **Upcoming card** has somewhere to appear while a train is live. Marquee is a seamless crawl with no **Pass** gap, so roughly every three minutes the whole **Stage** clears — Train *and* Track together, by a fade, never a slide — the card takes it alone for one **Page**, and both return. Deliberately not called a Pass (nothing traverses) nor a gap (that is the `pass`-Mode word), so "Pass gaps and marquee Breathers" reads unambiguously. Its length is chosen rather than imposed, so it stays short and constant; a longer **Horizon** rotates across successive Breathers instead of stretching any one of them.
 
+**Stage choreography**:
+The rule that the **Train** and the **Upcoming card** never share the **Stage**, and the way it is kept: not by mounting and unmounting, but by one shared period. The card's presence is a single generated opacity keyframe on its own layer, timed against the **Pass** — or against the **Breather**, where marquee has no Pass — so the two cannot drift apart over a stream that runs for days, and nothing is measured frame by frame. Two consequences follow and both are load-bearing. The card's keyframe may be re-seeded *only* when the period it is timed against restarts: a card re-seeded at any other moment slides out of phase with the **Pass** or **Breather** it is timed against, and can then appear *on* a Train. And an empty stretch too short for one whole **Page** or **Lap** is sat out entirely rather than filled with a fraction of one.
+_Avoid_: sync, scheduling, timing (each names a mechanism; this names the guarantee)
+
 **Upcoming card**:
 The panel that lists what raid trains are coming up. What the Overlay shows when no Train is live — a **Live Link** concept, since resolving "next" needs a **Profile** — and it also takes the pauses while one is running: the gap between **Passes**, or a marquee **Breather**. Deliberately unthemed: a sodium departure-board slab that sits on any scene, never the active **Theme**'s art. Distinct from **Upcoming**, the Train lifecycle state: that is a Train waiting at the station, this is the card on screen when there is no Train at all.
 _Avoid_: idle card, next-up widget, banner (the code's `idle*` naming is older and inconsistent; the domain word is the card)
@@ -143,6 +147,10 @@ The transparent full-canvas page loaded as an OBS browser source. All behavior i
 **Configurator**:
 The streamer-facing app hosted alongside the Overlay: an app shell over a Profile's raid trains, with My Raid Trains as its home view plus the Raid Train Config editor, the Preset library, and Profile settings. Building a single Overlay URL by hand is one secondary view inside it (the One-off link), not the whole page.
 _Avoid_: settings page, admin, generator, form page
+
+**Preview**:
+The Configurator's rehearsal of what OBS will paint. There are two: the **Train** preview (the real Overlay in a frame, standing still by default and rolled across on request) and the **Upcoming card** preview, the "Between trains" pane. A Preview is honest about *placement* — the **Cell** an anchor may fill and the **Footprint** the card wears are exactly what the **Stage** will give them — and deliberately dishonest about *scale*: the card's contents are drawn several times larger than a true miniature would be, because a 1:1 model in a small pane cannot be read. A Preview is therefore a rehearsal and never a scale model, and it does not have to paint what the Overlay paints. What it may never misstate is where the card lands.
+_Avoid_: mock (the code's older word), thumbnail, simulation, WYSIWYG
 
 **Preset**:
 A named, saved bundle of Configurator settings — *settings only, no Event*. Stored in the Configurator's localStorage; never read by the Overlay. Referenced by Raid Train Configs.
