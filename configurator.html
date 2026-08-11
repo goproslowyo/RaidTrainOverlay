@@ -1416,8 +1416,7 @@
       <div class="ll-head"><h2>${te('configurator.navLiveLink')}</h2><span class="ll-badge">${te('configurator.llBadge')}</span></div>
       <p class="ll-sub">${t('configurator.llSub')}</p>
       <div class="url-row stacked">
-        <input type="text" id="ll-url" readonly value="${esc(link.url)}" aria-label="${te('configurator.llUrlAria')}">
-        ${previewLinkHtml(link.url)}
+        ${urlRowHtml('ll-url', link.url, te('configurator.llUrlAria'))}
         <button type="button" class="btn gold" data-act="copy-live">${te('configurator.llCopy')}</button>
       </div>
       ${tooBig}
@@ -1442,10 +1441,32 @@
 
   /** The see-it-yourself door every URL row carries — absent while the URL
    *  is. A real bordered button (not ghost text): obviously clickable, but
-   *  the amber copy button beside it stays the call to action. */
-  function previewLinkHtml(url, { small = false } = {}) {
+   *  the amber copy button beside it stays the call to action. It names the
+   *  box it stands beside, which is how setUrlRow finds it after an edit. */
+  function previewLinkHtml(inputId, url, { small = false } = {}) {
     if (!url) return '';
-    return `<a class="btn${small ? ' sm' : ''}" href="${esc(url)}" target="_blank" rel="noopener">${icon('ext', small ? 11 : 13)}&nbsp;${te('configurator.obsPreviewBtn')}</a>`;
+    return `<a class="btn${small ? ' sm' : ''}" data-preview-for="${inputId}" href="${esc(url)}" target="_blank" rel="noopener">${icon('ext', small ? 11 : 13)}&nbsp;${te('configurator.obsPreviewBtn')}</a>`;
+  }
+
+  /**
+   * A URL row's two faces — the read-only box you copy from and the Preview
+   * door beside it — emitted from ONE url. They are written together here at
+   * render, and together by setUrlRow after an edit; nothing else writes
+   * either. That is what stops the door falling an edit behind the box (#87):
+   * "keep the two in step" is not a rule a caller can forget, because there is
+   * no longer a way to address one of them on its own.
+   */
+  function urlRowHtml(inputId, url, aria, opts) {
+    return `<input type="text" id="${inputId}" readonly value="${esc(url)}" aria-label="${aria}">
+        ${previewLinkHtml(inputId, url, opts)}`;
+  }
+
+  /** The one way to say: this row now shows this URL. */
+  function setUrlRow(inputId, url) {
+    const input = $(`#${inputId}`);
+    if (input) input.value = url;
+    const door = $(`[data-preview-for="${inputId}"]`);
+    if (door) door.href = url;
   }
 
   /**
@@ -1506,8 +1527,7 @@
         <div class="ll-head"><h2>${te('configurator.llUpOnlyTitle')}</h2><span class="ll-badge">${te('configurator.llUpOnlyBadge')}</span></div>
         <p class="ll-sub">${te('configurator.llUpOnlySub')}</p>
         <div class="url-row stacked">
-          <input type="text" id="ll-uponly-url" readonly value="${esc(upOnlyUrl())}" aria-label="${te('configurator.llUpOnlyAria')}">
-          ${previewLinkHtml(upOnlyUrl())}
+          ${urlRowHtml('ll-uponly-url', upOnlyUrl(), te('configurator.llUpOnlyAria'))}
           <button type="button" class="btn gold" data-act="copy-uponly">${te('configurator.llUpOnlyCopy')}</button>
         </div>
       </section>
@@ -2367,8 +2387,7 @@
         <section class="card" style="padding:16px 18px;margin-bottom:0">
           <div class="ll-head"><h2 style="font-size:15.5px">${te('configurator.llUpOnlyTitle')}</h2><span class="ll-badge">${te('configurator.llUpOnlyBadge')}</span></div>
           <div class="url-row stacked" style="margin-top:10px">
-            <input type="text" id="ll-uponly-url" readonly value="${esc(upOnlyUrl())}" aria-label="${te('configurator.llUpOnlyAria')}">
-            ${previewLinkHtml(upOnlyUrl())}
+            ${urlRowHtml('ll-uponly-url', upOnlyUrl(), te('configurator.llUpOnlyAria'))}
             <button type="button" class="btn gold" data-act="copy-uponly">${te('configurator.llUpOnlyCopy')}</button>
           </div>
         </section>
@@ -2558,8 +2577,11 @@
     const s = baseSettings(library, profiles, me());
     previewCaption(s);
     preview?.render(buildOverlayQuery({ ...s, event: DEMO_EVENT }), DEMO_EVENT);
-    const url = $('#ll-url');
-    if (url) url.value = liveLinkUrl();
+    // Both rows carry the look: the upcoming-trains URL is the Live Link with
+    // ?uponly=1 riding along, so a look edit moves that row too, and Simple
+    // shows both. Rows absent from this view are simply not found.
+    setUrlRow('ll-url', liveLinkUrl());
+    setUrlRow('ll-uponly-url', upOnlyUrl());
     const summary = $('#simple-summary');
     if (summary) summary.textContent = simpleSummary();
   }
@@ -2594,10 +2616,8 @@
     if (!me()) { toast(t('configurator.toastAddProfileFirst')); return; }
     profiles = setLiveLinkPrefs(profiles, me(), { [key]: value });
     saveProfiles();
-    const url = $('#ll-url');
-    if (url) url.value = liveLinkUrl();
-    const uponly = $('#ll-uponly-url');
-    if (uponly) uponly.value = upOnlyUrl();
+    setUrlRow('ll-url', liveLinkUrl());
+    setUrlRow('ll-uponly-url', upOnlyUrl());
   }
 
   // ── Master render ──────────────────────────────────────────────────────

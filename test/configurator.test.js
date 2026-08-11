@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { parseConfig } from '../src/config.js';
 import { extractSlug, buildOverlayQuery } from '../src/configurator.js';
 import { decodeLineup } from '../src/lineup-codec.js';
@@ -196,4 +197,69 @@ test('the three-way maps onto the URL in all three positions', () => {
 test('upgap only ever rides with a Live Link', () => {
   const q = buildOverlayQuery({ source: 'event', event: 'trainwreck-lucky-13', upgap: '0' });
   assert.ok(!q.includes('upgap'), 'without a Live Link there is no other-trains card to gate');
+});
+
+/**
+ * WHAT THIS TEST DOES NOT COVER. A URL row is a read-only box, a Preview
+ * anchor and a copy button that must never disagree (#87: the anchor opened
+ * the settings from before the last edit). The row is built and written inside
+ * configurator.html's inline `<script type="module">`, which no test can
+ * import, so nothing here observes a live `href`, a live input value or what
+ * the copy action actually produces. Those three were compared by hand in a
+ * browser. This is a source-text guard of the SHAPE only — that one function
+ * emits both faces from one URL, that one function writes both, and that no
+ * caller can address either face alone — in the same idiom as the greps in
+ * test/upcoming-card.test.js. It is a fence around the fix, not proof of it.
+ */
+test('one place writes a URL row, so its Preview anchor cannot lag its box', () => {
+  const page = readFileSync(new URL('../configurator.html', import.meta.url), 'utf8');
+  const body = (name) => {
+    const m = page.match(new RegExp(`function ${name}\\([^)]*\\) \\{[\\s\\S]*?\\n  \\}`));
+    assert.ok(m, `${name} is declared in configurator.html`);
+    return m[0];
+  };
+
+  // The anchor knows which box it stands beside. Before #87 it carried nothing
+  // to be found by, which is why the edit paths could only reach the box.
+  assert.match(body('previewLinkHtml'), /data-preview-for="\$\{inputId\}"/,
+    'the Preview anchor must carry the id of the input it belongs to');
+
+  // Both faces come from ONE url argument at render time.
+  const row = body('urlRowHtml');
+  assert.match(row, /<input type="text" id="\$\{inputId\}"[^>]*value="\$\{esc\(url\)\}"/,
+    'urlRowHtml emits the box from its url argument');
+  assert.match(row, /previewLinkHtml\(inputId, url/,
+    'urlRowHtml emits the anchor from the SAME url argument');
+
+  // ...and nowhere else. Every call outside the declaration is urlRowHtml's.
+  for (const [, args] of page.matchAll(/(?<!function )previewLinkHtml\(([^)]*)\)/g)) {
+    assert.match(args, /^inputId, url\b/,
+      'the Preview anchor is only ever emitted by urlRowHtml, beside its own box');
+  }
+
+  // One way to say: this row now shows this URL — and it writes both faces.
+  const setter = body('setUrlRow');
+  assert.match(setter, /input\.value = url/, 'setUrlRow writes the box');
+  assert.match(setter, /\.href = url/, 'setUrlRow writes the anchor');
+
+  // No caller may reach a row's input on its own, and no view may hand-roll a
+  // row's markup — either would let one face move without the other.
+  assert.doesNotMatch(page, /\$\('#ll-(?:uponly-)?url'\)/,
+    'a row is written through setUrlRow, never by looking its input up alone');
+  assert.doesNotMatch(page, /<input[^>]*id="ll-(?:uponly-)?url"/,
+    'a row is rendered through urlRowHtml, never as loose input markup');
+
+  // Both affected rows are built by the row builder. (The One-off row is out
+  // of scope: it carries a copy button and no Preview anchor.)
+  for (const id of ['ll-url', 'll-uponly-url']) {
+    assert.ok(page.includes(`urlRowHtml('${id}'`), `${id} is built by urlRowHtml`);
+  }
+
+  // Both in-place edit paths refresh BOTH rows: the upcoming-trains URL is the
+  // Live Link with ?uponly=1 riding along, so every edit moves both.
+  for (const name of ['refreshSimpleChrome', 'writeUpcomingPref']) {
+    const path = body(name);
+    assert.match(path, /setUrlRow\('ll-url', liveLinkUrl\(\)\)/, `${name} refreshes the Live Link row`);
+    assert.match(path, /setUrlRow\('ll-uponly-url', upOnlyUrl\(\)\)/, `${name} refreshes the upcoming-trains row`);
+  }
 });
