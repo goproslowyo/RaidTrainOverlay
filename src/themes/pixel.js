@@ -24,9 +24,9 @@ const STYLE_ID = 'rt-theme-pixel2-style';
 const R = (x, y, w, h, f) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${f}"/>`;
 const mid = (x, w) => x + w / 2;
 
-export function ensureStyles() {
-  if (document.getElementById(STYLE_ID)) return;
-  const style = document.createElement('style');
+export function ensureStyles(doc) {
+  if (doc.getElementById(STYLE_ID)) return;
+  const style = doc.createElement('style');
   style.id = STYLE_ID;
   style.textContent = `
     .rt-theme-pixel2 { image-rendering: pixelated; }
@@ -55,11 +55,11 @@ export function ensureStyles() {
     .rt-rails-pixel2::after { top: 34%; bottom: 0;
       background: repeating-linear-gradient(90deg, #8a5a2b 0 calc(var(--rt-th) * 0.045), transparent calc(var(--rt-th) * 0.045) calc(var(--rt-th) * 0.09)); }
   `;
-  document.head.appendChild(style);
+  doc.head.appendChild(style);
 }
 
-export function buildTrack() {
-  const el = document.createElement('div');
+export function buildTrack({ doc }) {
+  const el = doc.createElement('div');
   el.className = 'rt-rails rt-rails-pixel2';
   el.style.setProperty('--rt-rail-top', `calc(var(--rt-th) * ${((railY - VIEW_TOP) / VIEW_H).toFixed(4)})`);
   return el;
@@ -163,6 +163,7 @@ function renderUnit(unit, x, w, i) {
 }
 
 export function build(train, opts = {}) {
+  const { doc } = opts;
   L = themeT(opts);
   const vehicles = toVehicles(train);
   const units = [];
@@ -178,7 +179,7 @@ export function build(train, opts = {}) {
   let body = '';
   units.forEach((u, i) => { body += renderUnit(u, xs[i], widthFor(u), i); });
 
-  const holder = document.createElement('div');
+  const holder = doc.createElement('div');
   holder.innerHTML = `<svg class="rt-theme-pixel2" viewBox="0 ${VIEW_TOP} ${totalW} ${VIEW_H}" role="img" shape-rendering="crispEdges" style="--rt-ride:0">${body}</svg>`;
   const svg = holder.firstElementChild;
 

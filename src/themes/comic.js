@@ -25,9 +25,9 @@ const COL = { now: '#f2c744', spot: '#22d3ee', open: '#3d9e57' };
 const STYLE_ID = 'rt-theme-comic2-style';
 const mid = (x, w) => x + w / 2;
 
-export function ensureStyles() {
-  if (document.getElementById(STYLE_ID)) return;
-  const style = document.createElement('style');
+export function ensureStyles(doc) {
+  if (doc.getElementById(STYLE_ID)) return;
+  const style = doc.createElement('style');
   style.id = STYLE_ID;
   style.textContent = `
     .rt-theme-comic2 .rt-car--departed { opacity: 0.86; }
@@ -61,11 +61,11 @@ export function ensureStyles() {
     .rt-rails-comic2::before { content: ''; position: absolute; inset: 0; background: ${INK}; border-radius: 999px; }
     .rt-rails-comic2::after { content: ''; position: absolute; left: 0; right: 0; top: 20%; height: 18%; background: #ffffff38; border-radius: 999px; }
   `;
-  document.head.appendChild(style);
+  doc.head.appendChild(style);
 }
 
-export function buildTrack() {
-  const el = document.createElement('div');
+export function buildTrack({ doc }) {
+  const el = doc.createElement('div');
   el.className = 'rt-rails rt-rails-comic2';
   el.style.setProperty('--rt-rail-top', `calc(var(--rt-th) * ${((railY + 2 - VIEW_TOP) / VIEW_H).toFixed(4)})`);
   return el;
@@ -228,6 +228,7 @@ function renderUnit(unit, x, w, i) {
 }
 
 export function build(train, opts = {}) {
+  const { doc } = opts;
   L = themeT(opts);
   const vehicles = toVehicles(train);
   const units = [];
@@ -244,7 +245,7 @@ export function build(train, opts = {}) {
   let body = '';
   units.forEach((u, i) => { body += renderUnit(u, xs[i], widthFor(u), i); });
 
-  const holder = document.createElement('div');
+  const holder = doc.createElement('div');
   holder.innerHTML = `<svg class="rt-theme-comic2" viewBox="0 ${VIEW_TOP} ${totalW} ${VIEW_H}" role="img" style="--rt-ride:1.25">` +
     `<defs><pattern id="c2-dots" width="8" height="8" patternUnits="userSpaceOnUse"><circle cx="4" cy="4" r="1.6" fill="#00000033"/></pattern></defs>${body}</svg>`;
   const svg = holder.firstElementChild;

@@ -69,7 +69,7 @@ function artFor(seed) {
   return ART_POOL[h % ART_POOL.length];
 }
 
-/* 1) ensureStyles() — inject the Theme's CSS once (keyed by an id). State is the
+/* 1) ensureStyles(doc) — inject the Theme's CSS once (keyed by an id). State is the
  *    shared .rt-car--current/--departed/--spotlit classes; the Now/Spotlight GLOW is
  *    a drop-shadow over the STATIC .bullet-art group (the .bl-live power-up rides a
  *    sibling layer, so a lit Car's filter bitmap caches across frames instead of
@@ -77,9 +77,9 @@ function artFor(seed) {
  *    theme-rendering-constraints). The anime power-up (.bl-live) is revealed on
  *    .rt-car--current, like the Now pointer. All motion is compositor-only
  *    (transform/opacity) and disabled under prefers-reduced-motion. */
-export function ensureStyles() {
-  if (document.getElementById(STYLE_ID)) return;
-  const style = document.createElement('style');
+export function ensureStyles(doc) {
+  if (doc.getElementById(STYLE_ID)) return;
+  const style = doc.createElement('style');
   style.id = STYLE_ID;
   style.textContent = `
     /* SHINKANSEN RIDE — sleek + smooth on the rails. The shared undulation gives each
@@ -172,10 +172,10 @@ export function ensureStyles() {
       .rt-rails-bullet .rt-bl-lane, .rt-rails-bullet .rt-bl-glow { animation: none !important; }
     }
   `;
-  document.head.appendChild(style);
+  doc.head.appendChild(style);
 }
 
-/* 2) buildTrack() — the SCENE BAND. ONE stationary, full-canvas-width element built
+/* 2) buildTrack(opts) — the SCENE BAND. ONE stationary, full-canvas-width element built
  *    once (never per-car): a translucent dark-blue night backing (so the live stream
  *    shows through dimly) + the theme's scene-wide elements over it — the headline
  *    RUSHING SPEED-LINES streaking the full width at a few depths/speeds (parallax)
@@ -185,8 +185,8 @@ export function ensureStyles() {
  *    band's internal SVG uses preserveAspectRatio="none" so a normalized 0..100 box
  *    stretches to the live canvas width; horizontal streaking is exactly the goal.
  *    NO per-frame filters: glows are static gradients, motion is translateX only. */
-export function buildTrack() {
-  const el = document.createElement('div');
+export function buildTrack({ doc }) {
+  const el = doc.createElement('div');
   el.className = 'rt-rails rt-rails-bullet';
   // The band backs the train's vertical extent: top just above the car bodies (a touch
   // of headroom so the speed-lines streak behind the upper body), height ~1.0×--rt-th.
@@ -395,7 +395,7 @@ function setTimeLines(timeText, lines) {
   const baseY = Number(timeText.getAttribute('y'));
   timeText.replaceChildren();
   lines.forEach((line, i) => {
-    const tspan = document.createElementNS(SVG_NS, 'tspan');
+    const tspan = timeText.ownerDocument.createElementNS(SVG_NS, 'tspan');
     tspan.setAttribute('x', x);
     tspan.setAttribute('y', String(baseY - (lines.length - 1 - i) * TIME_LH));
     tspan.textContent = line;
@@ -499,6 +499,7 @@ function bulletOpen(v, x, w, i) {
  *    loco carries no per-slot state (no NOW/departed/spotlight) — it dims only
  *    post-event (isDimmed). */
 export function build(train, opts = {}) {
+  const { doc } = opts;
   L = themeT(opts);
   const vehicles = toVehicles(train);
   // Width + role key off the view-model's kind, NOT the index: post-event
@@ -538,7 +539,7 @@ export function build(train, opts = {}) {
     body += `<g class="rt-car${state}"${slot}>${burst}${parts.art}<g class="bl-front">${parts.front}</g>${parts.live}${pointer}</g>`;
   });
 
-  const holder = document.createElement('div');
+  const holder = doc.createElement('div');
   // --rt-ride 0.45 — a bullet train glides tight & smooth on its guideway (only a small
   // left-right sway survives; the rock is zeroed in ensureStyles for a sleek, modern ride).
   holder.innerHTML = `<svg class="rt-theme-bullet" viewBox="0 ${VIEW_TOP} ${totalW} ${VIEW_H}" role="img" style="--rt-ride:0.45">${bulletDefs()}${body}</svg>`;

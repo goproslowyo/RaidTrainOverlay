@@ -31,15 +31,18 @@ const VIEW_H = 220;       // viewBox height — all the art lives inside this bo
 const railY = 168;        // the wheel line (art is positioned relative to it)
 const STYLE_ID = 'rt-theme-starter-style';
 
-/* 1) ensureStyles() — inject the Theme's CSS once (keyed by an id so re-renders
- *    don't duplicate it). State is driven by the shared .rt-car--current /
+/* 1) ensureStyles(doc) — inject the Theme's CSS once (keyed by an id so re-renders
+ *    don't duplicate it) into the Document the renderer resolved from the mount.
+ *    NEVER the global `document`: reach for that and this Theme's art and stylesheet
+ *    land in whatever page happens to be global while the Stage sits in the mount —
+ *    silently, with nothing anywhere saying why. State is driven by the shared .rt-car--current /
  *    --departed / --spotlit classes the renderer toggles on a tick; the Now/Spotlight
  *    GLOW is a CSS drop-shadow over the STATIC .st-art group (the wheels ride a
  *    sibling .st-front layer), so a lit Car's filter bitmap caches across frames
  *    instead of re-rasterising the spinning wheels (memory theme-rendering-constraints). */
-export function ensureStyles() {
-  if (document.getElementById(STYLE_ID)) return;
-  const style = document.createElement('style');
+export function ensureStyles(doc) {
+  if (doc.getElementById(STYLE_ID)) return;
+  const style = doc.createElement('style');
   style.id = STYLE_ID;
   style.textContent = `
     .rt-theme-starter .rt-car--current .st-art { filter: drop-shadow(0 0 4px #fbbf24) drop-shadow(0 0 9px #fbbf24); }
@@ -51,14 +54,15 @@ export function ensureStyles() {
     .rt-theme-starter .st-stamp { visibility: hidden; }
     .rt-theme-starter .rt-car--departed .st-stamp { visibility: visible; }
   `;
-  document.head.appendChild(style);
+  doc.head.appendChild(style);
 }
 
-/* 2) buildTrack() — OPTIONAL. Return the stationary rail the Train rolls over, or
+/* 2) buildTrack(opts) — OPTIONAL. Return the stationary rail the Train rolls over, or
  *    delete this export and the renderer skips it. It sits behind the Train, full
- *    canvas width; size it in fractions of --rt-th so it scales with the Train. */
-export function buildTrack() {
-  const el = document.createElement('div');
+ *    canvas width; size it in fractions of --rt-th so it scales with the Train.
+ *    Built out of `opts.doc`, the mount's Document, like everything else here. */
+export function buildTrack({ doc }) {
+  const el = doc.createElement('div');
   el.className = 'rt-rails';
   el.style.cssText = 'top: calc(var(--rt-th) * 0.79); height: calc(var(--rt-th) * 0.03); background: #6b7280;';
   return el;
@@ -90,11 +94,13 @@ function starterCar(v, x, w, i, isEngine) {
   return { body, front };
 }
 
-/* 3) build(train, opts) — build the Train art ONCE and return a handle. toVehicles()
+/* 3) build(train, opts) — build the Train art ONCE and return a handle. `opts` is
+ *    { doc, config, maxTimeLines }; every element comes out of `doc`. toVehicles()
  *    flattens the live view-model: vehicles[0] is the locomotive (the organiser, who
  *    conducts the train); the rest are the coaches. (engine.organiser is a vestigial,
  *    always-null fallback — the organiser drives the loco, so there is no tender.) */
 export function build(train, opts = {}) {
+  const { doc } = opts;
   L = themeT(opts);
   const vehicles = toVehicles(train);
   // Width + role key off the view-model's kind, NOT the index: post-event
@@ -121,7 +127,7 @@ export function build(train, opts = {}) {
     body += `<g class="rt-car${state}"${slot}><g class="st-art">${parts.body}</g><g class="st-front">${parts.front}</g>${pointer}</g>`;
   });
 
-  const holder = document.createElement('div');
+  const holder = doc.createElement('div');
   holder.innerHTML = `<svg class="rt-theme-starter" viewBox="0 0 ${totalW} ${VIEW_H}" role="img">${body}</svg>`;
   const svg = holder.firstElementChild;
 

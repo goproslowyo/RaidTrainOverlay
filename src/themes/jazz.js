@@ -71,7 +71,7 @@ function labelColorFor(seed, departed) {
   return LAB[h % LAB.length];
 }
 
-/* 1) ensureStyles() — inject the Theme's CSS once (keyed by an id). The ambient
+/* 1) ensureStyles(doc) — inject the Theme's CSS once (keyed by an id). The ambient
  *    motion is the record SPIN: a compositor-only @keyframes rotating the disc
  *    COUNTER-CLOCKWISE; reduced-motion stops it. State is the shared
  *    .rt-car--current/--departed/--spotlit classes; the Now/Spotlight GLOW is a
@@ -79,9 +79,9 @@ function labelColorFor(seed, departed) {
  *    sibling, so a lit Car's filter bitmap caches across frames instead of
  *    re-rasterising the spin every frame — memory theme-rendering-constraints).
  *    The tonearm + floating notes ride .jz-live, revealed on .rt-car--current. */
-export function ensureStyles() {
-  if (document.getElementById(STYLE_ID)) return;
-  const style = document.createElement('style');
+export function ensureStyles(doc) {
+  if (doc.getElementById(STYLE_ID)) return;
+  const style = doc.createElement('style');
   style.id = STYLE_ID;
   style.textContent = `
     .rt-theme-jazz .jz-spin { transform-box: fill-box; transform-origin: center; animation: rt-jz-spin 4.2s linear infinite; will-change: transform; }
@@ -192,10 +192,10 @@ export function ensureStyles() {
       .rt-rails-jazz .jz-pool-bg, .rt-rails-jazz .jz-mote, .rt-rails-jazz .jz-led { animation: none !important; }
     }
   `;
-  document.head.appendChild(style);
+  doc.head.appendChild(style);
 }
 
-/* 2) buildTrack() — the CLUB-FX scene band: ONE stationary, full-canvas-width
+/* 2) buildTrack(opts) — the CLUB-FX scene band: ONE stationary, full-canvas-width
  *    element built once, pinned behind the Train (and faded under track=periodic)
  *    by the renderer. It is a LOWER band — the top of the frame stays see-through.
  *    Two parts (per the scene-band spec; styled in ensureStyles):
@@ -208,8 +208,8 @@ export function ensureStyles() {
  *          CONSOLE DECK as the ground + a power LED.
  *    FILTER-FREE: glows are static radial gradients; motion = compositor
  *    transform/opacity. Deterministic layout (no Math.random) so it's stable. */
-export function buildTrack() {
-  const el = document.createElement('div');
+export function buildTrack({ doc }) {
+  const el = doc.createElement('div');
   el.className = 'rt-rails rt-rails-jazz';
 
   // (a) the band's vertical extent: a lower band backing the train + deck. Top
@@ -373,7 +373,7 @@ function setTimeLines(timeText, lines) {
   const baseY = Number(timeText.getAttribute('y'));
   timeText.replaceChildren();
   lines.forEach((line, i) => {
-    const tspan = document.createElementNS(SVG_NS, 'tspan');
+    const tspan = timeText.ownerDocument.createElementNS(SVG_NS, 'tspan');
     tspan.setAttribute('x', x);
     tspan.setAttribute('y', String(baseY - (lines.length - 1 - i) * TIME_LH));
     tspan.textContent = line;
@@ -466,6 +466,7 @@ function jazzCar(v, x, w, i, isEngine) {
  *    conducts the train); the rest are the coaches. The loco carries no per-slot
  *    state (no NOW/departed/spotlight) — it dims only post-event (isDimmed). */
 export function build(train, opts = {}) {
+  const { doc } = opts;
   L = themeT(opts);
   const vehicles = toVehicles(train);
   // Width + role key off the view-model's kind, NOT the index: post-event
@@ -503,7 +504,7 @@ export function build(train, opts = {}) {
     body += `<g class="rt-car${state}"${slot}>${parts.artBack}<g class="jz-front">${parts.spin}</g>${parts.artFront}${parts.live}${pointer}</g>`;
   });
 
-  const holder = document.createElement('div');
+  const holder = doc.createElement('div');
   holder.innerHTML = `<svg class="rt-theme-jazz" viewBox="0 ${VIEW_TOP} ${totalW} ${VIEW_H}" role="img" style="--rt-ride:0.9">${jazzDefs()}${body}</svg>`;
   const svg = holder.firstElementChild;
 

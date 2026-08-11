@@ -123,7 +123,7 @@ function setTimeLines(textEl, lines) {
   const baseY = Number(textEl.getAttribute('y'));
   textEl.replaceChildren();
   (lines.length ? lines : ['']).forEach((line, i) => {
-    const tspan = document.createElementNS(SVG_NS, 'tspan');
+    const tspan = textEl.ownerDocument.createElementNS(SVG_NS, 'tspan');
     tspan.setAttribute('x', x);
     tspan.setAttribute('y', String(baseY - (lines.length - 1 - i) * TIME_LH));
     tspan.textContent = line;
@@ -261,14 +261,14 @@ function prideDefs() {
   </defs>`;
 }
 
-/* 1) ensureStyles() — inject the Theme's CSS once (keyed by an id). State is the
+/* 1) ensureStyles(doc) — inject the Theme's CSS once (keyed by an id). State is the
  *    shared .rt-car--current/--spotlit/--departed classes; the Now/Spotlight GLOW is
  *    a drop-shadow over the STATIC .pride-art group, and the loco carries a permanent
  *    sheen-glow on the same static group. All motion (sparkles, the scene band) is
  *    compositor-only and disabled under prefers-reduced-motion. */
-export function ensureStyles() {
-  if (document.getElementById(STYLE_ID)) return;
-  const style = document.createElement('style');
+export function ensureStyles(doc) {
+  if (doc.getElementById(STYLE_ID)) return;
+  const style = doc.createElement('style');
   style.id = STYLE_ID;
   style.textContent = `
     /* Now/Spotlight glow — a drop-shadow over the STATIC .pride-art group only. */
@@ -319,16 +319,16 @@ export function ensureStyles() {
       .rt-theme-pride .pride-spark, .rt-theme-pride .pride-flag, .pride-lane { animation: none !important; }
     }
   `;
-  document.head.appendChild(style);
+  doc.head.appendChild(style);
 }
 
-/* 2) buildTrack() — the SCENE BAND. ONE stationary, full-canvas-width element built
+/* 2) buildTrack(opts) — the SCENE BAND. ONE stationary, full-canvas-width element built
  *    once (never per-car): full-width rushing RAINBOW speed-lines at a few depths/
  *    speeds (parallax). The renderer pins this full-width behind the train and fades
  *    it under track=periodic. Lower band (top near the train band, height ~--rt-th) so
  *    the top of the frame stays see-through. NO per-frame filters: motion is translateX. */
-export function buildTrack() {
-  const el = document.createElement('div');
+export function buildTrack({ doc }) {
+  const el = doc.createElement('div');
   el.className = 'rt-rails rt-rails-pride';
   const bandTopU = (cTop - 26 - VIEW_TOP) / VIEW_H;
   const bandHU = (railY + 40 - (cTop - 26)) / VIEW_H;
@@ -360,6 +360,7 @@ export function buildTrack() {
  *    steam-bullet lead; the rest are the coaches; the last (isCaboose) is the cupola
  *    caboose. The loco carries no per-slot state — it dims only post-event (isDimmed). */
 export function build(train, opts = {}) {
+  const { doc } = opts;
   L = themeT(opts);
   const vehicles = toVehicles(train);
   // Derive the role from the view-model, NOT the index: when the Engine is hidden
@@ -392,7 +393,7 @@ export function build(train, opts = {}) {
     body += `<g class="rt-car${state}"${slot}>${inner}</g>`;
   });
 
-  const holder = document.createElement('div');
+  const holder = doc.createElement('div');
   // --rt-ride 0.75 — a parade train with a little life, but sleeker than wood/comic.
   holder.innerHTML = `<svg class="rt-theme-pride" viewBox="0 ${VIEW_TOP} ${totalW} ${VIEW_H}" role="img" style="--rt-ride:0.75">${prideDefs()}${body}</svg>`;
   const svg = holder.firstElementChild;

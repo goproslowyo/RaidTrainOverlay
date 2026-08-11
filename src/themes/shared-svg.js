@@ -7,6 +7,11 @@
  * after a built Train is attached. Ported from the original mockup — the art
  * decisions are not re-derived here.
  *
+ * Neither post-processor takes a Document parameter: both are handed the Train's
+ * own root, so they take the mount's Document (and its view) from `ownerDocument`
+ * — one fewer thing a Theme can forget to pass, and correct by construction when a
+ * Train is built into a foreign document.
+ *
  * The ambient-animation hooks (.rt-wheel, .rt-smoke, .rt-now-bob) and the
  * undulation on .rt-car are styled by the renderer's base CSS; these
  * builders only emit the markup that carries those classes.
@@ -105,12 +110,20 @@ export function avatarSVG(id, cx, cy, r, image, name, ring) {
  * SVG `<text class="rt-fit" data-maxw>` is condensed via textLength; HTML
  * `.rt-fit` (for the HTML Themes) steps the font size down, then wraps.
  * Runs once after attach — names don't change on a time tick.
+ *
+ * Both branches MEASURE, so both read from the mount's own view rather than a
+ * global one: a Train built into a foreign Document must be fitted against
+ * that Document. Where the mount has no layout engine at all — a constructed
+ * Document, which reports no text length and offers no getComputedStyle —
+ * there is nothing to measure and fitting is a no-op. In a browser both APIs
+ * are always there, so this changes nothing on stream.
  */
 export function fitAll(root) {
+  const view = root.ownerDocument?.defaultView;
   root.querySelectorAll('.rt-fit').forEach((el) => {
     if (el.namespaceURI && el.namespaceURI.includes('svg')) {
       const maxw = parseFloat(el.getAttribute('data-maxw'));
-      if (!Number.isFinite(maxw)) return;
+      if (!Number.isFinite(maxw) || typeof el.getComputedTextLength !== 'function') return;
       const len = el.getComputedTextLength();
       if (len > maxw) {
         el.setAttribute('textLength', maxw);
@@ -123,8 +136,9 @@ export function fitAll(root) {
       }
       return;
     }
+    if (!view?.getComputedStyle) return;
     el.style.whiteSpace = 'nowrap';
-    let fs = parseFloat(getComputedStyle(el).fontSize);
+    let fs = parseFloat(view.getComputedStyle(el).fontSize);
     const baseFs = fs;
     const min = 8.5;
     let guard = 60;
@@ -220,11 +234,14 @@ function rideRand(i, seed) {
  * the animation entirely (base CSS), leaving a calm static baseline.
  *
  * `ride` defaults to the `--rt-ride` value declared on the Theme root (a per-Theme
- * convention, NOT a field on the Theme contract), or 1.
+ * convention, NOT a field on the Theme contract), or 1 — read through the mount's
+ * own view, so a Train built into a foreign Document reads the value it declared
+ * there rather than one from whatever page happens to be global.
  */
 export function undulate(root, ride) {
   if (ride == null) {
-    const declared = parseFloat(getComputedStyle(root).getPropertyValue('--rt-ride'));
+    const view = root.ownerDocument?.defaultView;
+    const declared = parseFloat(view?.getComputedStyle?.(root)?.getPropertyValue('--rt-ride'));
     ride = Number.isFinite(declared) ? declared : 1;
   }
   [...root.querySelectorAll('.rt-car')].forEach((el, i) => {

@@ -65,13 +65,13 @@ const BIG = { ax: 24, ayB: 26, ayR: 44, pxB: 26, pxR: 12, pyB: 19, pyR: 12, sc: 
 const AMB = { ax: 70, ayB: 30, ayR: 52, pxB: 21, pxR: 12, pyB: 16, pyR: 10, sc: 0.07 };  // wide → crosses cars
 const CL = { ax: 18, ayB: 22, ayR: 42, pxB: 17, pxR: 10, pyB: 13, pyR: 9, sc: 0.07 };
 
-/* 1) ensureStyles() — inject the Theme's CSS once (guarded by a style-id). Carries
+/* 1) ensureStyles(doc) — inject the Theme's CSS once (guarded by a style-id). Carries
  *    the prototype's keyframes (gx / gy / riderY+bobY / bub / hue), all
  *    reduced-motion-safe. State: current = reveal the NOW bloom + the NOW marker;
  *    spotlit = an accent ring; departed = a LIGHT dim + the PLAYED stamp. */
-export function ensureStyles() {
-  if (document.getElementById(STYLE_ID)) return;
-  const style = document.createElement('style');
+export function ensureStyles(doc) {
+  if (doc.getElementById(STYLE_ID)) return;
+  const style = doc.createElement('style');
   style.id = STYLE_ID;
   style.textContent = `
     .rt-theme-lava { --rt-ride: 0.85; }
@@ -115,18 +115,18 @@ export function ensureStyles() {
     .rt-theme-lava .lava-stamp{ visibility: hidden; }
     .rt-theme-lava .rt-car--departed .lava-stamp{ visibility: visible; }
   `;
-  document.head.appendChild(style);
+  doc.head.appendChild(style);
 }
 
-/* 2) buildTrack() — the translucent dark LOUNGE-FLOOR band the lamp stands on. ONE
+/* 2) buildTrack(opts) — the translucent dark LOUNGE-FLOOR band the lamp stands on. ONE
  *    stationary, full-canvas-width element (built once; .rt-rails so the renderer
  *    pins it full-width behind the train and fades it under track=periodic). It is a
  *    LOWER band — NEVER opaque, NEVER full-screen: a theme-tinted dark gradient at
  *    ~0.4 alpha (the stream shows THROUGH it dimly) so the lamp pops over a bright
  *    stream, with a warm floor uplight + a thin violet floor line. Sized in fractions
  *    of --rt-th, so it scales with the train; the top of the frame stays see-through. */
-export function buildTrack() {
-  const el = document.createElement('div');
+export function buildTrack({ doc }) {
+  const el = doc.createElement('div');
   el.className = 'rt-rails rt-rails-lava';
   // the band backs the river's vertical extent: its top sits near the lava-band top.
   // Height 0.72×th (review): at 0.96 its violet floor line sat a fifth of a
@@ -295,6 +295,7 @@ function carArt(v, x, w, i, isEngine) {
  *    is ONE shared field layer spanning the whole train (cross-car blend); the
  *    per-car .rt-car groups carry only the bead/labels/state on top. */
 export function build(train, opts = {}) {
+  const { doc } = opts;
   L = themeT(opts);
   const vehicles = toVehicles(train);
   // Width + role key off the view-model's kind, NOT the index: post-event
@@ -336,7 +337,7 @@ export function build(train, opts = {}) {
     cars += `<g class="rt-car${state}"${slot}><g class="lava-art">${carArt(v, xs[i], w, i, isEngine)}</g>${pointer}</g>`;
   });
 
-  const holder = document.createElement('div');
+  const holder = doc.createElement('div');
   holder.innerHTML = `<svg class="rt-theme-lava" viewBox="0 0 ${totalW} ${VIEW_H}" role="img">${defs(vehicles)}${baseGlow}${river}${bubbles}${cars}</svg>`;
   const svg = holder.firstElementChild;
 

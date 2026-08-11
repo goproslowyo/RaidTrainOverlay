@@ -25,8 +25,8 @@ const COL = { now: '#ffe75c', spot: '#6ff7ff', open: '#37e0a0' };
 const STYLE_ID = 'rt-theme-synthwave2-style';
 const mid = (x, w) => x + w / 2;
 
-export function ensureStyles() {
-  injectStyle(STYLE_ID, `
+export function ensureStyles(doc) {
+  injectStyle(doc, STYLE_ID, `
     .rt-theme-synthwave2 .sw2-art { filter: drop-shadow(0 0 6px #ff2bd655); }
     .rt-theme-synthwave2 .rt-car--departed { opacity: 0.8; }
     .rt-theme-synthwave2 .rt-car--departed .sw2-art { filter: saturate(0.5) drop-shadow(0 0 3px #ff2bd633); }
@@ -78,8 +78,8 @@ function gridFloorSVG(color) {
   return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" style="filter: drop-shadow(0 0 3px ${color})">${p}</svg>`;
 }
 
-export function buildTrack() {
-  const el = document.createElement('div');
+export function buildTrack({ doc }) {
+  const el = doc.createElement('div');
   el.className = 'rt-rails rt-rails-synthwave2';
   el.style.setProperty('--rt-rail-top', 'calc(var(--rt-th) * 0.885)');
   const palm = encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 100"><g fill="#1b0f38" stroke="#ff5ad6" stroke-width="1.6"><path d="M60 100 C57 74 55 52 61 34 L67 34 C63 56 64 76 68 100 Z"/><path d="M64 36 C48 28 34 28 22 36 C36 22 54 22 64 30 C74 20 92 20 106 32 C92 26 76 28 64 36 Z"/><path d="M64 34 C56 20 44 14 30 14 C46 6 62 14 66 26 C72 12 88 6 102 12 C88 14 74 22 64 34 Z"/></g><g fill="#1b0f38" stroke="#ff5ad6" stroke-width="1.4" transform="translate(150 22) scale(0.72)"><path d="M60 108 C57 78 55 52 61 34 L67 34 C63 56 64 80 68 108 Z"/><path d="M64 36 C48 28 34 28 22 36 C36 22 54 22 64 30 C74 20 92 20 106 32 C92 26 76 28 64 36 Z"/><path d="M64 34 C56 20 44 14 30 14 C46 6 62 14 66 26 C72 12 88 6 102 12 C88 14 74 22 64 34 Z"/></g></svg>`);
@@ -221,6 +221,7 @@ function renderUnit(unit, x, w, i) {
 }
 
 export function build(train, opts = {}) {
+  const { doc } = opts;
   L = themeT(opts);
   const vehicles = toVehicles(train);
   const units = [];
@@ -237,7 +238,7 @@ export function build(train, opts = {}) {
   let body = '';
   units.forEach((u, i) => { body += renderUnit(u, xs[i], widthFor(u), i); });
 
-  const holder = document.createElement('div');
+  const holder = doc.createElement('div');
   holder.innerHTML = `<svg class="rt-theme-synthwave2" viewBox="0 ${VIEW_TOP} ${totalW} ${VIEW_H}" role="img" style="--rt-ride:0.6">` +
     `<defs>` +
     `<linearGradient id="sw2-sun" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#cdb9f2"/><stop offset="0.4" stop-color="#8a5cc8"/><stop offset="0.75" stop-color="#5b2a78"/><stop offset="1" stop-color="#2a1058"/></linearGradient>` +

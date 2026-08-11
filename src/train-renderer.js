@@ -419,19 +419,16 @@ function applyMode(doc, track, config, buildCopy) {
  */
 export function renderTrain(train, container, config) {
   const theme = resolveTheme(config?.theme);
-  // The Document comes from the mount, once, and is used throughout this module.
-  //
-  // The seam stops here, and honestly: `ensureStyles`/`build` are not part of the
-  // Theme contract's Document awareness (docs/authoring-a-theme.md), so a Theme
-  // reaches for the global document for its own stylesheet and all its Car art.
-  // Mounting a Train into a foreign document would therefore split it — the base
-  // stylesheet into `doc`, the Theme's into the global page. So this resolution
-  // makes the Theme-agnostic shell mount-correct, and NOT the Train as a whole.
-  // Closing it means widening the Theme contract across all 15 Themes, which is
-  // its own ticket; until then, do not read this as "renderTrain mounts anywhere".
+  // The Document comes from the mount, once, and is threaded through everything
+  // below — the Theme-agnostic shell here AND the Theme itself. `ensureStyles(doc)`
+  // and the `doc` on the build context are part of the Theme contract
+  // (docs/authoring-a-theme.md), so a Theme's own stylesheet and every Car of art
+  // land in the same document as the Stage. A Train mounts anywhere: hand
+  // renderTrain a container from a constructed Document or an iframe and the whole
+  // Train — Stage, Track, art, stylesheets — is built there.
   const doc = container.ownerDocument ?? document;
   ensureBaseStyles(doc);
-  theme.ensureStyles();
+  theme.ensureStyles(doc);
   container.replaceChildren();
 
   // The Stage fixes vertical position (height param → translateY); the Track
@@ -461,7 +458,7 @@ export function renderTrain(train, container, config) {
   // a paint.
   const built = [];
   const buildCopy = () => {
-    const copy = theme.build(train, { config, maxTimeLines });
+    const copy = theme.build(train, { doc, config, maxTimeLines });
     built.push(copy);
     return copy.node;
   };
@@ -469,7 +466,7 @@ export function renderTrain(train, container, config) {
   // The stationary Track (rails/ties) the Train rolls over.
   // Built once — never inside buildCopy, so marquee never duplicates it — and added
   // as a sibling behind .rt-track (a Theme may omit it; the renderer tolerates that).
-  const rails = theme.buildTrack?.({ config, maxTimeLines });
+  const rails = theme.buildTrack?.({ doc, config, maxTimeLines });
   if (rails) stage.appendChild(rails);
   stage.appendChild(track);
   container.appendChild(stage);

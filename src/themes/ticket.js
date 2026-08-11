@@ -15,9 +15,9 @@ const DESIGN_H = 122;
 const u = (n) => `calc(${n} * var(--u))`;
 const STOCK = '#f4ecd9';
 
-export function ensureStyles() {
-  ensureHtmlShared();
-  injectStyle(STYLE_ID, `
+export function ensureStyles(doc) {
+  ensureHtmlShared(doc);
+  injectStyle(doc, STYLE_ID, `
     .tk2 {
       --u: calc(var(--rt-th) / ${DESIGN_H});
       --rt-ride: 0.5;
@@ -120,9 +120,10 @@ function ticketCar(v, i) {
 }
 
 export function build(train, opts = {}) {
+  const { doc } = opts;
   L = themeT(opts);
   const vehicles = toVehicles(train);
-  const node = document.createElement('div');
+  const node = doc.createElement('div');
   node.className = 'tk2 rt-theme-ticket2';
   node.innerHTML = vehicles.map((v, i) => ticketCar(v, i)).join('');
 
@@ -163,8 +164,8 @@ export function build(train, opts = {}) {
   };
 }
 
-export function buildTrack() {
-  const el = document.createElement('div');
+export function buildTrack({ doc }) {
+  const el = doc.createElement('div');
   el.className = 'rt-rails rt-rails-ticket2';
   el.style.setProperty('--rt-rail-top', 'calc(var(--rt-th) * 0.995)');
   return el;

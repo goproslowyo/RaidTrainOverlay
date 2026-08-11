@@ -44,10 +44,32 @@ export default { key, ensureStyles, build, buildTrack, foot };
 | Member | Required | What it does |
 |---|---|---|
 | `key` | ✅ | The Theme's id. Must match its registry slot (section 8) — the config enum derives from the registry, so there is no second list to keep it in step with. |
-| `ensureStyles()` | ✅ | Inject the Theme's CSS once (guard by a style-id so re-renders don't duplicate it). |
+| `ensureStyles(doc)` | ✅ | Inject the Theme's CSS once into `doc` (guard by a style-id so re-renders don't duplicate it). |
 | `build(train, opts)` | ✅ | Build the train art once; return a **handle** `{ node, update, afterAttach }`. |
 | `foot` | ✅ | The Theme's **baseline** — where its floor sits, as a fraction of the train height, or a function of `{ maxTimeLines }` when the box height is content-driven (section 5). Omitting it falls back to `1` (the pre-baseline behaviour), which is a silent per-Theme drift — every shipped Theme declares one. |
 | `buildTrack(opts)` | optional | Return the stationary rail/ground the train rolls over, or omit it. |
+
+### Take your Document from the caller, never the global
+
+Every element and every stylesheet a Theme creates comes out of the **Document the
+renderer hands it** — `ensureStyles(doc)`, and `opts.doc` in `build` and `buildTrack`:
+
+```js
+export function ensureStyles(doc) { … doc.createElement('style') … doc.head.appendChild(style); }
+export function build(train, opts = {}) { const { doc } = opts; … doc.createElement('div') … }
+export function buildTrack({ doc }) { … doc.createElement('div') … }
+```
+
+`renderTrain` resolves it once from the mount (`container.ownerDocument`), so a train
+mounts into any document — the overlay page, a preview `iframe`, a constructed
+`Document` in a test — and the whole train lands in one place. Reach for the global
+`document` in even one of the three and that Theme *splits*: the stage in the mount, its
+art and stylesheet in whatever page happens to be global. Nothing errors; it just
+silently doesn't paint. The same applies after attach — anywhere you need a `Document`
+or a `Window` later (a tick handler rewriting `<tspan>`s, say), take it from an element
+you already hold: `el.ownerDocument`, `el.ownerDocument.defaultView`.
+
+`opts` is `{ doc, config, maxTimeLines }`; `buildTrack` gets the same object.
 
 ### `build` returns a handle
 
@@ -142,6 +164,7 @@ of writing the literal: import `themeT` from `shared-svg.js`, bind it at the top
 import { themeT } from './shared-svg.js';
 let L = themeT();                       // English fallback until build runs
 export function build(train, opts = {}) {
+  const { doc } = opts;                 // the mount's Document — never the global one
   L = themeT(opts);                     // opts.config.t, set by the overlay shell
   // …`>${esc(L('overlay.played'))}</text>`  instead of  `>PLAYED</text>`
 }

@@ -16,9 +16,9 @@ const DESIGN_H = 182;
 const u = (n) => `calc(${n} * var(--u))`;
 const YELLOW = '#f5c518', GREEN = '#3ddc97', RED = '#e05656';
 
-export function ensureStyles() {
-  ensureHtmlShared();
-  injectStyle(STYLE_ID, `
+export function ensureStyles(doc) {
+  ensureHtmlShared(doc);
+  injectStyle(doc, STYLE_ID, `
     .dp2 { --u: calc(var(--rt-th) / ${DESIGN_H}); --rt-ride: 1.2; flex: none; height: var(--rt-th); display: flex; align-items: flex-end; gap: ${u(20)};
       font-family: 'DM Mono', 'Courier New', monospace; }
     .dp2-unit { display: flex; flex-direction: column; align-items: center; }
@@ -134,9 +134,10 @@ function boardUnit(v, isEngine) {
 }
 
 export function build(train, opts = {}) {
+  const { doc } = opts;
   L = themeT(opts);
   const vehicles = toVehicles(train);
-  const node = document.createElement('div');
+  const node = doc.createElement('div');
   node.className = 'dp2 rt-theme-departures2';
   const hasEngine = vehicles[0]?.kind === 'engine';
   node.innerHTML = vehicles.map((v, i) => boardUnit(v, hasEngine && i === 0)).join('');
@@ -182,8 +183,8 @@ export function build(train, opts = {}) {
   };
 }
 
-export function buildTrack() {
-  const el = document.createElement('div');
+export function buildTrack({ doc }) {
+  const el = doc.createElement('div');
   el.className = 'rt-rails rt-rails-departures2';
   el.style.setProperty('--rt-rail-top', 'calc(var(--rt-th) * 0.955)');
   return el;

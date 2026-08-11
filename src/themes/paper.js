@@ -30,9 +30,9 @@ const COL = { now: '#fbbf24', spot: '#22d3ee', open: '#3d9e57' };
 const STYLE_ID = 'rt-theme-paper2-style';
 const mid = (x, w) => x + w / 2;
 
-export function ensureStyles() {
-  if (document.getElementById(STYLE_ID)) return;
-  const style = document.createElement('style');
+export function ensureStyles(doc) {
+  if (doc.getElementById(STYLE_ID)) return;
+  const style = doc.createElement('style');
   style.id = STYLE_ID;
   style.textContent = `
     .rt-theme-paper2 .rt-car--departed { opacity: 0.85; }
@@ -45,11 +45,11 @@ export function ensureStyles() {
     .rt-rails-paper2 { top: var(--rt-rail-top); height: calc(var(--rt-th) * 0.018);
       background: #b9a98c; border-radius: 999px; box-shadow: 0 calc(var(--rt-th) * 0.006) calc(var(--rt-th) * 0.01) #00000030; }
   `;
-  document.head.appendChild(style);
+  doc.head.appendChild(style);
 }
 
-export function buildTrack() {
-  const el = document.createElement('div');
+export function buildTrack({ doc }) {
+  const el = doc.createElement('div');
   el.className = 'rt-rails rt-rails-paper2';
   el.style.setProperty('--rt-rail-top', `calc(var(--rt-th) * ${((railY + 2 - VIEW_TOP) / VIEW_H).toFixed(4)})`);
   return el;
@@ -233,6 +233,7 @@ function renderUnit(unit, x, w, i) {
 }
 
 export function build(train, opts = {}) {
+  const { doc } = opts;
   L = themeT(opts);
   const vehicles = toVehicles(train);
   const units = [];
@@ -248,7 +249,7 @@ export function build(train, opts = {}) {
   let body = '';
   units.forEach((u, i) => { body += renderUnit(u, xs[i], widthFor(u), i); });
 
-  const holder = document.createElement('div');
+  const holder = doc.createElement('div');
   holder.innerHTML = `<svg class="rt-theme-paper2" viewBox="0 ${VIEW_TOP} ${totalW} ${VIEW_H}" role="img" style="--rt-ride:0.9">${body}</svg>`;
   const svg = holder.firstElementChild;
 

@@ -25,9 +25,9 @@ const SERIF = "Georgia, 'Times New Roman', serif";
 const STYLE_ID = 'rt-theme-classic2-style';
 const mid = (x, w) => x + w / 2;
 
-export function ensureStyles() {
-  if (document.getElementById(STYLE_ID)) return;
-  const style = document.createElement('style');
+export function ensureStyles(doc) {
+  if (doc.getElementById(STYLE_ID)) return;
+  const style = doc.createElement('style');
   style.id = STYLE_ID;
   style.textContent = `
     .rt-theme-classic2 .rt-car--departed { opacity: 0.85; }
@@ -48,11 +48,11 @@ export function ensureStyles() {
     .rt-rails-classic2::after { top: calc(var(--rt-th) * 0.022); bottom: 0;
       background: repeating-linear-gradient(90deg, #3a2d1e 0 calc(var(--rt-th) * 0.05), transparent calc(var(--rt-th) * 0.05) calc(var(--rt-th) * 0.115)); }
   `;
-  document.head.appendChild(style);
+  doc.head.appendChild(style);
 }
 
-export function buildTrack() {
-  const el = document.createElement('div');
+export function buildTrack({ doc }) {
+  const el = doc.createElement('div');
   el.className = 'rt-rails rt-rails-classic2';
   el.style.setProperty('--rt-rail-top', `calc(var(--rt-th) * ${((railY + 12 - VIEW_TOP) / VIEW_H).toFixed(4)})`);
   return el;
@@ -181,6 +181,7 @@ function renderUnit(unit, x, w, i) {
 }
 
 export function build(train, opts = {}) {
+  const { doc } = opts;
   L = themeT(opts);
   const vehicles = toVehicles(train);
   const units = [];
@@ -197,7 +198,7 @@ export function build(train, opts = {}) {
   let body = '';
   units.forEach((u, i) => { body += renderUnit(u, xs[i], widthFor(u), i); });
 
-  const holder = document.createElement('div');
+  const holder = doc.createElement('div');
   holder.innerHTML = `<svg class="rt-theme-classic2" viewBox="0 ${VIEW_TOP} ${totalW} ${VIEW_H}" role="img" style="--rt-ride:0.9">${body}</svg>`;
   const svg = holder.firstElementChild;
 

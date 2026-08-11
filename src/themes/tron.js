@@ -27,8 +27,8 @@ const TINTS = ['#7ee7ff', '#ff9a2e', '#c07aff', '#5aff9c', '#ff5a6e'];
 const STYLE_ID = 'rt-theme-tron2-style';
 const mid = (x, w) => x + w / 2;
 
-export function ensureStyles() {
-  injectStyle(STYLE_ID, `
+export function ensureStyles(doc) {
+  injectStyle(doc, STYLE_ID, `
     .rt-theme-tron2 .tr2-art { filter: drop-shadow(0 0 5px #7ee7ff99); }
     .rt-theme-tron2 .rt-car--departed { opacity: 0.8; }
     /* derez: ribbon off, circuits dimmed */
@@ -72,8 +72,8 @@ export function ensureStyles() {
   `);
 }
 
-export function buildTrack() {
-  const el = document.createElement('div');
+export function buildTrack({ doc }) {
+  const el = doc.createElement('div');
   el.className = 'rt-rails rt-rails-tron2';
   el.style.setProperty('--rt-rail-top', `calc(var(--rt-th) * ${((railY + WHEEL_R + 2 - VIEW_TOP) / VIEW_H).toFixed(4)})`);
   return el;
@@ -189,6 +189,7 @@ function renderUnit(unit, x, w, i) {
 }
 
 export function build(train, opts = {}) {
+  const { doc } = opts;
   L = themeT(opts);
   const vehicles = toVehicles(train);
   const units = [];
@@ -204,7 +205,7 @@ export function build(train, opts = {}) {
   let body = '';
   units.forEach((u, i) => { body += renderUnit(u, xs[i], CYCLE_W, i); });
 
-  const holder = document.createElement('div');
+  const holder = doc.createElement('div');
   holder.innerHTML = `<svg class="rt-theme-tron2" viewBox="0 ${VIEW_TOP} ${totalW} ${VIEW_H}" role="img" style="--rt-ride:0.35">` +
     `<defs>` +
     `<linearGradient id="tr2-fade" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="${TUBE}" stop-opacity="0.32"/><stop offset="1" stop-color="${TUBE}" stop-opacity="0"/></linearGradient>` +

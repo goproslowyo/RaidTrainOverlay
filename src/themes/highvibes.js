@@ -40,7 +40,7 @@ const STYLE_ID = 'rt-theme-highvibes2-style';
  * marquee copy) keeps each plant's frost/pistil/soil scatter identical. */
 const rng = (s) => { const x = Math.sin(s * 99.13) * 43758.5; return x - Math.floor(x); };
 
-/* 1) ensureStyles() — inject the Theme's CSS once (keyed by an id). The Now /
+/* 1) ensureStyles(doc) — inject the Theme's CSS once (keyed by an id). The Now /
  *    Spotlight GLOW is a CSS drop-shadow over the INTERNALLY STATIC .hv2-art
  *    group (the drifting leaves ride a sibling .hv2-front layer), so a lit
  *    plant's filter bitmap caches across frames instead of re-rasterising the
@@ -49,9 +49,9 @@ const rng = (s) => { const x = Math.sin(s * 99.13) * 43758.5; return x - Math.fl
  *    animates inside the filtered subtree. Departed = a LIGHT opacity dim + a
  *    revealed PLAYED stamp, never heavy shade (viewer feedback). All ambient
  *    motion is compositor transform/opacity and disabled under reduced-motion. */
-export function ensureStyles() {
-  if (document.getElementById(STYLE_ID)) return;
-  const style = document.createElement('style');
+export function ensureStyles(doc) {
+  if (doc.getElementById(STYLE_ID)) return;
+  const style = doc.createElement('style');
   style.id = STYLE_ID;
   style.textContent = `
     .rt-theme-highvibes2 .rt-car--current .hv2-art { filter: drop-shadow(0 0 4px #7fff9f) drop-shadow(0 0 10px #5fc54f); }
@@ -150,7 +150,7 @@ export function ensureStyles() {
       .rt-theme-highvibes2-haze { animation: none; }
     }
   `;
-  document.head.appendChild(style);
+  doc.head.appendChild(style);
 }
 
 /* The shared <defs> — every gradient lifted verbatim from the prototype. Emitted
@@ -530,7 +530,7 @@ function hillPath(baseY, amp, lumps, seed) {
   return d;
 }
 
-/* 2) buildTrack() — the stationary SCENE BAND: a translucent dark backing (the
+/* 2) buildTrack(opts) — the stationary SCENE BAND: a translucent dark backing (the
  *    live stream shows THROUGH it dimly) under a rolling-hill landscape with a
  *    connected resin ground glow + ambient drifting leaves and rising motes.
  *    ONE element, full canvas width, behind the train, fades under track=periodic.
@@ -538,8 +538,8 @@ function hillPath(baseY, amp, lumps, seed) {
  *    plant band and its bottom sits flush with the holder floor (1.0×--rt-th) —
  *    a LOWER band; the top of the frame stays see-through. Filter-free; all
  *    motion is compositor-only. */
-export function buildTrack() {
-  const el = document.createElement('div');
+export function buildTrack({ doc }) {
+  const el = doc.createElement('div');
   // The theme class must ride the band element itself: the .hv2-scene /
   // .hv2-scene-svg rules are scoped under .rt-theme-highvibes2, and the track
   // slot has no themed ancestor — without it the svg falls back to its
@@ -556,7 +556,7 @@ export function buildTrack() {
   //     bright stream content reads dimly through it. NEVER opaque, NEVER the
   //     whole frame. Two stacked gradients: a soft sky-fade above the hills and a
   //     deeper resin-dark pool below, plus a centred glow that lifts the train.
-  const backing = document.createElement('div');
+  const backing = doc.createElement('div');
   backing.style.cssText = [
     'position:absolute', 'inset:0',
     'background:' +
@@ -621,12 +621,12 @@ export function buildTrack() {
     `<radialGradient id="hv2-resinGlow" cx=".5" cy=".1" r=".9"><stop offset="0" stop-color="#7fff9f" stop-opacity=".42"/><stop offset=".4" stop-color="#3f9a3a" stop-opacity=".2"/><stop offset="1" stop-color="#0d3e16" stop-opacity="0"/></radialGradient>` +
     `</defs>`;
 
-  const holder = document.createElement('div');
+  const holder = doc.createElement('div');
   holder.innerHTML = `<svg class="hv2-scene-svg rt-theme-highvibes2" viewBox="0 0 1200 ${VB}" preserveAspectRatio="none" aria-hidden="true">${sceneDefs}${hills}${groundGlow}${sceneLeaves}${motes}</svg>`;
   el.appendChild(holder.firstElementChild);
   // drifting haze bands over the hills (two, offset, different speeds)
   for (const [hz, op, dl] of [['52s', '.34', '0s'], ['74s', '.22', '-30s']]) {
-    const haze = document.createElement('div');
+    const haze = doc.createElement('div');
     haze.className = 'rt-theme-highvibes2-haze';
     haze.style.cssText = `--hz:${hz}; opacity:${op}; animation-delay:${dl};`;
     el.appendChild(haze);
@@ -636,6 +636,7 @@ export function buildTrack() {
 
 /* 3) build(train, opts) — build the Train art ONCE and return a handle. */
 export function build(train, opts = {}) {
+  const { doc } = opts;
   L = themeT(opts);
   const vehicles = toVehicles(train);
   // Width + role key off the view-model's kind, NOT the index: post-event
@@ -684,7 +685,7 @@ export function build(train, opts = {}) {
     body += `<g class="rt-car${state}"${slot}>${float(`${nowGlow}<g class="hv2-art">${art}${stamp}${name}</g>`)}<g class="hv2-front">${leafCloud(xs[i], w, i)}</g>${pointer}</g>`;
   });
 
-  const holder = document.createElement('div');
+  const holder = doc.createElement('div');
   holder.innerHTML = `<svg class="rt-theme-highvibes2" viewBox="0 0 ${totalW} ${VIEW_H}" role="img" style="--rt-ride:1.2">${defs()}${body}</svg>`;
   const svg = holder.firstElementChild;
 

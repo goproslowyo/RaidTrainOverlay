@@ -15,10 +15,14 @@ import { esc, initials } from './shared-svg.js';
 
 const SHARED_ID = 'rt-theme-html-shared-style';
 
-/** Inject the shared HTML-Theme CSS once (avatar layering + spoked wheel). */
-export function ensureHtmlShared() {
-  if (document.getElementById(SHARED_ID)) return;
-  const style = document.createElement('style');
+/** Inject the shared HTML-Theme CSS once (avatar layering + spoked wheel) into
+ *  `doc` — the Document the Train is being mounted into, which the renderer takes
+ *  from the container and threads down. "Once" is per Document: a second mount
+ *  elsewhere needs its own copy, and the style-id guard is what keeps one mount
+ *  from collecting duplicates. */
+export function ensureHtmlShared(doc) {
+  if (doc.getElementById(SHARED_ID)) return;
+  const style = doc.createElement('style');
   style.id = SHARED_ID;
   style.textContent = `
     /* Shrink-to-fit names: fitAll measures scrollWidth vs clientWidth
@@ -45,16 +49,16 @@ export function ensureHtmlShared() {
     .rt-hw::before { left: 14%; right: 14%; top: 45%; height: 10%; }
     .rt-hw::after { top: 14%; bottom: 14%; left: 45%; width: 10%; }
   `;
-  document.head.appendChild(style);
+  doc.head.appendChild(style);
 }
 
-/** Inject a Theme's own stylesheet once, keyed by id. */
-export function injectStyle(id, css) {
-  if (document.getElementById(id)) return;
-  const style = document.createElement('style');
+/** Inject a Theme's own stylesheet once into `doc`, keyed by id. */
+export function injectStyle(doc, id, css) {
+  if (doc.getElementById(id)) return;
+  const style = doc.createElement('style');
   style.id = id;
   style.textContent = css;
-  document.head.appendChild(style);
+  doc.head.appendChild(style);
 }
 
 /**

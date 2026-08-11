@@ -30,9 +30,9 @@ const COL = { now: '#fbbf24', spot: '#22d3ee', open: '#3f9e63' };
 const STYLE_ID = 'rt-theme-flat2-style';
 const mid = (x, w) => x + w / 2;
 
-export function ensureStyles() {
-  if (document.getElementById(STYLE_ID)) return;
-  const style = document.createElement('style');
+export function ensureStyles(doc) {
+  if (doc.getElementById(STYLE_ID)) return;
+  const style = doc.createElement('style');
   style.id = STYLE_ID;
   style.textContent = `
     .rt-theme-flat2 .rt-car--departed { opacity: 0.86; }
@@ -56,11 +56,11 @@ export function ensureStyles() {
       background: repeating-linear-gradient(90deg, #4c4437 0 calc(var(--rt-th) * 0.045), transparent calc(var(--rt-th) * 0.045) calc(var(--rt-th) * 0.1));
     }
   `;
-  document.head.appendChild(style);
+  doc.head.appendChild(style);
 }
 
-export function buildTrack() {
-  const el = document.createElement('div');
+export function buildTrack({ doc }) {
+  const el = doc.createElement('div');
   el.className = 'rt-rails rt-rails-flat2';
   el.style.setProperty('--rt-rail-top', `calc(var(--rt-th) * ${((railY + 6 - VIEW_TOP) / VIEW_H).toFixed(4)})`);
   el.style.setProperty('--rt-rail-h', `calc(var(--rt-th) * ${(16 / VIEW_H).toFixed(4)})`);
@@ -75,7 +75,7 @@ function setTimeLines(timeText, lines) {
   const baseY = Number(timeText.dataset.baseY);
   timeText.replaceChildren();
   (lines?.length ? lines : ['']).forEach((line, i) => {
-    const tspan = document.createElementNS('http://www.w3.org/2000/svg', 'tspan');
+    const tspan = timeText.ownerDocument.createElementNS('http://www.w3.org/2000/svg', 'tspan');
     tspan.setAttribute('x', x);
     tspan.setAttribute('y', String(baseY + i * TIME_LH));
     tspan.textContent = line;
@@ -208,6 +208,7 @@ function renderUnit(unit, x, w, i) {
 }
 
 export function build(train, opts = {}) {
+  const { doc } = opts;
   L = themeT(opts);
   const vehicles = toVehicles(train);
   const units = [];
@@ -225,7 +226,7 @@ export function build(train, opts = {}) {
   let body = '';
   units.forEach((u, i) => { body += renderUnit(u, xs[i], widthFor(u), i); });
 
-  const holder = document.createElement('div');
+  const holder = doc.createElement('div');
   holder.innerHTML = `<svg class="rt-theme-flat2" viewBox="0 ${VIEW_TOP} ${totalW} ${VIEW_H}" role="img" style="--rt-ride:0.85">${body}</svg>`;
   const svg = holder.firstElementChild;
 
