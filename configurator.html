@@ -424,12 +424,13 @@
     }
     /* The mock card itself — the same skin the Overlay paints.
 
-       ⚠ THE CELL RULE LIVES IN TWO PLACES. Both views take exactly the box the
-       anchor wrapper budgets them (a third of the stage, from PREVIEW_BUDGET in
-       the script below) — the same `flex: 1 1 auto; min-width: 0` fill rule
-       upcoming-card.js gives renderCard and renderTicker. No width of their
-       own: an independent width here is what let the Overlay's one-line view
-       span whole screens at every anchor. Change one place, change the other. */
+       ⚠ THE FILL RULE LIVES IN TWO PLACES. The Cell itself no longer does —
+       PREVIEW_BUDGET composes cellThird() from upcoming-card.js, so the third
+       is stated once. What stays twinned is how a view fills the box the anchor
+       wrapper budgets it: the same `flex: 1 1 auto; min-width: 0` upcoming-card.js
+       gives renderCard and renderTicker. No width of their own: an independent
+       width here is what let the Overlay's one-line view span whole screens at
+       every anchor. Change one place, change the other. */
     .up {
       border: 1px solid rgba(255, 255, 255, .09); border-radius: 9px; padding: 9px 11px;
       background: rgba(9, 12, 17, var(--upop, .88)); backdrop-filter: blur(8px); color: #EDF1F7;

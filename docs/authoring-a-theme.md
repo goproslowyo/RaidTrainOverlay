@@ -45,9 +45,9 @@ export default { key, ensureStyles, build, buildTrack, foot };
 |---|---|---|
 | `key` | ✅ | The Theme's id. Must match its registry slot (section 8) — the config enum derives from the registry, so there is no second list to keep it in step with. |
 | `ensureStyles(doc)` | ✅ | Inject the Theme's CSS once into `doc` (guard by a style-id so re-renders don't duplicate it). |
-| `build(train, opts)` | ✅ | Build the train art once; return a **handle** `{ node, update, afterAttach }`. |
+| `build(train, opts)` | ✅ | Build the train art once out of `opts.doc` (never the global `document`); return a **handle** `{ node, update, afterAttach }`. |
 | `foot` | ✅ | The Theme's **baseline** — where its floor sits, as a fraction of the train height, or a function of `{ maxTimeLines }` when the box height is content-driven (section 5). Omitting it falls back to `1` (the pre-baseline behaviour), which is a silent per-Theme drift — every shipped Theme declares one. |
-| `buildTrack(opts)` | optional | Return the stationary rail/ground the train rolls over, or omit it. |
+| `buildTrack(opts)` | optional | Return the stationary rail/ground the train rolls over, built out of `opts.doc`, or omit it. |
 
 ### Take your Document from the caller, never the global
 
