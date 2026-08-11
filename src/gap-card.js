@@ -1,24 +1,34 @@
 /**
- * gap-card: whether the **Upcoming card** may take the **Stage** at all while a
- * Train is running, and — when it may — the schedule it appears on.
+ * gap-card: the **Stage choreography** — the Train and the **Upcoming card**
+ * never share the **Stage**.
  *
- * Every rule here is a settled product rule, and every one of them is a
- * predicate over values the caller already holds: the tagged timing the render
- * handed back, how long the **Horizon** is, and the config. None of it needs a
- * DOM, a clock or storage, so the whole rule set is pure and unit-testable —
- * which is the point, since it used to live in the shell's wiring where nothing
- * could import it.
+ * That guarantee is ONE generated opacity keyframe sharing the **Pass** period:
+ * synchronised with the Train by construction, so it cannot drift over a stream
+ * that runs for days, and costing no per-frame JavaScript (the OBS mandate).
+ * The whole rule set that makes it hold lives here, in two halves.
+ *
+ * The plan half (`gapCardPlan`) is every rule about whether the card may take
+ * the Stage at all while a Train runs, and — when it may — the schedule it
+ * appears on. Each is a predicate over values the caller already holds: the
+ * tagged timing the render handed back, how long the **Horizon** is, and the
+ * config. None of it needs a DOM, a clock or storage, so it is pure and
+ * unit-testable — which is the point, since it used to live in the shell's
+ * wiring where nothing could import it.
+ *
+ * The apply half (`createGapCard`) owns the card's layer, the generated
+ * keyframes, the card mount and the **Breather** switch, and states the phase
+ * rule as two verbs rather than a flag. A caller that could pass a `restart`
+ * boolean wrongly would put the card on screen ON a Train — the one failure
+ * this design exists to prevent — so there is no boolean to pass.
  *
  * This sits beside `gap-choreography.js` rather than inside it: the
  * choreography answers "given an empty stretch, when and for how long", and is
- * shared with marquee; this answers "is there an empty stretch to use, and may
- * we use it", which is the Overlay's question alone.
- *
- * The apply half — mounting the card, switching the **Breather**, writing the
- * generated keyframe — stays with the caller.
+ * shared with marquee; this answers "is there an empty stretch to use, may we
+ * use it, and where does the card go", which is the Overlay's question alone.
  */
-import { gapSchedule } from './gap-choreography.js';
+import { gapSchedule, windowKeyframes } from './gap-choreography.js';
 import { upcomingPages } from './live-link.js';
+import { renderUpcomingCard, retireUpcomingCard } from './upcoming-card.js';
 
 /** Nothing to show; the caller clears whatever is on the layer. */
 const NO = Object.freeze({ show: false });
@@ -66,4 +76,133 @@ export function gapCardPlan({ timing, horizonLength, config }) {
   // entirely rather than flash part of one.
   if (schedule.windows.length === 0) return NO;
   return { show: true, schedule };
+}
+
+/** The class that IS the card's presence: one generated opacity keyframe. */
+const ON_CLASS = 'rt-gap-card--on';
+const STYLE_ID = 'rt-gap-card-style';
+
+/**
+ * This module's own generated stylesheet, injected once by id. Kept here rather
+ * than in some module that owns "all generated CSS": four of these are injected
+ * across three modules and they have nothing to do with one another, so such a
+ * module would have an interface as wide as its implementation. All that is
+ * worth sharing is this three-line ensure-an-element helper, and it is cheaper
+ * to keep than to depend on.
+ */
+function setGapStyle(doc, cssText) {
+  let style = doc.getElementById(STYLE_ID);
+  if (!style) {
+    style = doc.createElement('style');
+    style.id = STYLE_ID;
+    doc.head.appendChild(style);
+  }
+  style.textContent = cssText;
+}
+
+/**
+ * Take over the **Stage choreography** for an Overlay mounted at `container`.
+ *
+ * The card gets a full-canvas layer of its own, laid as a SIBLING of the
+ * Train's container: the card's own render dissolves whatever else holds the
+ * container it mounts into, and inside `#train` that would be the Train. The
+ * layer is the same positioning context the anchor grammar expects, and the
+ * renderer never touches it — which is exactly what lets "never on stage
+ * together" be a timing guarantee rather than a mount-and-unmount one.
+ *
+ * Two entry points, because the phase rule is not a parameter:
+ *
+ *   restart(view, horizon)  a render just built a Stage (or, with `null`,
+ *                           nothing is running any more) and re-seeded the
+ *                           Train's own keyframe — re-seed ours with it.
+ *   refresh(horizon)        the Horizon changed. The running animation must NOT
+ *                           move: a re-seed here would slide the card out of
+ *                           phase with the Pass it is timed against, and it
+ *                           could then appear ON a Train. A changed schedule
+ *                           reaches it through the keyframe text instead, which
+ *                           CSS re-reads without restarting.
+ *
+ * `view` is renderTrain's handle. It carries the tagged `timing` and the
+ * `setBreather` switch together because both belong to the Stage that render
+ * built — the switch is the reason the handle is taken whole rather than the
+ * timing alone. A Breather with nothing to put in it is just the Train
+ * vanishing for no reason, so it is switched on only alongside a card that is
+ * actually going to appear in it.
+ */
+export function createGapCard({ container, config }) {
+  // The Document comes from the mount, like every other DOM module here, so an
+  // Overlay built into a constructed Document or an iframe keeps all of its
+  // parts — layer, card, stylesheet — in the one document.
+  const doc = container.ownerDocument ?? document;
+  const layer = doc.createElement('div');
+  layer.id = 'gap-card';
+  layer.style.cssText = 'position:absolute;inset:0;pointer-events:none';
+  container.insertAdjacentElement('afterend', layer);
+
+  // The Stage the card is currently timed against, and when it was built. The
+  // handle is held rather than the timing alone so the Breather can still be
+  // switched off on the Stage that is on screen at the moment it is dropped.
+  let view = null;
+  let seededAt = 0;
+
+  const clear = () => {
+    retireUpcomingCard(layer);
+    layer.classList.remove(ON_CLASS);
+    layer.style.animationDelay = '';
+    view?.setBreather(false);
+  };
+
+  /**
+   * Plan for this moment and apply it. `reseed` is not a mode: it is which of
+   * the two entry points called, and only the one that follows a render passes
+   * it. See the phase rule above.
+   */
+  const apply = (horizon, reseed) => {
+    const plan = gapCardPlan({ timing: view?.timing, horizonLength: horizon.length, config });
+    if (!plan.show) return clear();
+    const { schedule } = plan;
+    setGapStyle(doc, `
+      @keyframes rt-gap-card { ${windowKeyframes(schedule)} }
+      .${ON_CLASS} { animation: rt-gap-card ${schedule.cycleSec}s linear infinite; }
+      @media (prefers-reduced-motion: reduce) {
+        /* The whole occasion IS the motion: a card that pulses in and out over
+           a live stream. Reduced motion keeps the Train and drops the pulse
+           rather than leaving the card parked over the Train at full opacity. */
+        .${ON_CLASS} { animation: none; opacity: 0; }
+      }`);
+    renderUpcomingCard(layer, horizon, config);
+    view.setBreather(true);
+    if (reseed) {
+      layer.classList.remove(ON_CLASS);
+      layer.style.animationDelay = '';
+      void layer.offsetWidth; // commit, so the restart re-seeds with the Pass
+    } else if (!layer.classList.contains(ON_CLASS)) {
+      // Presence is off and the Horizon has just arrived — which is the normal
+      // way round, since the feed resolves the other trains after the render.
+      // Switching on from 0% would time the card against this instant instead
+      // of against the Pass, so it starts where the Pass has got to by now. One
+      // clock read, at the only moment the phase is not already right; nothing
+      // per-frame, and nothing that ticks.
+      // Floored, so a machine whose clock steps backwards mid-stream starts the
+      // card at the top of the cycle rather than writing a delay CSS will drop.
+      const elapsed = Math.max(0, (Date.now() - seededAt) / 1000) % schedule.cycleSec;
+      layer.style.animationDelay = `-${elapsed.toFixed(3)}s`;
+    }
+    layer.classList.add(ON_CLASS);
+  };
+
+  return {
+    restart(nextView, horizon) {
+      // The Stage being replaced may still be on screen (idle arrives with the
+      // last render painted), and its Breather switch dies with its handle, so
+      // it is let back up before the handle goes.
+      if (nextView !== view) view?.setBreather(false);
+      view = nextView ?? null;
+      seededAt = Date.now();
+      apply(horizon, true);
+    },
+    refresh(horizon) {
+      apply(horizon, false);
+    },
+  };
 }

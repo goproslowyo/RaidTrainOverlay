@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { gapCardPlan } from '../src/gap-card.js';
+import { parseHTML } from 'linkedom';
+import { createGapCard, gapCardPlan } from '../src/gap-card.js';
 import { breatherCycle } from '../src/gap-choreography.js';
 
 // Every rule about whether the Upcoming card may take the Stage at all while a
@@ -120,4 +121,185 @@ test('the scrolling view is planned in whole Laps, and sits out when one will no
   const slow = { ...config, upscroll: 120 };
   const tight = { kind: 'pass', periodSec: 180, emptyFromSec: 60, emptyToSec: 170 };
   assert.deepEqual(plan({ config: slow, timing: tight }), { show: false });
+});
+
+// ---------------------------------------------------------------------------
+// The apply half: the **Stage choreography** itself.
+//
+// These stop at the edge of layout — `linkedom` has no layout engine, so
+// `offsetWidth` and `getBoundingClientRect()` read 0 and nothing here may
+// assert on painted geometry. What they CAN hold honest is the structure the
+// guarantee rests on: that the card gets a layer of its own beside the Train
+// rather than inside it, that the presence keyframe is written once per module
+// into the mount's own Document, that a `restart` re-seeds it and a `refresh`
+// never does, and which Stage the **Breather** switch is worked on. Whether
+// the card is truly never on screen with a Train — the phase rule as OBSERVED
+// — stays the browser sweep's job.
+
+/** The mount a real Overlay hands this module: overlay.html's #train. */
+const scene = () => parseHTML(
+  '<!doctype html><html><head></head><body><div id="train"></div></body></html>',
+).document;
+
+/** Enough config to mount the card as well as plan it. */
+const MOUNTABLE = { ...LIVE, t: (key) => key, locale: 'en-US', uppos: 'bc' };
+
+/** Trains for the Horizon — three Pages' worth, so the page count is visible. */
+const HORIZON = Array.from({ length: 9 }, (_, i) => ({
+  slug: `train-${i}`,
+  title: `Night Run ${i}`,
+  starttime: new Date(Date.UTC(2026, 7, 14 + i, 20, 0, 0)),
+}));
+
+/**
+ * A stand-in for renderTrain's handle. The tagged timing and the Breather
+ * switch travel together because both belong to the Stage that render built,
+ * and this records every throw of the switch so a test can say which Stage was
+ * worked and in which order.
+ */
+const handle = (timing) => {
+  const breathers = [];
+  return { timing, breathers, setBreather(on) { breathers.push(on); } };
+};
+
+/** The presence class: the card's whole appearance, as one opacity keyframe. */
+const ON = 'rt-gap-card--on';
+
+/**
+ * A mounted Overlay: the Train's container and the choreographer beside it.
+ *
+ * Torn down with the idle call, because a standing card view pages on a real
+ * interval and only retiring it stops the clock. Registered on the test rather
+ * than called at the end, so a failing assertion reports instead of hanging the
+ * runner on a timer nobody cleared.
+ */
+function overlay(t) {
+  const page = scene();
+  const container = page.getElementById('train');
+  const gap = createGapCard({ container, config: MOUNTABLE });
+  t.after(() => gap.restart(null, []));
+  return { page, container, gap, layer: container.nextElementSibling };
+}
+
+test('the choreographer lays its own full-canvas layer beside the Train', () => {
+  // Beside, never inside: the card's own render dissolves whatever else holds
+  // its container, and inside #train that would be the Train. The layer is why
+  // "never on stage together" can be a timing guarantee instead of a
+  // mount-and-unmount one.
+  const page = scene();
+  const container = page.getElementById('train');
+
+  createGapCard({ container, config: MOUNTABLE });
+
+  const layer = container.nextElementSibling;
+  assert.ok(layer, 'no layer was laid beside the Train');
+  assert.equal(layer.parentNode, container.parentNode, 'the layer must be a sibling of the Train');
+  assert.equal(layer, page.getElementById('gap-card'), 'the layer belongs to the mount Document');
+  assert.match(layer.getAttribute('style'), /position:absolute/);
+  assert.match(layer.getAttribute('style'), /inset:0/, 'the layer is the whole canvas');
+  assert.match(layer.getAttribute('style'), /pointer-events:none/);
+});
+
+test('a restart mounts the card and writes one opacity keyframe on the Pass period', (t) => {
+  const { page, gap, layer } = overlay(t);
+  const view = handle(PASS);
+
+  gap.restart(view, HORIZON);
+
+  const style = page.getElementById('rt-gap-card-style');
+  assert.ok(style, 'the generated stylesheet never reached the mount Document');
+  assert.match(style.textContent, /@keyframes rt-gap-card/, 'presence is one generated keyframe');
+  assert.match(
+    style.textContent,
+    new RegExp(`\\.rt-gap-card--on \\{ animation: rt-gap-card ${PASS.periodSec}s linear infinite`),
+    'the card must share the Pass period, or it drifts off it',
+  );
+  assert.ok(layer.classList.contains(ON), 'the card was never switched on');
+  assert.ok(layer.querySelector('.rt-upcoming-card'), 'the card never mounted onto the layer');
+  assert.deepEqual(view.breathers, [true], 'the Breather is switched on for the card to appear in');
+});
+
+test('a restart with nothing to show clears the layer and lets the Train back up', (t) => {
+  // An empty Horizon: a Breather here would be the Train vanishing for no
+  // reason, so the empty stretch is suppressed along with the card.
+  const { gap, layer } = overlay(t);
+  const view = handle(BREATHER);
+
+  gap.restart(view, []);
+
+  assert.equal(layer.classList.contains(ON), false, 'nothing to show, yet the layer was switched on');
+  assert.equal(layer.querySelector('.rt-upcoming-card'), null, 'a card was mounted with no Horizon');
+  assert.deepEqual(view.breathers, [false], 'the Breather must be switched off, not left standing');
+});
+
+test('a restart re-seeds the presence keyframe; a refresh never touches it', (t) => {
+  // This is the phase rule as an interface: only a render restarts the Train's
+  // own keyframe, so only a restart may re-seed the card's. A Horizon change
+  // reaches the running animation through the keyframe TEXT, which CSS re-reads
+  // in place.
+  const { page, gap, layer } = overlay(t);
+
+  gap.restart(handle(PASS), HORIZON);
+
+  // Count re-seeds from here: taking the class off and putting it back is what
+  // starts the animation over.
+  const tokens = layer.classList;
+  const real = tokens.remove.bind(tokens);
+  let reseeds = 0;
+  tokens.remove = (...names) => { reseeds += names.filter((n) => n === ON).length; return real(...names); };
+  const before = page.getElementById('rt-gap-card-style').textContent;
+
+  gap.refresh(HORIZON.slice(0, 2)); // three Pages down to one
+
+  assert.equal(reseeds, 0, 'a refresh restarted the animation — the card can now land on a Train');
+  assert.ok(layer.classList.contains(ON), 'the refresh left the card switched off');
+  assert.notEqual(
+    page.getElementById('rt-gap-card-style').textContent, before,
+    'the shorter Horizon never reached the keyframe',
+  );
+
+  gap.restart(handle(PASS), HORIZON);
+
+  assert.equal(reseeds, 1, 'a restart must re-seed, or the card falls out of phase with the new Pass');
+  assert.ok(layer.classList.contains(ON), 'the restart left the card switched off');
+});
+
+test('nothing running: the Stage still on screen is let back up before it is dropped', (t) => {
+  // Idle arrives with the previous render still painted. The Breather switch
+  // is bound to THAT Stage, so it has to be thrown before the handle goes.
+  const { gap, layer } = overlay(t);
+  const view = handle(BREATHER);
+  gap.restart(view, HORIZON);
+  assert.deepEqual(view.breathers, [true]);
+
+  gap.restart(null, []); // the idle call: nothing is running any more
+
+  assert.deepEqual(view.breathers, [true, false], 'the outgoing Stage was left in its Breather');
+  assert.equal(layer.classList.contains(ON), false, 'the card outlived the Train it belonged to');
+});
+
+test('a refresh that brings the card back starts it in phase with the Pass, not from zero', (t) => {
+  // The Horizon is routinely empty at render time and arrives moments later, so
+  // a refresh does have to be able to switch presence ON. Starting the keyframe
+  // where it is by now — from the render the Train's own keyframe started at —
+  // is the only way to do that without landing the card on a Train.
+  const { gap, layer } = overlay(t);
+  // The wall clock is the only way to say how far into the Pass we are, so the
+  // test drives it: five minutes pass between the render and the Horizon.
+  const realNow = Date.now;
+  t.after(() => { Date.now = realNow; });
+  let clock = realNow();
+  Date.now = () => clock;
+
+  gap.restart(handle(PASS), []);
+  assert.equal(layer.classList.contains(ON), false, 'an empty Horizon put the card on');
+  clock += 300_000;
+
+  gap.refresh(HORIZON);
+
+  assert.ok(layer.classList.contains(ON), 'the card never came back when its Horizon arrived');
+  assert.equal(
+    layer.style.animationDelay, '-300.000s',
+    'presence started from 0%, which is the Pass the Train is five minutes into',
+  );
 });
