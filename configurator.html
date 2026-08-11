@@ -938,6 +938,7 @@
   import { filterUpcoming, upcomingPages, visibleUpcoming, mySlot, CARD_MAX_ROWS } from './src/live-link.js';
   import { anchorStyle } from './src/upcoming-card.js';
   import { loadMyRaidTrains, loadEventDetails, refreshEventDetail, userCacheKey } from './src/my-raid-trains.js';
+  import { readVerdict } from './src/feed-verdict.js';
   import { buildLiveLink, baseSettings } from './src/live-link-url.js';
   import {
     SETTINGS_DEFAULTS, SETTING_FIELDS, THEME_OPTION_KEYS, applySettings, diffSettings, normalizeSettings,
@@ -1163,24 +1164,12 @@
     return `${OVERLAY_BASE}?${query}`;
   }
   /**
-   * The feed's events, but ONLY when this read is trustworthy — a fresh
-   * `ready` with no error and nothing served from a stale cache. Everything
-   * downstream treats these as positive evidence about when trains end (#31),
-   * so a doubtful read must contribute none.
+   * What the current read proves: `events` non-null is a **Good read**,
+   * `verified` a **Verified read**. Both bars, and the reasoning behind them,
+   * live in src/feed-verdict.js — every caller here asks it once rather than
+   * re-deriving the distinction from `state.feed` in its own way.
    */
-  function goodFeedEvents() {
-    const f = state.feed;
-    return f.status === 'ready' && !f.stale && !f.error ? f.events : null;
-  }
-  /**
-   * …and whether that read actually reached RaidPal (#39). `goodFeedEvents`
-   * cannot tell: `loadMyRaidTrains` serves a cache hit inside its 6h window
-   * with no error and no stale flag, so a feed can look perfectly healthy and
-   * still be a six-hour-old snapshot nobody re-checked. That is fine for an end
-   * time — a recorded fact — but absence from it is an inference, and pruning a
-   * train's overrides on a stale inference is silent data loss.
-   */
-  const feedVerified = () => goodFeedEvents() != null && state.feed.fromCache === false;
+  const verdict = () => readVerdict(state.feed);
   /**
    * Drop Configs for trains that are over and gone (#41), and offer them back.
    *
@@ -1197,10 +1186,11 @@
    */
   function cleanUpOrphans({ force = false } = {}) {
     if (!force && state.cleanupRan) return;
-    if (!feedVerified()) return;
+    const { events, verified } = verdict();
+    if (!verified) return;
     state.cleanupRan = true;
     const { store, removed } = pruneOrphanedConfigs(profiles, me(), {
-      events: goodFeedEvents(), verified: true, now: Date.now(),
+      events, verified: true, now: Date.now(),
     });
     if (removed.length === 0) return;
     // The prune is blind to `kept` by design — it answers "is this reachable?",
@@ -1214,16 +1204,15 @@
     // offers to undo belongs to ONE Profile, and `me()` can change underneath it.
     state.cleanup = { removed: fresh, login: me() };
   }
-  /** When the feed says this train ends, as epoch ms — only from a good read. */
+  /** When the feed says this train ends, as epoch ms — only from a Good read. */
   function feedEndsAt(slug) {
-    const event = (goodFeedEvents() ?? []).find((e) => e.slug === slug);
+    const event = (verdict().events ?? []).find((e) => e.slug === slug);
     return event ? event.endtime.getTime() : null;
   }
   /** The Live Link plus its size verdict (#33) and its train coverage (#31). */
   const liveLink = () => {
-    const link = buildLiveLink(library, profiles, me(), {
-      now: Date.now(), events: goodFeedEvents(), verified: feedVerified(),
-    });
+    const { events, verified } = verdict();
+    const link = buildLiveLink(library, profiles, me(), { now: Date.now(), events, verified });
     return { ...link, url: link.query ? `${OVERLAY_BASE}?${link.query}` : '' };
   };
   const liveLinkUrl = () => liveLink().url;
@@ -1272,8 +1261,8 @@
       // cache hit (#39). This is the ONLY assignment that sets it: loadFeed
       // rebuilds state.feed from scratch on entry, so a later `...state.feed`
       // spread can only ever carry THIS call's value — and the notFound/error
-      // paths that do spread it are already excluded by goodFeedEvents()
-      // returning null, which feedVerified() requires first.
+      // paths that do spread it already fail the Good read the Verified one
+      // is built on.
       state.feed = {
         ...state.feed, status: 'ready', events: result.user.events,
         displayName: result.user.displayName,
