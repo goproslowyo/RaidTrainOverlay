@@ -8,9 +8,10 @@
 import { parseConfig } from './config.js';
 import { startEventFeed } from './event-feed.js';
 import { startLiveLinkFeed } from './live-link-feed.js';
-import { filterUpcoming, shouldSelfReload, upcomingPages } from './live-link.js';
+import { filterUpcoming, shouldSelfReload } from './live-link.js';
 import { renderUpcomingCard, retireUpcomingCard } from './upcoming-card.js';
-import { gapSchedule, windowKeyframes } from './gap-choreography.js';
+import { windowKeyframes } from './gap-choreography.js';
+import { gapCardPlan } from './gap-card.js';
 import { buildTrain } from './lineup-engine.js';
 import { renderTrain } from './train-renderer.js';
 import { SHIPPED_THEMES } from './themes/registry.js';
@@ -107,32 +108,18 @@ if (!config.event && !config.lineup && !config.user) {
   // changed schedule reaches it through the keyframe text, which CSS re-reads
   // without restarting.
   const renderGapCard = ({ restart = false } = {}) => {
-    const spec = config.upcoming;
-    // Live Link only (nothing else knows other trains), never on an
-    // upcoming-only source (that scene shows the card outright), never while
-    // nothing is running, and never when the streamer opted out.
-    if (!config.user || config.uponly || !spec || !config.upgap
-      || !current?.view || liveHorizon.length === 0) return clearGapCard();
-    // A Pass gap, or — in marquee, which has none — the Breather the cycle
-    // manufactures instead. Same choreography either way; only the source of
-    // the empty stretch differs, and the render that built the Stage says which
-    // it handed back. A Breather holds exactly one page, and the card's
-    // free-running pager is what walks the horizon across successive Breathers.
-    const { timing } = current.view;
-    if (timing.kind === 'none') return clearGapCard();
-    const breather = timing.kind === 'breather';
-    const schedule = gapSchedule({
-      periodSec: timing.periodSec,
-      emptyFromSec: timing.emptyFromSec,
-      emptyToSec: timing.emptyToSec,
-      pageCount: breather ? 1 : upcomingPages(liveHorizon),
-      upcycleSec: config.upcycle,
-      style: config.upstyle,
-      upscrollSec: config.upscroll,
+    // Every rule about whether the card may appear at all — no Live Link login,
+    // an upcoming-only source, the opt-out, nothing running, an empty Horizon,
+    // and a stretch too short for one whole Page — is a pure predicate over the
+    // render's tagged timing, the Horizon's length and the config. It lives in
+    // gap-card.js, under test; the shell keeps only the applying.
+    const plan = gapCardPlan({
+      timing: current?.view?.timing,
+      horizonLength: liveHorizon.length,
+      config,
     });
-    // A gap too short for one whole page: the card sits this one out entirely
-    // rather than flashing a partial page.
-    if (schedule.windows.length === 0) return clearGapCard();
+    if (!plan.show) return clearGapCard();
+    const { schedule } = plan;
     let style = document.getElementById('rt-gap-card-style');
     if (!style) {
       style = document.createElement('style');
