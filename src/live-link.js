@@ -130,6 +130,67 @@ export function mySlot(event, names) {
     && wanted.includes(s.broadcaster?.displayName?.toLowerCase())) ?? null;
 }
 
+/**
+ * Localized "Fri, Aug 8, 10:30 PM PDT" — weekday cue first, then the time WITH
+ * its zone named. A bare clock time on stream is ambiguous (whose clock?), and
+ * these trains span the globe: a UTC-afternoon train departs at 3 AM Pacific,
+ * which reads as "wrong" until the zone is on screen.
+ */
+function zonedTime(date, locale, zone) {
+  // Every numeric field 2-digit: in the mono face that makes every departure
+  // the same width, so the time column cannot drift between pages (a 1-digit
+  // day used to re-size the grid on every page turn). The zone name is
+  // per-DATE, so summer vs standard time (PDT/PST) is already right.
+  return new Intl.DateTimeFormat(locale, {
+    weekday: 'short', month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit',
+    timeZoneName: 'short', ...(zone && { timeZone: zone }),
+  }).format(date);
+}
+
+/**
+ * The same moment as a UTC anchor — the streamer's viewers are worldwide and
+ * nobody knows the streamer's zone, so every row carries a fixed reference.
+ * The weekday appears only when UTC lands on a different day than the zoned
+ * reading beside it (a late-night departure crossing midnight); repeating it
+ * on every row would be noise in a column that exists to be glanced at.
+ */
+function utcAnchor(date, locale, zone) {
+  const day = (tz) => new Intl.DateTimeFormat('en', { weekday: 'short', ...(tz && { timeZone: tz }) }).format(date);
+  const prefix = day(zone) === day('UTC')
+    ? ''
+    : `${new Intl.DateTimeFormat(locale, { weekday: 'short', timeZone: 'UTC' }).format(date)} `;
+  const time = new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: 'UTC' }).format(date);
+  return `${prefix}${time} UTC`;
+}
+
+/**
+ * The Upcoming card's rows, for both surfaces: `[{ when, utc, title }]`, one
+ * per train, in order. Pure — no DOM, no clock of its own, nothing mutated.
+ *
+ * It lives here rather than in the card because the card is not its only
+ * reader: the Configurator's **Preview** draws its own rows, at its own
+ * deliberately-oversize scale, and a second copy of these Intl options is a
+ * second thing to keep in step by hand. One builder means a change to how a
+ * departure reads lands on the stream and in the pane at the same time.
+ *
+ * It takes TRAINS, not text, so the Preview can feed it the same shape the
+ * Live Link feed hands the card — including `mySlotAt`, the streamer's own
+ * slot start from the Event's lineup. That moment wins wherever it is known:
+ * "when do I play" is the question the card actually answers on stream. The
+ * train's departure is the fallback, for a lineup still loading or a train the
+ * streamer isn't on.
+ *
+ * `zone` is the streamer's first `tz` setting when set (pinning the card to a
+ * chosen zone even when the OBS machine's clock lives elsewhere), else the
+ * machine's own zone.
+ */
+export function upcomingRows(trains, { locale, zone } = {}) {
+  return trains.map((train) => {
+    const at = train.mySlotAt ?? train.starttime;
+    return { when: zonedTime(at, locale, zone), utc: utcAnchor(at, locale, zone), title: train.title };
+  });
+}
+
 /** How many CARD_MAX_ROWS pages a list needs — at least 1, so `% pages` is always safe. */
 export function upcomingPages(trains) {
   return Math.max(1, Math.ceil(trains.length / CARD_MAX_ROWS));

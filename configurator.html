@@ -935,7 +935,7 @@
     resolveTrainSettings, countPresetReferences, materializePreset, liveLinkPrefs, setLiveLinkPrefs,
     isSetupDone, markSetupDone, pruneOrphanedConfigs, restoreTrainConfigs,
   } from './src/profiles.js';
-  import { filterUpcoming, upcomingPages, visibleUpcoming, mySlot, CARD_MAX_ROWS } from './src/live-link.js';
+  import { filterUpcoming, upcomingPages, visibleUpcoming, upcomingRows, mySlot, CARD_MAX_ROWS } from './src/live-link.js';
   import { anchorStyle } from './src/upcoming-card.js';
   import { loadMyRaidTrains, loadEventDetails, refreshEventDetail, userCacheKey } from './src/my-raid-trains.js';
   import { readVerdict } from './src/feed-verdict.js';
@@ -1896,55 +1896,45 @@
   /** The soonest upcoming train, or null. */
   const nextTrain = () => upcomingTrains()[0] ?? null;
 
-  // The same Intl options the real card uses (upcoming-card.js
-  // formatDeparture), so the preview's rows read exactly like the stream's:
-  // zone-named times, pinned to the base Preset's first `tz` zone when set.
+  // The preview's rows come from the Overlay's own builder (live-link.js
+  // upcomingRows), so they read exactly like the stream's — zone-named times
+  // and UTC anchors — rather than from a second copy of the same Intl options
+  // kept in step by hand. The zone is the base Preset's first `tz` when set,
+  // which is the same rule the card applies to `config.tz`.
   function cardZone() {
     const tz = baseSettings(library, profiles, me()).tz ?? '';
     return resolveZone(tz.split(',')[0])?.zone;
   }
-  const fmtDep = (date) => new Intl.DateTimeFormat(pageLocale, {
-    // day '2-digit' matches upcoming-card.js: constant-width departures keep
-    // the mock's time column from drifting between pages.
-    weekday: 'short', month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit',
-    timeZoneName: 'short', ...(cardZone() && { timeZone: cardZone() }),
-  }).format(date);
-  /** The UTC anchor the real card carries on every row (upcoming-card.js). */
-  function fmtDepUtc(date) {
-    const day = (zone) => new Intl.DateTimeFormat('en', { weekday: 'short', ...(zone && { timeZone: zone }) }).format(date);
-    const prefix = day(undefined) === day('UTC') ? ''
-      : `${new Intl.DateTimeFormat(pageLocale, { weekday: 'short', timeZone: 'UTC' }).format(date)} `;
-    const time = new Intl.DateTimeFormat(pageLocale, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: 'UTC' }).format(date);
-    return `${prefix}${time} UTC`;
-  }
+  /** Trains → the `{ when, utc, title }` rows the Overlay would paint for them. */
+  const cardRows = (trains) => upcomingRows(trains, { locale: pageLocale, zone: cardZone() });
 
   /**
-   * Rows for the card mock: the real feed, or labeled examples before it
-   * loads. Example departures are synthesized as real near-future instants and
-   * run through the same formatter as real rows, so they localize; only the
-   * train names are literals (proper nouns, like the demo lineup's).
+   * A feed train, annotated the way the Live Link feed annotates one for the
+   * card: `mySlotAt` is the streamer's own slot from the loaded lineup detail,
+   * absent while the lineup is still loading or the streamer isn't on it. The
+   * builder applies the fallback to the departure, so the rule lives once.
    */
-  /**
-   * When a train's row should say the streamer plays: their own slot from the
-   * loaded lineup detail (the same rule the overlay's card applies), else the
-   * train's departure while the lineup is still loading or absent.
-   */
-  function mockWhen(e) {
+  function annotateSlot(e) {
     const detail = state.feed.details[e.slug]?.event;
-    return mySlot(detail, [me(), state.feed.displayName])?.starttime ?? e.starttime;
+    return { ...e, mySlotAt: mySlot(detail, [me(), state.feed.displayName])?.starttime };
   }
 
-  function upcomingMockRows() {
-    const asRow = (date, title) => [fmtDep(date), title, fmtDepUtc(date)];
+  /**
+   * The TRAINS the card mock lists: the real feed, or labeled examples before
+   * it loads. Examples are train-shaped and carry real near-future instants —
+   * they go through the same builder as real rows, so they localize; only the
+   * names are literals (proper nouns, like the demo lineup's).
+   */
+  function upcomingMockTrains() {
     const real = upcomingTrains();
-    if (real.length > 0) return { rows: real.map((e) => asRow(mockWhen(e), e.title)), example: false };
+    if (real.length > 0) return { trains: real.map(annotateSlot), example: false };
     const DAY_MS = 24 * 60 * 60_000;
     const at = (days, hour) => { const d = new Date(Date.now() + days * DAY_MS); d.setHours(hour, 0, 0, 0); return d; };
     return {
-      rows: [
-        asRow(at(1, 21), 'House Is A Feeling'),
-        asRow(at(3, 20), 'Trainwreck Lucky 13'),
-        asRow(at(6, 18), 'Sunday Slow Burn'),
+      trains: [
+        { title: 'House Is A Feeling', starttime: at(1, 21) },
+        { title: 'Trainwreck Lucky 13', starttime: at(3, 20) },
+        { title: 'Sunday Slow Burn', starttime: at(6, 18) },
       ],
       example: true,
     };
@@ -1982,15 +1972,16 @@
   const PREVIEW_ZOOM = 0.45;
 
   /**
-   * The [time, name] rows the mock actually shows for a horizon — the
-   * horizon-filtered feed, or the labeled examples before it loads. The cycle
-   * hint derives its page math from THIS list, so the hint can never
-   * contradict the mock's own page badge beside it.
+   * The `{ when, utc, title }` rows the mock actually shows for a horizon —
+   * the horizon-filtered feed, or the labeled examples before it loads,
+   * both through the Overlay's builder. The cycle hint derives its page math
+   * from THIS list, so the hint can never contradict the mock's own page badge
+   * beside it.
    */
   function upcomingMockList(horizon) {
-    const { rows, example } = upcomingMockRows();
-    const matched = example ? rows : horizonTrains(horizon).map((e) => [fmtDep(mockWhen(e)), e.title, fmtDepUtc(mockWhen(e))]);
-    return matched.length > 0 ? matched : rows;
+    const { trains, example } = upcomingMockTrains();
+    const matched = example ? trains : horizonTrains(horizon).map(annotateSlot);
+    return cardRows(matched.length > 0 ? matched : trains);
   }
 
   /** The Upcoming-card mock itself (the same skin the Overlay paints). */
@@ -1999,7 +1990,7 @@
     const horizon = v.upcoming ?? '3';
     const list = upcomingMockList(horizon);
     if (v.upstyle === 'ticker') {
-      const run = list.map(([tm, nm, utc]) => `<span class="tick"><span class="tm">${esc(tm)}</span>${esc(nm)}<span class="utc">${esc(utc ?? '')}</span></span>`).join('<span class="tsep">•</span>');
+      const run = list.map(({ when, title, utc }) => `<span class="tick"><span class="tm">${esc(when)}</span>${esc(title)}<span class="utc">${esc(utc)}</span></span>`).join('<span class="tsep">•</span>');
       // Two identical LAP spans (each closing with its separator + a matching
       // pad) so the -50% loop is seamless — the same discipline as the real
       // scrolling view in upcoming-card.js.
@@ -2015,8 +2006,8 @@
     const pages = upcomingPages(list);
     const page = ((state.upcomingPage % pages) + pages) % pages;
     const win = visibleUpcoming(list, page);
-    const rowsHtml = win.map(([tm, nm, utc]) => `
-      <div class="row enter"><span class="tm">${esc(tm)}</span><span class="nm">${esc(nm)}</span><span class="utc">${esc(utc ?? '')}</span></div>`).join('');
+    const rowsHtml = win.map(({ when, title, utc }) => `
+      <div class="row enter"><span class="tm">${esc(when)}</span><span class="nm">${esc(title)}</span><span class="utc">${esc(utc)}</span></div>`).join('');
     return `<div style="zoom:${PREVIEW_ZOOM};${anchorStyle(v.uppos, PREVIEW_BUDGET)}">
       <div class="up" style="--upop:${esc(v.upop)}">
         <div class="uphead">
@@ -2034,7 +2025,7 @@
     const caption = !on ? te('configurator.upcomingCapOff')
       : v.upstyle === 'ticker' ? te('configurator.upcomingCapScrollingView')
         : te('configurator.upcomingCapCardView', { s: v.upcycle });
-    const example = on && upcomingMockRows().example
+    const example = on && upcomingMockTrains().example
       ? ` <span class="dim">${te('configurator.upcomingExample')}</span>` : '';
     return `<div class="pf">
       <div class="stage scene"><span class="stagelabel">${te('configurator.upcomingStageLabel')}</span><span id="upcoming-mock">${on ? upcomingMockHtml() : ''}</span></div>
@@ -2162,7 +2153,7 @@
     return `<section class="card" id="upcoming-section" style="padding:16px 18px">
       <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:4px;flex-wrap:wrap">
         <div class="eyebrow">${te('configurator.upcomingTitle')}</div>
-        ${next ? `<span class="cap dim">${te('configurator.upcomingNextIs', { when: fmtDep(next.starttime) })}</span>` : ''}
+        ${next ? `<span class="cap dim">${te('configurator.upcomingNextIs', { when: cardRows([next])[0].when })}</span>` : ''}
       </div>
       ${upcomingFoldHtml(te('configurator.settings'), `
         <p class="sm dim" style="margin:0 0 14px">${te('configurator.upcomingLede')}</p>
@@ -2504,7 +2495,7 @@
           <p class="sm dim" style="margin:0">${(() => {
             const next = nextTrain();
             if (!next) return te('configurator.whatNextNoTrains');
-            const when = `<b style="color:var(--rt-ink)">${esc(fmtDep(next.starttime))}</b>`;
+            const when = `<b style="color:var(--rt-ink)">${esc(cardRows([next])[0].when)}</b>`;
             return t(upcomingValues().upcoming != null ? 'configurator.whatNextBody' : 'configurator.whatNextBodyOff', { when });
           })()}</p>
         </section>

@@ -30,7 +30,9 @@
  * `upstyle`/`upscroll` pick and pace the scrolling view.
  */
 
-import { visibleUpcoming, upcomingPages, CARD_MAX_ROWS } from './live-link.js';
+import {
+  visibleUpcoming, upcomingPages, upcomingRows, CARD_MAX_ROWS,
+} from './live-link.js';
 
 // Local stacks matching the design system's fallback chains (assets/app.css)
 // — the sodium look's signature here is the mono/amber time treatment, not a
@@ -41,39 +43,16 @@ const AMBER = '#FFC578';
 const INK = '#EDF1F7';
 
 /**
- * Localized "Fri, Aug 8, 10:30 PM PDT" — weekday cue first, then the time
- * WITH its zone named. A bare clock time on stream is ambiguous (whose
- * clock?), and these trains span the globe: a UTC-afternoon train departs at
- * 3 AM Pacific, which reads as "wrong" until the zone is on screen. `zone` is
- * the streamer's first `tz` setting when set (pinning the card to a chosen
- * zone even when the OBS machine's clock lives elsewhere), else the machine's
- * own zone.
+ * What the rows are built from: the locale, and the streamer's first `tz`
+ * zone when set — pinning the card to a chosen zone even when the OBS
+ * machine's clock lives elsewhere — else the machine's own.
+ *
+ * The rows themselves come from `upcomingRows` in live-link.js, because this
+ * card is not their only reader: the Configurator's **Preview** draws the same
+ * rows at its own scale, and one builder means a change to how a departure
+ * reads lands on the stream and in the pane at the same time.
  */
-function formatDeparture(date, locale, zone) {
-  // Every numeric field 2-digit: in the mono face that makes every departure
-  // the same width, so the time column cannot drift between pages (a
-  // 1-digit day used to re-size the grid on every page turn). The zone name
-  // is per-DATE, so summer vs standard time (PDT/PST) is already right.
-  return new Intl.DateTimeFormat(locale, {
-    weekday: 'short', month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit',
-    timeZoneName: 'short', ...(zone && { timeZone: zone }),
-  }).format(date);
-}
-
-/**
- * The same departure as a UTC anchor — the streamer's viewers are worldwide
- * and nobody knows the streamer's zone, so every row carries a fixed
- * reference. Weekday appears only when UTC lands on a different day than the
- * local rendering (a late-night departure crossing midnight).
- */
-function formatDepartureUtc(date, locale) {
-  const day = (zone) => new Intl.DateTimeFormat('en', { weekday: 'short', ...(zone && { timeZone: zone }) }).format(date);
-  const prefix = day(undefined) === day('UTC')
-    ? ''
-    : `${new Intl.DateTimeFormat(locale, { weekday: 'short', timeZone: 'UTC' }).format(date)} `;
-  const time = new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: 'UTC' }).format(date);
-  return `${prefix}${time} UTC`;
-}
+const rowOptions = (config) => ({ locale: config.locale, zone: config.tz?.[0]?.zone });
 
 const ROW_ENTER_MS = 620;
 // The panel's own fades: mount/unmount, and the page-turn crossfade. Plain
@@ -234,20 +213,17 @@ function panelLabel(doc, config) {
 }
 
 /**
- * One moment as [zoned time (amber mono), UTC anchor (dim mono)]. The moment
- * is the streamer's OWN slot start (`mySlotAt`, annotated by the Live Link
- * feed from the Event's lineup) wherever it is known — that is the question
- * the card actually answers on stream — falling back to the train's
- * departure while the lineup is unknown or the streamer isn't on it.
+ * A built row's moment as [zoned time (amber mono), UTC anchor (dim mono)].
+ * Which moment that is — the streamer's own slot start where the lineup knows
+ * it, the train's departure otherwise — is `upcomingRows`' rule, not this
+ * file's; here it is only type.
  */
-function timePair(doc, train, config) {
-  const at = train.mySlotAt ?? train.starttime;
+function timePair(doc, row) {
   const when = doc.createElement('span');
-  // The streamer's first `tz` zone pins the clock; otherwise the machine's.
-  when.textContent = formatDeparture(at, config.locale, config.tz?.[0]?.zone);
+  when.textContent = row.when;
   when.style.cssText = `font-family:${FONT_MONO};font-size:15px;color:${AMBER};white-space:nowrap;flex:none`;
   const utc = doc.createElement('span');
-  utc.textContent = formatDepartureUtc(at, config.locale);
+  utc.textContent = row.utc;
   utc.style.cssText = `font-family:${FONT_MONO};font-size:12.5px;color:rgba(237,241,247,0.45);white-space:nowrap;flex:none`;
   return [when, utc];
 }
@@ -286,10 +262,10 @@ function renderCard(doc, trains, config) {
   const paintRows = (page) => {
     if (pageMark) pageMark.textContent = `${(((page % pages) + pages) % pages) + 1} / ${pages}`;
     list.replaceChildren();
-    for (const train of visibleUpcoming(trains, page)) {
-      const [when, utc] = timePair(doc, train, config);
+    for (const row of upcomingRows(visibleUpcoming(trains, page), rowOptions(config))) {
+      const [when, utc] = timePair(doc, row);
       const name = doc.createElement('span');
-      name.textContent = train.title;
+      name.textContent = row.title;
       // min-width:0 makes the ellipsis real (a grid item's min-width defaults
       // to its content); the soft shadow lifts the name off any scene behind
       // the panel's translucency.
@@ -371,17 +347,17 @@ function renderScrollingView(doc, trains, config) {
   run.className = 'rt-upcoming-ticker-run';
   run.style.cssText = `display:inline-flex;white-space:nowrap;animation:rt-upcoming-ticker ${config.upscroll ?? 34}s linear infinite`;
 
-  const entry = (train) => {
+  const entry = (row) => {
     const item = doc.createElement('span');
     item.style.cssText = 'display:inline-flex;align-items:baseline;gap:9px;font-size:15.5px;font-weight:600';
-    const [when, utc] = timePair(doc, train, config);
+    const [when, utc] = timePair(doc, row);
     when.style.fontSize = '13.5px';
     utc.style.fontSize = '11.5px';
     // Sheds below the eyebrow's breakpoint: the UTC anchor is the least of the
     // three parts, and dropping it buys the name ~80px of the scroll window.
     utc.className = 'rt-upcoming-ticker-utc';
     const name = doc.createElement('span');
-    name.textContent = train.title;
+    name.textContent = row.title;
     name.style.textShadow = '0 1px 2px rgba(0,0,0,0.85), 0 0 8px rgba(0,0,0,0.5)';
     item.append(when, name, utc);
     return item;
@@ -396,10 +372,11 @@ function renderScrollingView(doc, trains, config) {
   // The gap lives inside each lap (plus a matching trailing pad), never on the
   // run itself: a gap between two children of the run would sit astride the
   // -50% point and jump the loop by half a gap once per lap.
+  const rows = upcomingRows(trains, rowOptions(config));
   const lap = () => {
     const half = doc.createElement('span');
     half.style.cssText = 'display:inline-flex;gap:16px;align-items:baseline;padding-right:16px';
-    for (const train of trains) half.append(entry(train), sep());
+    for (const row of rows) half.append(entry(row), sep());
     return half;
   };
   run.append(lap(), lap());

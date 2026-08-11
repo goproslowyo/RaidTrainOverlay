@@ -219,3 +219,73 @@ test('upcomingPages is at least 1, even for an empty or short list', () => {
   assert.equal(upcomingPages(UP.slice(0, 2)), 1);
   assert.equal(upcomingPages(UP), 2);
 });
+
+// ---- upcomingRows: the Upcoming card's rows, for both surfaces ----
+//
+// The Overlay's card and the Configurator's Preview render the same rows
+// through this one builder, so a change to how a departure reads lands on the
+// stream and in the pane at once. Pinned to a fixed locale and zone here — the
+// point of the parameters is that output does not depend on the machine.
+
+import { upcomingRows } from '../src/live-link.js';
+
+const ROW_OPTS = { locale: 'en-US', zone: 'America/Los_Angeles' };
+const train = (title, start, extra = {}) => ({ slug: title, title, starttime: at(start), ...extra });
+
+test('upcomingRows renders one instant as its zoned time and its UTC anchor', () => {
+  // 20:00 UTC is 13:00 the same day in Los Angeles, so both readings agree on
+  // the day and the anchor is a bare clock time.
+  const [row] = upcomingRows([train('House Is A Feeling', '2026-08-07T20:00:00Z')], ROW_OPTS);
+  assert.equal(row.title, 'House Is A Feeling');
+  // Every numeric field 2-digit and the zone NAMED — a bare clock on stream is
+  // ambiguous, and the constant width keeps the time column from drifting.
+  assert.match(row.when, /^Fri, Aug 07, 01:00\sPM PDT$/);
+  assert.equal(row.utc, '20:00 UTC');
+});
+
+test('upcomingRows reads the instant in the zone it is given, not the machine\'s', () => {
+  const trains = [train('Sunday Slow Burn', '2026-08-07T20:00:00Z')];
+  const [pacific] = upcomingRows(trains, ROW_OPTS);
+  const [tokyo] = upcomingRows(trains, { locale: 'en-US', zone: 'Asia/Tokyo' });
+  assert.match(tokyo.when, /^Sat, Aug 08, 05:00\sAM GMT\+9$/);
+  assert.notEqual(tokyo.when, pacific.when);
+  // Same instant, so the same UTC clock time either way — that is what the
+  // anchor is for. Tokyo's reading has already crossed into Saturday, so its
+  // anchor also says which day it means; Pacific's has not, so it does not.
+  assert.equal(tokyo.utc, 'Fri 20:00 UTC');
+  assert.equal(pacific.utc, '20:00 UTC');
+});
+
+test('upcomingRows names the weekday on the UTC anchor only when UTC lands on another day', () => {
+  // 21:30 Friday in Los Angeles is already Saturday in UTC, so the anchor says
+  // which Saturday it means; the same-day row above carries no weekday.
+  const [crossing] = upcomingRows([train('Trainwreck Lucky 13', '2026-08-08T04:30:00Z')], ROW_OPTS);
+  assert.match(crossing.when, /^Fri, Aug 07, 09:30\sPM PDT$/);
+  assert.equal(crossing.utc, 'Sat 04:30 UTC');
+  const [sameDay] = upcomingRows([train('House Is A Feeling', '2026-08-07T20:00:00Z')], ROW_OPTS);
+  assert.equal(sameDay.utc, '20:00 UTC');
+});
+
+test('upcomingRows says when the streamer PLAYS: mySlotAt wins over the train\'s departure', () => {
+  // The card answers "when am I on", so the streamer's own slot start — the
+  // annotation the Live Link feed makes from the Event's lineup — beats the
+  // train's departure wherever it is known.
+  const departs = '2026-08-07T20:00:00Z';
+  const [mine] = upcomingRows([train('Sunday Slow Burn', departs, { mySlotAt: at('2026-08-07T23:00:00Z') })], ROW_OPTS);
+  assert.equal(mine.utc, '23:00 UTC');
+  assert.match(mine.when, /^Fri, Aug 07, 04:00\sPM PDT$/);
+  // Unknown slot (the lineup has not loaded, or the streamer is not on it) →
+  // the departure, unchanged.
+  const [fallback] = upcomingRows([train('Sunday Slow Burn', departs)], ROW_OPTS);
+  assert.equal(fallback.utc, '20:00 UTC');
+});
+
+test('upcomingRows is a pure mapping: one row per train, in order, nothing mutated', () => {
+  const trains = [train('a', '2026-08-07T20:00:00Z'), train('b', '2026-08-09T06:00:00Z')];
+  const before = JSON.stringify(trains);
+  const rows = upcomingRows(trains, ROW_OPTS);
+  assert.deepEqual(rows.map((r) => r.title), ['a', 'b']);
+  assert.deepEqual(Object.keys(rows[0]).sort(), ['title', 'utc', 'when']);
+  assert.deepEqual(upcomingRows([], ROW_OPTS), []);
+  assert.equal(JSON.stringify(trains), before);
+});
