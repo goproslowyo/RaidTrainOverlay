@@ -9,9 +9,10 @@
  * interface. The cut is at the judgement: the Configurator keeps the feed and
  * asks this what it may conclude from it.
  *
- * Two bars, and they are two because four issues put them there (#31, #39,
- * #41, #49). Every caller that needs either asks here, so the distinction
- * cannot drift between the end-time lookup, the Live Link and Cleanup.
+ * Two bars, and they are two because three issues put them there (#31, #39,
+ * #41) — one per caller: the end-time lookup, the Live Link and Cleanup. Every
+ * caller that needs either asks here, so the distinction cannot drift between
+ * them. (#49 moved neither bar; it changed which wire responses may clear one.)
  *
  * Cleanup's judgement half lives here too, as a plan: when to spend a Verified
  * read on a prune, and whose answer to overrule. The conditions themselves stay
@@ -41,7 +42,7 @@ import { pruneOrphanedConfigs, restoreTrainConfigs } from './profiles.js';
  * @returns {{ events: object[] | null, verified: boolean }}
  */
 export function readVerdict(feed) {
-  const good = feed.status === 'ready' && !feed.stale && !feed.error ? feed.events : null;
+  const good = feed.status === 'ready' && !feed.stale && !feed.error ? feed.events ?? null : null;
   return { events: good, verified: good != null && feed.fromCache === false };
 }
 

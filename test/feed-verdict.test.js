@@ -3,10 +3,11 @@ import assert from 'node:assert/strict';
 import { readVerdict, planCleanup } from '../src/feed-verdict.js';
 import { addProfile, upsertTrainConfig, getTrainConfig } from '../src/profiles.js';
 
-// Two bars, four issues' worth of reasoning (#31, #39, #41, #49), and until now
-// nothing could check either. A Good read is positive evidence about when
-// trains end; a Verified read is the only evidence strong enough to let absence
-// from the feed delete a streamer's saved settings.
+// Two bars, three issues' worth of reasoning (#31, #39, #41 — one per caller),
+// and until now nothing could check either. A Good read is positive evidence
+// about when trains end; a Verified read is the only evidence strong enough to
+// let absence from the feed delete a streamer's saved settings. (#49 moved
+// neither bar; it changed which wire responses may clear one.)
 
 /** A feed snapshot the way the Configurator holds one, with the bits that matter. */
 const feed = (over = {}) => ({
@@ -56,6 +57,15 @@ test('a read that is not Good is never Verified, however fresh it claims to be',
   assert.equal(readVerdict(feed({ error: new Error('nope'), fromCache: false })).verified, false);
 });
 
+test('readVerdict reads the feed and writes nothing back to it', () => {
+  // Purity is the whole reason this judgement could be lifted out of the page:
+  // the Configurator keeps the feed and hands it over to be read, not amended.
+  const snapshot = feed({ events: EVENTS, fromCache: false });
+  const before = JSON.stringify(snapshot);
+  readVerdict(snapshot);
+  assert.equal(JSON.stringify(snapshot), before, 'the caller\'s feed is untouched');
+});
+
 // ── planCleanup ────────────────────────────────────────────────────────────
 // The judgement half of Cleanup: not "may this Config go?" — pruneOrphanedConfigs
 // answers that, and test/profiles.test.js pins its five conditions — but WHEN to
@@ -94,11 +104,20 @@ test('a Verified read with an Orphaned Config plans its removal', () => {
   assert.equal(getTrainConfig(result.store, 'me', 'gone-and-over'), null);
 });
 
+test('a Verified read that finds nothing orphaned plans nothing at all', () => {
+  // The store's only train is the one the feed lists, so nothing can be an
+  // orphan. A plan with an empty removal list would raise a notice offering
+  // nothing back, so "found nothing" and "asked nothing" must look the same.
+  assert.equal(plan({ store: withTrains({ 'a-train': NOW - HOUR }) }), null);
+});
+
 test('nothing is planned without a Verified read', () => {
   assert.equal(plan({ feed: feed({ events: EVENTS, fromCache: true }) }), null, 'from cache');
   assert.equal(plan({ feed: feed({ events: EVENTS }) }), null, 'never said');
   assert.equal(plan({ feed: feed({ events: EVENTS, stale: 'notfound' }) }), null, 'stale');
   assert.equal(plan({ feed: feed({ status: 'error', error: new Error('down') }) }), null, 'errored');
+  assert.equal(plan({ feed: feed({ status: 'loading', events: EVENTS }) }), null, 'still loading');
+  assert.equal(plan({ feed: feed({ status: 'notfound', events: EVENTS }) }), null, 'no such login');
 });
 
 test('the once-per-session guard stops a second automatic pass on the same feed', () => {
@@ -109,6 +128,14 @@ test('an explicit refresh forces the pass through the once-per-session guard', (
   assert.deepEqual(slugs(plan({ alreadyRan: true, force: true })), ['gone-and-over']);
 });
 
+test('a forced pass on a read that is not Verified still plans nothing', () => {
+  // `force` opens the once-per-session guard and nothing else. A refresh
+  // answered from the cache still proves nothing about a train's absence, so
+  // asking harder must not lower the Verified read bar.
+  assert.equal(plan({ feed: feed({ events: EVENTS, fromCache: true }), force: true }), null, 'from cache');
+  assert.equal(plan({ feed: feed({ events: EVENTS }), alreadyRan: true, force: true }), null, 'never said');
+});
+
 test('a suppressed slug survives the next Verified read — "Keep them" is not undone', () => {
   // Without this the streamer's undo lasts until the next read, which may land
   // before they have finished reading the notice that offered it.
@@ -116,12 +143,16 @@ test('a suppressed slug survives the next Verified read — "Keep them" is not u
 });
 
 test('a mix of suppressed and fresh removals reports only the fresh ones', () => {
-  const result = plan({
-    store: withTrains({ 'already-kept': NOW - HOUR, 'newly-gone': NOW - HOUR }),
-    kept: new Set(['already-kept']),
-  });
+  const store = withTrains({ 'already-kept': NOW - HOUR, 'newly-gone': NOW - HOUR });
+  const suppressed = getTrainConfig(store, 'me', 'already-kept');
+  const result = plan({ store, kept: new Set(['already-kept']) });
   assert.deepEqual(slugs(result), ['newly-gone'], 'the notice offers back only what it just took');
-  assert.ok(getTrainConfig(result.store, 'me', 'already-kept'), 'the suppressed Config is put straight back');
+  // Verbatim, not merely present: a mangled or emptied restore would satisfy a
+  // truthiness check while having already lost the settings it claims to keep.
+  assert.deepEqual(
+    getTrainConfig(result.store, 'me', 'already-kept'), suppressed,
+    'the suppressed Config is put straight back, exactly as it was',
+  );
   assert.equal(getTrainConfig(result.store, 'me', 'newly-gone'), null);
 });
 
@@ -137,11 +168,19 @@ test('the login travels through the plan unchanged — prune and restore hit the
   assert.ok(getTrainConfig(result.store, 'bob', 'his-gone'), "another Profile's Configs are untouched");
 });
 
-test('the plan returns a NEW store and never mutates the one it was given', () => {
-  const store = withTrains({ 'gone-and-over': NOW - HOUR });
-  const result = plan({ store });
+test('the plan returns a NEW store and never mutates anything it was given', () => {
+  // Non-empty `kept`, so the claim covers the restore arm as well as the prune:
+  // both build the new store, and neither may write through to the caller's.
+  const store = withTrains({ 'gone-and-over': NOW - HOUR, 'kept-one': NOW - HOUR });
+  const snapshot = verifiedFeed();
+  const kept = new Set(['kept-one']);
+  const result = plan({ store, feed: snapshot, kept });
+  assert.deepEqual(slugs(result), ['gone-and-over']);
   assert.notEqual(result.store, store);
   assert.ok(getTrainConfig(store, 'me', 'gone-and-over'), 'the caller\'s store is still intact');
+  assert.ok(getTrainConfig(store, 'me', 'kept-one'), 'including what the restore arm handled');
+  assert.equal(JSON.stringify(snapshot), JSON.stringify(verifiedFeed()), 'the feed snapshot is unwritten');
+  assert.deepEqual([...kept], ['kept-one'], 'the suppression Set is read, never added to');
 });
 
 test('a Good but unverified read prunes nothing while still contributing end times', () => {
