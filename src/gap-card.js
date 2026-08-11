@@ -5,7 +5,9 @@
  * That guarantee is ONE generated opacity keyframe sharing the **Pass** period:
  * synchronised with the Train by construction, so it cannot drift over a stream
  * that runs for days, and costing no per-frame JavaScript (the OBS mandate).
- * The whole rule set that makes it hold lives here, in two halves.
+ * The whole rule set that makes it hold lives here, in three named pieces: the
+ * plan (`gapCardPlan`), the phase rule (`reseedsKeyframe`), and the apply half
+ * (`createGapCard`) that keeps them.
  *
  * The plan half (`gapCardPlan`) is every rule about whether the card may take
  * the Stage at all while a Train runs, and — when it may — the schedule it
@@ -14,6 +16,12 @@
  * config. None of it needs a DOM, a clock or storage, so it is pure and
  * unit-testable — which is the point, since it used to live in the shell's
  * wiring where nothing could import it.
+ *
+ * The phase rule (`reseedsKeyframe`) is the one question the apply half asks of
+ * every moment: did the period the card is timed against just start over? It is
+ * a predicate over the event, not over the plan, so it is pure and can be asked
+ * directly by a test — the thing the rule lacked while it was three scattered
+ * assignments and a comment.
  *
  * The apply half (`createGapCard`) owns the card's layer, the generated
  * keyframes, the card mount and the **Breather** switch, and states the phase
@@ -78,6 +86,30 @@ export function gapCardPlan({ timing, horizonLength, config }) {
   return { show: true, schedule };
 }
 
+/**
+ * The phase half of the **Stage choreography**: may this moment move the card's
+ * epoch?
+ *
+ * The card re-seeds exactly when the period it is timed against re-seeds, and
+ * at no other moment. There are two such events and no more. A render is one:
+ * `rt-pass` starts again with the Stage it built. A **Breather** switched back
+ * on is the other: `rt-breather` starts when `rt-stage--breather` lands, and a
+ * card held at its old epoch through that measured ~2.4s out of phase with the
+ * Breather it shares — enough to fade in over a Train that has not finished
+ * fading out (#85). Everything else is a **Horizon** refresh under a period
+ * that kept running, where the card must not start over but come back at the
+ * phase the **Pass** has reached by now.
+ *
+ * `rendered` is whether a render just built the Stage; `timingKind` is that
+ * Stage's tagged timing, and `breatherWasOn` whether the Breather was already
+ * switched on before this moment. Pure, and safe on nothing at all: an unknown
+ * moment moves no epoch.
+ */
+export function reseedsKeyframe({ rendered = false, timingKind = null, breatherWasOn = false } = {}) {
+  if (rendered) return true;
+  return timingKind === 'breather' && !breatherWasOn;
+}
+
 /** The class that IS the card's presence: one generated opacity keyframe. */
 const ON_CLASS = 'rt-gap-card--on';
 const STYLE_ID = 'rt-gap-card-style';
@@ -119,15 +151,10 @@ function setGapStyle(doc, cssText) {
  *                           card through the keyframe text, which CSS re-reads
  *                           without restarting.
  *
- * The rule the two of them keep is not "only a render re-seeds" but the one the
- * glossary states: the card re-seeds exactly when the PERIOD IT IS TIMED
- * AGAINST re-seeds, and never at any other moment. A render is one such event.
- * A returning **Breather** is the other, and it arrives through `refresh`:
- * `rt-stage--breather` carries the `rt-breather` keyframe, so switching the
- * Breather back on restarts the marquee card's whole period from 0%. Re-seeding
- * on anything else — or failing to re-seed on either of these — slides the card
- * out of phase with the Pass or Breather it shares, and it can then appear ON a
- * Train.
+ * The rule the two of them keep is not "only a render re-seeds": a returning
+ * **Breather** re-seeds too, and it arrives through `refresh`. Which entry
+ * point was used is therefore only half of the question, and the whole of it is
+ * `reseedsKeyframe` — asked once, at the top of `apply`.
  *
  * `view` is renderTrain's handle. It carries the tagged `timing` and the
  * `setBreather` switch together because both belong to the Stage that render
@@ -175,11 +202,18 @@ export function createGapCard({ container, config }) {
   };
 
   /**
-   * Plan for this moment and apply it. `reseed` is not a mode: it is which of
+   * Plan for this moment and apply it. `rendered` is not a mode: it is which of
    * the two entry points called, and only the one that follows a render passes
    * it. See the phase rule above.
    */
-  const apply = (horizon, reseed) => {
+  const apply = (horizon, rendered) => {
+    // The phase question is asked of the EVENT, before the plan is asked
+    // anything: whether the period the card shares just started over is a fact
+    // about this moment, not about what the plan decides to do with it. A
+    // render that shows nothing still re-seeded the Pass.
+    if (reseedsKeyframe({ rendered, timingKind: view?.timing?.kind, breatherWasOn: breatherOn })) {
+      seededAt = Date.now();
+    }
     const plan = gapCardPlan({ timing: view?.timing, horizonLength: horizon.length, config });
     if (!plan.show) return clear();
     const { schedule } = plan;
@@ -193,16 +227,10 @@ export function createGapCard({ container, config }) {
         .${ON_CLASS} { animation: none; opacity: 0; }
       }`);
     renderUpcomingCard(layer, horizon, config);
-    // A Breather that was off and is now on has just restarted `rt-breather`
-    // from 0%, which on marquee is the period the card is timed against. That
-    // is a re-seed of the period, exactly as a render is a re-seed of the Pass,
-    // so the card's seed moves to this instant too. Without it the two are
-    // timed to different epochs — measured at ~2.4s apart on a Horizon that
-    // emptied and refilled — and the card can appear ON a Train.
-    const breatherWasOff = !breatherOn;
+    // The card is going to appear, so the Stage gets its Breather. Whether that
+    // switch also moved the epoch was settled above, by the phase rule.
     setBreather(true);
-    if (breatherOn && breatherWasOff) seededAt = Date.now();
-    if (reseed) {
+    if (rendered) {
       layer.classList.remove(ON_CLASS);
       layer.style.animationDelay = '';
       void layer.offsetWidth; // commit, so the restart re-seeds with the Pass
@@ -228,7 +256,6 @@ export function createGapCard({ container, config }) {
       // it is let back up before the handle goes.
       if (nextView !== view) setBreather(false);
       view = nextView ?? null;
-      seededAt = Date.now();
       apply(horizon, true);
     },
     refresh(horizon) {

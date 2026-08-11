@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parseHTML } from 'linkedom';
-import { createGapCard, gapCardPlan } from '../src/gap-card.js';
+import { createGapCard, gapCardPlan, reseedsKeyframe } from '../src/gap-card.js';
 import { breatherCycle } from '../src/gap-choreography.js';
 
 // Every rule about whether the Upcoming card may take the Stage at all while a
@@ -135,6 +135,53 @@ test('the scrolling view is planned in whole Laps, and sits out when one will no
 // never does, and which Stage the **Breather** switch is worked on. Whether
 // the card is truly never on screen with a Train — the phase rule as OBSERVED
 // — stays the browser sweep's job.
+
+// The phase rule on its own, before any of that: one predicate over the moment,
+// which is the only part of the guarantee a DOM-free test can ask directly.
+
+test('a render moves the epoch, whatever it built and whatever was already on', () => {
+  // A render restarts `rt-pass` with the Stage it built, so the epoch moves for
+  // it every time — including on a marquee Stage, and including when a Breather
+  // was already standing from the Stage before.
+  assert.equal(reseedsKeyframe({ rendered: true, timingKind: 'pass' }), true);
+  assert.equal(reseedsKeyframe({ rendered: true, timingKind: 'breather' }), true);
+  assert.equal(reseedsKeyframe({ rendered: true, timingKind: 'breather', breatherWasOn: true }), true);
+  assert.equal(
+    reseedsKeyframe({ rendered: true, timingKind: null }), true,
+    'a render that built no Stage at all still re-seeded the one it replaced',
+  );
+});
+
+test('a Horizon refresh under a Pass never moves the epoch', () => {
+  // `rt-pass` runs on regardless of what the Horizon does. Moving the epoch here
+  // is the divergence #85 measured: the card comes back timed against this
+  // instant rather than against the Pass, and can then appear ON a Train.
+  assert.equal(reseedsKeyframe({ rendered: false, timingKind: 'pass' }), false);
+  assert.equal(reseedsKeyframe({ rendered: false, timingKind: 'pass', breatherWasOn: true }), false);
+});
+
+test('a Breather switched back on moves the epoch: it IS the card\'s period', () => {
+  // `rt-stage--breather` carries the `rt-breather` keyframe, so the class
+  // landing starts that period from 0%. The card's epoch moves with it or the
+  // two are timed to moments ~2.4s apart (#85).
+  assert.equal(reseedsKeyframe({ rendered: false, timingKind: 'breather', breatherWasOn: false }), true);
+});
+
+test('a Breather that kept running moves nothing', () => {
+  // Nothing restarted: the shorter Horizon reaches the card through the
+  // keyframe text, and the card stays where its Breather has got to.
+  assert.equal(reseedsKeyframe({ rendered: false, timingKind: 'breather', breatherWasOn: true }), false);
+});
+
+test('the phase rule is pure, and an unknown moment moves no epoch', () => {
+  // No DOM, no clock, no storage — and called on nothing at all it says no,
+  // which is the safe answer: a wrong yes is what puts the card on a Train.
+  assert.equal(reseedsKeyframe(), false);
+  assert.equal(reseedsKeyframe({}), false);
+  const moment = { rendered: false, timingKind: 'breather', breatherWasOn: false };
+  assert.equal(reseedsKeyframe(moment), true);
+  assert.deepEqual(moment, { rendered: false, timingKind: 'breather', breatherWasOn: false });
+});
 
 /** The mount a real Overlay hands this module: overlay.html's #train. */
 const scene = () => parseHTML(
