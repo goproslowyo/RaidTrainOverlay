@@ -6,6 +6,59 @@ All notable changes to RaidTrainOverlay are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-08-12
+
+The Upcoming card is readable from the sofa, the grid under it became an anchor
+instead of a fence, and a page that only wants the Theme roster's *names* stopped
+downloading its art.
+
+### Changed
+- **The Upcoming card's type is bigger, because a stream is not read at monitor
+  distance.** The owner reported the card legible on a monitor and not from
+  across a room. The train name — the thing you are there to read — goes from
+  17px to 20px, its departure time 15 → 17, the eyebrow 13 → 14, the UTC
+  footnote 12.5 → 13.5; the scrolling view a notch below throughout, its own
+  eyebrow left alone because the 1709px breakpoint is calibrated to that exact
+  width. Stated once as a ranked scale rather than nine literals across two
+  renderers, and guarded on the floor (nothing below 12.5px) and the ranking
+  (raising one role and leaving the rest flattens the panel instead of
+  enlarging it).
+- **The nine `uppos` anchors are an anchor point, not a fence.** The owner
+  relaxed the **Cell** rule: a card may overflow into the neighbours it sits
+  next to, so the ceiling is now its own Cell plus every neighbour it can grow
+  toward on that axis — three for a centre position, two for an edge. This was
+  needed by the line above: at one third of the scene, the bigger type
+  ellipsised titles that used to fit whole. The **card view** takes the room and
+  stops at its contents (622px at 1920, against 592). The **scrolling view**
+  deliberately does not follow — its content is longer than any screen, so
+  handed more room it simply takes it, and it went straight back to a bar across
+  the whole scene at every anchor. It keeps the single Cell, and the
+  Configurator's **Preview** imports the same cap: a Preview may be dishonest
+  about scale, never about where the card lands.
+- **The card's position picker now says what it moves.** "Where it sits" is
+  "Where the card sits", and its hint names the *other* position setting outright
+  — the Train's own **Vertical position**, under Look. Nothing on that panel had
+  said the grid moves only the card. All ten locales.
+
+### Performance
+- **A page that wants the Theme roster's keys no longer downloads the roster's
+  art.** `config.js` and `settings-schema.js` import the registry for sixteen
+  *strings* — the `theme` enum, the Configurator's option labels — and while the
+  Themes were static imports that pulled sixteen Themes' worth of art down the
+  wire. The registry now declares `import()` thunks in one literal, so the enum
+  is still derived (the drift class #70 closed stays closed) and the art is
+  fetched only when something is about to paint with it. `resolveTheme` and
+  `renderTrain` stay **synchronous**, which is what keeps a render one
+  indivisible turn: an `await` inside `renderTrain` clears the container past the
+  last point any caller can interpose, and destroys an **Upcoming card** that
+  went up mid-flight. A roster key whose art nobody loaded now throws rather than
+  quietly painting classic — #70's failure, arriving along a new axis. Unknown
+  keys still fall back, because a stale URL is a runtime condition, not a caller
+  bug. Measured as an A/B against the previous tree, uncompressed: the
+  Configurator 856,760 → 495,953 B, `index.html` 511,197 → 145,107 B, and the
+  **Overlay in OBS 611,272 → 287,187 B — one Theme plus its shared helpers
+  instead of all sixteen**, which is the part that reaches streamers. (#89)
+
 ## [0.10.1] - 2026-08-12
 
 Three moments where the overlay painted the wrong thing for a frame and then
@@ -526,7 +579,8 @@ for an OBS browser source. Static hosting on GitHub Pages, no build step.
 - A cache-first RaidPal client resilient to transient fetch failures, and a GitHub
   Pages landing page with a live deployed-commit stamp in the footer.
 
-[Unreleased]: https://github.com/goproslowyo/RaidTrainOverlay/compare/v0.10.1...HEAD
+[Unreleased]: https://github.com/goproslowyo/RaidTrainOverlay/compare/v0.11.0...HEAD
+[0.11.0]: https://github.com/goproslowyo/RaidTrainOverlay/releases/tag/v0.11.0
 [0.10.1]: https://github.com/goproslowyo/RaidTrainOverlay/releases/tag/v0.10.1
 [0.10.0]: https://github.com/goproslowyo/RaidTrainOverlay/releases/tag/v0.10.0
 [0.9.1]: https://github.com/goproslowyo/RaidTrainOverlay/releases/tag/v0.9.1
