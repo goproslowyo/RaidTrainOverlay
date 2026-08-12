@@ -208,7 +208,7 @@ test('the horizon stays fresh while the SAME train keeps running', async () => {
   assert.ok(calls.horizons.length > before, 're-resolving re-delivers the horizon');
 });
 
-test('uponly: even a LIVE train resolves to the Upcoming card — never onSwitch, never a lineup fetch', async () => {
+test('uponly: even a LIVE train resolves to the Upcoming card — never onSwitch, never an inner feed', async () => {
   // The upcoming-only Live Link (a second URL for a separate OBS scene):
   // whatever resolveLiveTrain says, this source renders the upcoming card.
   const log = [];
@@ -221,13 +221,19 @@ test('uponly: even a LIVE train resolves to the Upcoming card — never onSwitch
   await feed.ready;
   assert.deepEqual(calls.switches, []);
   assert.deepEqual(calls.events, []);
-  assert.equal(calls.idles.length, 1);
-  // luna is LIVE at this clock, so it is not "upcoming" — the card lists the rest.
-  assert.deepEqual(calls.idles[0].upcoming.map((e) => e.slug), ['trainwreck-lucky-13', 'my-own-train']);
-  // The inner LINEUP FEED never starts (no onSwitch/onEvent above); the only
-  // per-event traffic is the one-shot slot lookups, which fail soft here
-  // (unrouted) and leave the rows on their departure times.
-  assert.deepEqual(log, [userUrl, eventUrl('trainwreck-lucky-13'), eventUrl('my-own-train')]);
+  assert.ok(calls.idles.length >= 1);
+  // My luna turn is running at this clock, so it is not still ahead of me; the
+  // card lists the trains that are. (A turn that had NOT started yet would be
+  // listed — that is `ahead` rather than `upcoming`, and the whole point of the
+  // distinction on a source that renders no Train.)
+  assert.deepEqual(calls.idles.at(-1).upcoming.map((e) => e.slug), ['trainwreck-lucky-13', 'my-own-train']);
+  // The inner LINEUP FEED never starts (no onSwitch/onEvent above). The event
+  // traffic is one-shot reads: luna's lineup, to know where my turn on it sits,
+  // then the card's slot lookups — which fail soft here (unrouted) and leave
+  // those rows on their departure times.
+  assert.deepEqual(log, [
+    userUrl, eventUrl('luna-hao8'), eventUrl('trainwreck-lucky-13'), eventUrl('my-own-train'),
+  ]);
 });
 
 test('the Upcoming card learns when the streamer actually plays: cached lineups annotate mySlotAt', async () => {
@@ -574,4 +580,37 @@ test('lead= tunes how early the Train rolls in ahead of my slot', async () => {
   });
   await wide.feed.ready;
   assert.deepEqual(wide.calls.switches.map((s) => s.slug), ['morning']);
+});
+
+// The upcoming-only source (?uponly=1) is a whole OBS scene made of the card,
+// so a train missing from its Horizon is missing from the screen entirely.
+// v0.12.0 skipped reading lineups here — "a source that never renders the Train
+// has no use for knowing which train it would have rendered" — which was true
+// about the Stage and false about the card: without windows, a train that has
+// DEPARTED is the live train, and the live train is the one row the Horizon
+// leaves out. A streamer whose turn is at teatime on a train that left at dawn
+// saw an empty card all day.
+
+test('uponly: a train running now, with my turn later today, is still on the card', async () => {
+  const { calls, feed } = harness({
+    query: '?user=goproflowyo&uponly=1&upcoming=all',
+    clockMs: Date.parse('2026-08-12T14:30:00Z'), // morning departed at 14:00; my turn is 15:00
+    routes: OVERLAP_ROUTES,
+  });
+  await feed.ready;
+  assert.deepEqual(calls.switches, [], 'uponly never renders the Train');
+  assert.equal(calls.idles.length >= 1, true);
+  assert.deepEqual(calls.idles.at(-1).upcoming.map((e) => e.title), ['Morning']);
+});
+
+test('uponly: the card orders by when I PLAY, not by when the trains depart', async () => {
+  const { calls, feed } = harness({
+    query: '?user=goproflowyo&uponly=1&upcoming=all',
+    clockMs: Date.parse('2026-08-12T13:00:00Z'),
+    routes: OVERLAP_ROUTES,
+  });
+  await feed.ready;
+  // The overnight train is still running but my turn on it is long over, so it
+  // is not ahead of anything; only the morning train is still to come.
+  assert.deepEqual(calls.idles.at(-1).upcoming.map((e) => e.title), ['Morning']);
 });

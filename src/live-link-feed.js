@@ -246,14 +246,18 @@ export function startLiveLinkFeed(baseQuery, deps) {
       // first — cache-first, so a warm Overlay pays nothing — and a train whose
       // lineup will not read simply falls back to its whole-train window, which
       // is what this resolution did before it could read lineups at all.
-      // `wholetrain=1` opts out by declining to gather the evidence, and so
-      // does `uponly=1` — a source that never renders the Train has no use for
-      // an answer to which train it would have rendered, and reading lineups
-      // for one would be pure traffic.
-      const windows = baseConfig.wholetrain || baseConfig.uponly
+      // `wholetrain=1` opts out by declining to gather the evidence.
+      //
+      // `uponly=1` does NOT, though it briefly did: a source that renders no
+      // Train looked like one with no use for knowing which train it would have
+      // rendered. That is true of the Stage and false of the card. Without
+      // windows a departed train is simply "the live train", and the live train
+      // is the row a Horizon leaves out — so an upcoming-only scene hid the very
+      // train its streamer was about to play, from the moment it departed.
+      const windows = baseConfig.wholetrain
         ? null
         : await readMyWindows(r.user.events, names, slotDeps, { now, leadMs });
-      const { state, train, upcoming } = resolveLiveTrain(r.user.events, now, { leadMs, windows });
+      const { state, train, upcoming, ahead } = resolveLiveTrain(r.user.events, now, { leadMs, windows });
       // The card says when the streamer PLAYS, wherever a lineup names them:
       // paint immediately from whatever the cache knows, then complete the
       // lineups over the network and repaint only if that changed anything.
@@ -264,26 +268,29 @@ export function startLiveLinkFeed(baseQuery, deps) {
       // `detachFull` is what separates them: idle has nothing else to do, so it
       // awaits the network refinement, but a live train's resolve tick must not
       // sit behind slot lookups — it still has to schedule the next poll.
-      const paint = async (emit, { detachFull = false } = {}) => {
-        const first = await annotateMySlots(upcoming, names, { ...slotDeps, cacheOnly: true });
+      const paint = async (horizon, emit, { detachFull = false } = {}) => {
+        const first = await annotateMySlots(horizon, names, { ...slotDeps, cacheOnly: true });
         emit({ upcoming: first });
-        const refine = annotateMySlots(upcoming, names, slotDeps).then((full) => {
+        const refine = annotateMySlots(horizon, names, slotDeps).then((full) => {
           if (!stopped && slotSignature(full) !== slotSignature(first)) emit({ upcoming: full });
         });
         if (detachFull) refine.catch(() => {}); // fail-soft: the rows keep their departure times
         else await refine;
       };
-      const paintIdle = () => paint(onIdle);
       if (baseConfig.uponly) {
         // Upcoming-only Live Link (?uponly=1): whatever state the resolver
         // found, this source renders the upcoming card and never the Train —
         // a second URL for a separate OBS scene (starting soon / BRB). The
         // inner lineup feed is never started.
+        //
+        // `ahead`, not `upcoming`: the subtraction that keeps the card from
+        // repeating the train on the Stage has no Stage to defer to here, and
+        // takes the next train off a screen that is nothing BUT the card.
         stopInner();
-        await paintIdle();
+        await paint(ahead, onIdle);
       } else if (state === 'idle') {
         stopInner();
-        await paintIdle();
+        await paint(upcoming, onIdle);
       } else {
         if (train.slug !== activeSlug) {
           stopInner();
@@ -298,7 +305,7 @@ export function startLiveLinkFeed(baseQuery, deps) {
         // The horizon rides EVERY resolve tick, not just a switch: a broadcast
         // runs for hours, and the card that lists the other trains during it
         // would otherwise still be showing the horizon as it looked at sign-on.
-        await paint(onHorizon, { detachFull: true });
+        await paint(upcoming, onHorizon, { detachFull: true });
       }
     }
     // r.error with no cache: nothing to resolve from — keep the current

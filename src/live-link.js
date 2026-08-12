@@ -158,11 +158,20 @@ function renderWindow(event, windows, now) {
  * A turn that is running beats one that is merely approaching, so a streamer
  * mid-slot is never yanked off screen by the next train's lead window.
  *
- * `upcoming` is every OTHER train whose turn is still ahead — including one
- * that has already departed and is running right now, which the old
- * `starttime > now` filter silently dropped. That was the bug's second half:
- * a train that departed while another held the Stage was rendered nowhere and
- * listed nowhere.
+ * Two horizons come back, and which one a caller wants depends on whether
+ * anything is putting `train` on screen:
+ *
+ *   `ahead`    every train whose turn is still to come, `train` included.
+ *   `upcoming` the same list minus `train` — for a card sharing a screen with
+ *              the Train, where listing the train already on the Stage as
+ *              "coming up" is just saying it twice.
+ *
+ * An upcoming-only source (`uponly=1`) is the caller that wants `ahead`: it
+ * renders no Train at all, so subtracting one leaves a hole rather than
+ * avoiding a repeat. Both include a train that has already DEPARTED and is
+ * running right now, which the old `starttime > now` filter silently dropped —
+ * that was the original bug's second half, and taking `upcoming` on a source
+ * that renders nothing was how it survived into the upcoming-only scene.
  *
  * `idle` here names THE LINK having no train to show, which is the one sense
  * of the word this project keeps. It is not a name for the card that fills
@@ -183,12 +192,12 @@ export function resolveLiveTrain(events, now, { leadMs = LEAD_MS, windows = null
   const chosen = live
     ?? candidates.find((c) => c.window.from - now <= leadMs)
     ?? null;
-  const upcoming = candidates
-    .filter((c) => c !== chosen && c.window.from > now)
-    .map((c) => c.event);
+  const stillAhead = candidates.filter((c) => c.window.from > now);
+  const ahead = stillAhead.map((c) => c.event);
+  const upcoming = stillAhead.filter((c) => c !== chosen).map((c) => c.event);
 
-  if (chosen == null) return { state: 'idle', train: null, upcoming };
-  return { state: live ? 'live' : 'lead', train: chosen.event, upcoming };
+  if (chosen == null) return { state: 'idle', train: null, upcoming, ahead };
+  return { state: live ? 'live' : 'lead', train: chosen.event, upcoming, ahead };
 }
 
 /** Idle for this long since page load → the Overlay reloads itself (JS-leak insurance). */

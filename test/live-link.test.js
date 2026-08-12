@@ -82,7 +82,9 @@ test('resolveLiveTrain: beyond the lead window is idle, with the upcoming list e
 });
 
 test('resolveLiveTrain: no events at all is idle with an empty upcoming list', () => {
-  assert.deepEqual(resolveLiveTrain([], NOW), { state: 'idle', train: null, upcoming: [] });
+  assert.deepEqual(resolveLiveTrain([], NOW), {
+    state: 'idle', train: null, upcoming: [], ahead: [],
+  });
 });
 
 test('resolveLiveTrain picks the EARLIEST-started live train when two overlap and no lineup is known', () => {
