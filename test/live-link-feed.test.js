@@ -13,11 +13,19 @@ const DURING_LUNA = Date.parse('2026-08-05T00:00:00Z');
 const BETWEEN = Date.parse('2026-08-07T00:00:00Z'); // idle gap, trainwreck 3.75 days out
 const LEAD_TRAINWRECK = Date.parse('2026-08-10T17:30:00Z'); // 30 min before trainwreck departs
 
+// The feed asks its injected timer for two very different things: the resolve
+// SCHEDULE (minutes away — the thing a test wants to drive by hand) and the
+// polite PAUSE between consecutive lineup fetches (sub-second, an internal
+// nicety no test cares about). Holding the pause hostage to a manual tick just
+// deadlocks the read, so anything under a second runs on its own.
+const PAUSE_CEILING_MS = 1000;
+
 function manualTimers() {
   const scheduled = [];
   let nextId = 1;
   return {
     setTimer(fn, ms) {
+      if (ms < PAUSE_CEILING_MS) return setTimeout(fn, 0);
       const id = nextId++;
       scheduled.push({ id, fn, ms, ran: false, cleared: false });
       return id;
@@ -59,7 +67,49 @@ function routedFetch(routes, log = []) {
 }
 
 const okUser = () => ({ ok: true, status: 200, text: async () => JSON.stringify(makeUserPayload()) });
-const okEvent = (title) => () => ({ ok: true, status: 200, json: async () => makeEventPayload({ title }) });
+
+// The fixture user's three trains, with the times their summaries carry and
+// where the streamer's OWN slot sits on each. Resolution reads lineups now —
+// it picks the train the streamer is playing, not merely one that is running —
+// so a train a test expects to render has to actually name them in its lineup.
+// `mine`/`mineTo` bound the streamer's own slot; `mineTo` is where the NEXT
+// broadcaster takes over, which is what actually ends a turn.
+const TRAINS = {
+  'luna-hao8': {
+    from: '2026-08-03T22:00:00Z', to: '2026-08-06T12:00:00Z',
+    mine: '2026-08-04T22:00:00Z', mineTo: '2026-08-05T06:00:00Z',
+  },
+  'trainwreck-lucky-13': {
+    from: '2026-08-10T18:00:00Z', to: '2026-08-10T22:00:00Z',
+    mine: '2026-08-10T18:00:00Z', mineTo: '2026-08-10T19:00:00Z',
+  },
+  'my-own-train': {
+    from: '2026-08-20T18:00:00Z', to: '2026-08-20T22:00:00Z',
+    mine: '2026-08-20T18:00:00Z', mineTo: '2026-08-20T19:00:00Z',
+  },
+};
+
+const slot = (starttime, name, order) => ({
+  order, starttime, slot_occupied: true, user_timezone: 'UTC',
+  broadcaster_display_name: name, broadcaster_image: '', broadcaster_live: false, broadcaster_id: `${name}-id`,
+});
+
+/** A lineup for one of the fixture trains, with the streamer's slot on it. */
+const okEvent = (slug, title) => () => {
+  const t = TRAINS[slug];
+  const slots = [];
+  if (t.mine !== t.from) slots.push(slot(t.from, 'DJ Alpha', slots.length));
+  slots.push(slot(t.mine, 'GoProFlowYo', slots.length));
+  slots.push(slot(t.mineTo, 'DJ Omega', slots.length));
+  return {
+    ok: true,
+    status: 200,
+    json: async () => makeEventPayload({ title, starttime: t.from, endtime: t.to, time_table: slots }),
+  };
+};
+
+/** The slug an event URL addresses — for routes that answer any train. */
+const slugOf = (url) => url.slice(url.lastIndexOf('/') + 1);
 
 function harness({ query, clockMs, routes, log, storage }) {
   const timers = manualTimers();
@@ -85,7 +135,7 @@ test('a live train renders: onSwitch with its slug, then the lineup flows via on
   const { calls, feed } = harness({
     query: '?user=goproflowyo&theme=neon',
     clockMs: DURING_LUNA,
-    routes: { [userUrl]: okUser, [eventUrl('luna-hao8')]: okEvent('LUNA') },
+    routes: { [userUrl]: okUser, [eventUrl('luna-hao8')]: okEvent('luna-hao8', 'LUNA') },
   });
   await feed.ready;
   assert.equal(calls.switches.length, 1);
@@ -101,7 +151,7 @@ test('a live train also delivers the horizon: onHorizon lists the OTHER upcoming
   const { calls, feed } = harness({
     query: '?user=goproflowyo',
     clockMs: DURING_LUNA,
-    routes: { [userUrl]: okUser, [eventUrl('luna-hao8')]: okEvent('LUNA') },
+    routes: { [userUrl]: okUser, [eventUrl('luna-hao8')]: okEvent('luna-hao8', 'LUNA') },
   });
   await feed.ready;
   assert.equal(calls.switches.length, 1, 'the Train still renders');
@@ -133,7 +183,7 @@ test('the live Horizon is annotated like the between-trains one: cached lineups 
   const { calls, feed } = harness({
     query: '?user=goproflowyo',
     clockMs: DURING_LUNA,
-    routes: { [userUrl]: okUser, [eventUrl('luna-hao8')]: okEvent('LUNA') },
+    routes: { [userUrl]: okUser, [eventUrl('luna-hao8')]: okEvent('luna-hao8', 'LUNA') },
     storage,
   });
   await feed.ready;
@@ -149,7 +199,7 @@ test('the horizon stays fresh while the SAME train keeps running', async () => {
   const { calls, feed, timers } = harness({
     query: '?user=goproflowyo',
     clockMs: DURING_LUNA,
-    routes: { [userUrl]: okUser, [eventUrl('luna-hao8')]: okEvent('LUNA') },
+    routes: { [userUrl]: okUser, [eventUrl('luna-hao8')]: okEvent('luna-hao8', 'LUNA') },
   });
   await feed.ready;
   const before = calls.horizons.length;
@@ -234,7 +284,7 @@ test('the trains= mapping shapes the switched-to config; base params flow throug
   const { calls, feed } = harness({
     query: `?user=goproflowyo&theme=synthwave&scale=1.2&trains=${trains}`,
     clockMs: DURING_LUNA,
-    routes: { [userUrl]: okUser, [eventUrl('luna-hao8')]: okEvent('LUNA') },
+    routes: { [userUrl]: okUser, [eventUrl('luna-hao8')]: okEvent('luna-hao8', 'LUNA') },
   });
   await feed.ready;
   const { config } = calls.switches[0];
@@ -270,7 +320,7 @@ test('an unreadable trains= warns on the console and falls back to the base sett
     const h = harness({
       query: `?user=goproflowyo&theme=synthwave&trains=${oversized}`,
       clockMs: DURING_LUNA,
-      routes: { [userUrl]: okUser, [eventUrl('luna-hao8')]: okEvent('LUNA') },
+      routes: { [userUrl]: okUser, [eventUrl('luna-hao8')]: okEvent('luna-hao8', 'LUNA') },
     });
     await h.feed.ready;
     calls = h.calls;
@@ -288,7 +338,7 @@ test('an absent trains= is silent — no blob is not a broken blob', async () =>
     const { feed } = harness({
       query: '?user=goproflowyo&theme=synthwave',
       clockMs: DURING_LUNA,
-      routes: { [userUrl]: okUser, [eventUrl('luna-hao8')]: okEvent('LUNA') },
+      routes: { [userUrl]: okUser, [eventUrl('luna-hao8')]: okEvent('luna-hao8', 'LUNA') },
     });
     await feed.ready;
   });
@@ -316,7 +366,7 @@ test('a train departing within the lead window takes the full render', async () 
   const { calls, feed } = harness({
     query: '?user=goproflowyo',
     clockMs: LEAD_TRAINWRECK,
-    routes: { [userUrl]: okUser, [eventUrl('trainwreck-lucky-13')]: okEvent('Trainwreck') },
+    routes: { [userUrl]: okUser, [eventUrl('trainwreck-lucky-13')]: okEvent('trainwreck-lucky-13', 'Trainwreck') },
   });
   await feed.ready;
   assert.equal(calls.switches[0]?.slug, 'trainwreck-lucky-13');
@@ -328,8 +378,8 @@ test('the re-resolve tick rolls train-to-train unattended', async () => {
     clockMs: DURING_LUNA,
     routes: {
       [userUrl]: okUser,
-      [eventUrl('luna-hao8')]: okEvent('LUNA'),
-      [eventUrl('trainwreck-lucky-13')]: okEvent('Trainwreck'),
+      [eventUrl('luna-hao8')]: okEvent('luna-hao8', 'LUNA'),
+      [eventUrl('trainwreck-lucky-13')]: okEvent('trainwreck-lucky-13', 'Trainwreck'),
     },
   });
   await feed.ready;
@@ -351,7 +401,8 @@ test('a user fetch failure falls back to the cached user payload — the promise
       if (!networkUp) throw new Error('network down');
       return okUser();
     }
-    return okEvent('LUNA')();
+    const slug = slugOf(url);
+    return okEvent(slug, slug)();
   };
   const clock = { ms: DURING_LUNA };
   const feed = startLiveLinkFeed('?user=goproflowyo', {
@@ -397,4 +448,130 @@ test('stop() cancels the pending resolve tick', async () => {
   assert.equal(timers.pending(), 1);
   feed.stop();
   assert.equal(timers.pending(), 0);
+});
+
+// ── Overlapping trains: the Overlay follows its streamer, not the clock ────
+// The reported case. An overnight train runs into the afternoon; the streamer
+// raided out of it before dawn and plays the next train at 07:00. The old rule
+// gave the Stage to whichever train departed first and kept it there, so the
+// overnight train held the screen all morning — and the 07:00 train, once it
+// departed, was rendered nowhere and listed nowhere.
+
+const OVERNIGHT_USER = () => ({
+  ok: true,
+  status: 200,
+  text: async () => JSON.stringify(makeUserPayload({
+    events: [],
+    events_joined: [
+      {
+        title: 'Overnight',
+        starttime: '2026-08-11T20:00:00Z',
+        endtime: '2026-08-12T21:00:00Z',
+        raidpal_link: 'https://raidpal.com/en/event/overnight',
+        api_link: 'https://api.raidpal.com/rest/event/overnight',
+      },
+      {
+        title: 'Morning',
+        starttime: '2026-08-12T14:00:00Z',
+        endtime: '2026-08-12T20:00:00Z',
+        raidpal_link: 'https://raidpal.com/en/event/morning',
+        api_link: 'https://api.raidpal.com/rest/event/morning',
+      },
+    ],
+  })),
+});
+
+/** A lineup naming the streamer for one slot only, the rest filled by others. */
+const overlapLineup = (title, from, to, mine) => () => ({
+  ok: true,
+  status: 200,
+  json: async () => makeEventPayload({
+    title,
+    starttime: from,
+    endtime: to,
+    time_table: [slot(from, 'DJ Alpha', 0), slot(mine, 'GoProFlowYo', 1)],
+  }),
+});
+
+const OVERLAP_ROUTES = {
+  'https://api.raidpal.com/rest/user/goproflowyo': OVERNIGHT_USER,
+  // My slot on the overnight train ran 22:00–23:00 the night before.
+  [eventUrl('overnight')]: overlapLineup('Overnight', '2026-08-11T20:00:00Z', '2026-08-12T21:00:00Z', '2026-08-11T22:00:00Z'),
+  // My slot on the morning train runs 15:00–20:00, an hour after it departs.
+  [eventUrl('morning')]: overlapLineup('Morning', '2026-08-12T14:00:00Z', '2026-08-12T20:00:00Z', '2026-08-12T15:00:00Z'),
+};
+
+test('overlap: a train I already raided out of does not hold the Stage', async () => {
+  const { calls, feed } = harness({
+    query: '?user=goproflowyo&upcoming=all',
+    clockMs: Date.parse('2026-08-12T13:00:00Z'), // overnight running, my slot 14h gone
+    routes: OVERLAP_ROUTES,
+  });
+  await feed.ready;
+  assert.deepEqual(calls.switches, [], 'nothing renders — I am not playing on anything');
+  assert.equal(calls.idles.length, 1);
+  assert.deepEqual(calls.idles[0].upcoming.map((e) => e.slug), ['morning']);
+});
+
+test('overlap: the train I play next leads, while the overnight one still runs', async () => {
+  const { calls, feed } = harness({
+    query: '?user=goproflowyo&upcoming=all',
+    clockMs: Date.parse('2026-08-12T14:30:00Z'), // 30 min before my morning slot
+    routes: OVERLAP_ROUTES,
+  });
+  await feed.ready;
+  assert.deepEqual(calls.switches.map((s) => s.slug), ['morning']);
+});
+
+test('overlap: a train that departed under a running one is never swallowed', async () => {
+  // The bug's second half: at 16:00 `morning` had departed (so the old
+  // `starttime > now` horizon dropped it) while `overnight` held the Stage.
+  const { calls, feed } = harness({
+    query: '?user=goproflowyo&upcoming=all',
+    clockMs: Date.parse('2026-08-12T16:00:00Z'),
+    routes: OVERLAP_ROUTES,
+  });
+  await feed.ready;
+  assert.deepEqual(calls.switches.map((s) => s.slug), ['morning'], 'the train I am ON renders');
+});
+
+test('overlap: once my slot ends the Overlay clears, even though the train runs on', async () => {
+  const { calls, feed } = harness({
+    query: '?user=goproflowyo&upcoming=all',
+    clockMs: Date.parse('2026-08-12T20:30:00Z'), // my morning slot ended at 20:00
+    routes: OVERLAP_ROUTES,
+  });
+  await feed.ready;
+  assert.deepEqual(calls.switches, []);
+  assert.equal(calls.idles.length, 1);
+  assert.deepEqual(calls.idles[0].upcoming, [], 'nothing left ahead');
+});
+
+test('wholetrain=1 restores the old rule: the earliest-started running train wins', async () => {
+  const { calls, feed } = harness({
+    query: '?user=goproflowyo&wholetrain=1',
+    clockMs: Date.parse('2026-08-12T16:00:00Z'),
+    routes: OVERLAP_ROUTES,
+  });
+  await feed.ready;
+  assert.deepEqual(calls.switches.map((s) => s.slug), ['overnight']);
+});
+
+test('lead= tunes how early the Train rolls in ahead of my slot', async () => {
+  // My morning slot starts 15:00. At 13:30 a 60m lead is not enough...
+  const early = harness({
+    query: '?user=goproflowyo&upcoming=all',
+    clockMs: Date.parse('2026-08-12T13:30:00Z'),
+    routes: OVERLAP_ROUTES,
+  });
+  await early.feed.ready;
+  assert.deepEqual(early.calls.switches, []);
+  // ...but a 120m lead is.
+  const wide = harness({
+    query: '?user=goproflowyo&upcoming=all&lead=120',
+    clockMs: Date.parse('2026-08-12T13:30:00Z'),
+    routes: OVERLAP_ROUTES,
+  });
+  await wide.feed.ready;
+  assert.deepEqual(wide.calls.switches.map((s) => s.slug), ['morning']);
 });

@@ -17,7 +17,7 @@ import { MAX_BLOB_CHARS } from './blob-codec.js';
 import { fetchUserPayload, fetchEventPayload, normalizeUser, normalizeEvent } from './raidpal-client.js';
 import { startEventFeed, cacheKey as eventCacheKey } from './event-feed.js';
 import { nextPollDelayMs } from './backoff.js';
-import { decodeTrainMap, resolveLiveTrain, effectiveQuery, mySlot } from './live-link.js';
+import { decodeTrainMap, resolveLiveTrain, effectiveQuery, mySlot, myWindows } from './live-link.js';
 import { parseConfig } from './config.js';
 
 const USER_CACHE_PREFIX = 'raidtrainoverlay.cache.user.v1.';
@@ -51,21 +51,26 @@ function readEventCache(storage, slug) {
 }
 
 /**
- * The upcoming trains, each annotated with `mySlotAt` — when the streamer's
- * OWN slot starts — wherever the Event's lineup names them. Lineups come
- * cache-first from the Overlay's own event cache (shared with the active
- * train's feed) and are fetched sequentially with a polite pause when stale;
- * `cacheOnly` skips the network entirely, so the first paint never waits on
- * it. Fail-soft throughout: a lineup that cannot be read, or one the
- * streamer isn't on, simply leaves the row on the train's departure time.
+ * Read the lineups for a list of trains and hand each one to `derive`.
+ *
+ * The one lineup-reading loop this module has, because both of its readers want
+ * exactly the same manners and used to be one of them: cache-first from the
+ * Overlay's own event cache (shared with the active train's feed), fetched
+ * sequentially with a polite pause when stale, and fail-soft per train — a
+ * lineup that cannot be read yields `null` and the caller falls back rather
+ * than the whole read failing. `cacheOnly` skips the network entirely, for the
+ * paths that must not wait on it.
+ *
+ * Returns `{ [slug]: derive(event) }`, with unreadable trains simply absent —
+ * which is what lets a caller tell "we could not tell" from a real answer.
  */
-export async function annotateMySlots(upcoming, names, {
+async function readLineups(trains, {
   fetchImpl, storage, clock = Date.now,
   setTimer = (fn, ms) => setTimeout(fn, ms), cacheOnly = false,
-}) {
-  const out = [];
+}, derive) {
+  const out = {};
   let fetched = false;
-  for (const train of upcoming) {
+  for (const train of trains) {
     const cached = readEventCache(storage, train.slug);
     let payload = cached?.payload ?? null;
     const fresh = cached != null && clock() - cached.savedAt < SLOT_FRESH_MS;
@@ -76,20 +81,52 @@ export async function annotateMySlots(upcoming, names, {
         fetched = true;
         storage.setItem(eventCacheKey(train.slug), JSON.stringify({ payload, savedAt: clock() }));
       } catch {
-        // keep whatever the cache had (possibly null) — the row falls back.
+        // keep whatever the cache had (possibly null) — the caller falls back.
       }
     }
-    let slot = null;
-    if (payload != null) {
-      try {
-        slot = mySlot(normalizeEvent(payload), names);
-      } catch {
-        slot = null; // a malformed cached payload must not sink the card
-      }
+    if (payload == null) continue;
+    try {
+      out[train.slug] = derive(normalizeEvent(payload));
+    } catch {
+      // a malformed cached payload must not sink the card or the resolution
     }
-    out.push(slot ? { ...train, mySlotAt: slot.starttime } : { ...train });
   }
   return out;
+}
+
+/**
+ * The trains the Overlay might render right now: running, or departing within
+ * the lead window. Only these need a lineup read before resolution — the rest
+ * cannot take the Stage this tick whatever their lineup says, so making the
+ * first paint wait on them would buy nothing.
+ */
+function selectionCandidates(events, now, leadMs) {
+  return events.filter((e) => now <= e.endtime && e.starttime - now <= leadMs);
+}
+
+/**
+ * `{ [slug]: myWindows(...) }` for the trains that could take the Stage — the
+ * evidence `resolveLiveTrain` needs to pick the train the streamer is actually
+ * ON rather than whichever one departed first. A slug missing from the result
+ * is "we could not tell", and resolution falls back to the whole train there.
+ */
+export async function readMyWindows(events, names, deps, { now, leadMs }) {
+  return readLineups(selectionCandidates(events, now, leadMs), deps, (event) => myWindows(event, names));
+}
+
+/**
+ * The upcoming trains, each annotated with `mySlotAt` — when the streamer's
+ * OWN slot starts — wherever the Event's lineup names them. `cacheOnly` skips
+ * the network, so the first paint never waits on it. Fail-soft throughout: a
+ * lineup that cannot be read, or one the streamer isn't on, simply leaves the
+ * row on the train's departure time.
+ */
+export async function annotateMySlots(upcoming, names, deps) {
+  const slots = await readLineups(upcoming, deps, (event) => mySlot(event, names));
+  return upcoming.map((train) => {
+    const slot = slots[train.slug];
+    return slot ? { ...train, mySlotAt: slot.starttime } : { ...train };
+  });
 }
 
 /** The annotation fingerprint — two paints with the same signature are the same card. */
@@ -148,6 +185,10 @@ export function startLiveLinkFeed(baseQuery, deps) {
   }
   const map = decoded ?? {};
   const resolveMins = baseConfig.refresh > 0 ? baseConfig.refresh : DEFAULT_RESOLVE_MIN;
+  // How early the full Train rolls in ahead of the streamer's own slot. Read
+  // from the BASE query, not a train's effective config: it decides which train
+  // is chosen, so it cannot come from the mapping entry of a train not yet picked.
+  const leadMs = baseConfig.lead * 60_000;
 
   let consecutiveFailures = 0;
   let activeSlug = null;
@@ -197,11 +238,25 @@ export function startLiveLinkFeed(baseQuery, deps) {
       onIdle({ upcoming: [] });
     } else if (r.user) {
       notFoundReported = false;
-      const { state, train, upcoming } = resolveLiveTrain(r.user.events, new Date(clock()));
+      const now = new Date(clock());
+      const names = [login, r.user.displayName];
+      const slotDeps = { fetchImpl, storage, clock, setTimer };
+      // Which train the streamer is ON, not merely which one is running. The
+      // lineups for the handful of trains that could take the Stage are read
+      // first — cache-first, so a warm Overlay pays nothing — and a train whose
+      // lineup will not read simply falls back to its whole-train window, which
+      // is what this resolution did before it could read lineups at all.
+      // `wholetrain=1` opts out by declining to gather the evidence, and so
+      // does `uponly=1` — a source that never renders the Train has no use for
+      // an answer to which train it would have rendered, and reading lineups
+      // for one would be pure traffic.
+      const windows = baseConfig.wholetrain || baseConfig.uponly
+        ? null
+        : await readMyWindows(r.user.events, names, slotDeps, { now, leadMs });
+      const { state, train, upcoming } = resolveLiveTrain(r.user.events, now, { leadMs, windows });
       // The card says when the streamer PLAYS, wherever a lineup names them:
       // paint immediately from whatever the cache knows, then complete the
       // lineups over the network and repaint only if that changed anything.
-      const names = [login, r.user.displayName];
       // One annotate-and-paint, two destinations: `onIdle` when nothing is
       // running, `onHorizon` when a train is. The live path gets the same
       // cache-first-then-full treatment — the between-Pass card lists other
@@ -210,7 +265,6 @@ export function startLiveLinkFeed(baseQuery, deps) {
       // awaits the network refinement, but a live train's resolve tick must not
       // sit behind slot lookups — it still has to schedule the next poll.
       const paint = async (emit, { detachFull = false } = {}) => {
-        const slotDeps = { fetchImpl, storage, clock, setTimer };
         const first = await annotateMySlots(upcoming, names, { ...slotDeps, cacheOnly: true });
         emit({ upcoming: first });
         const refine = annotateMySlots(upcoming, names, slotDeps).then((full) => {
