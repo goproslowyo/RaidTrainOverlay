@@ -6,6 +6,52 @@ All notable changes to RaidTrainOverlay are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.10.1] - 2026-08-12
+
+Three moments where the overlay painted the wrong thing for a frame and then
+corrected itself — the kind a viewer catches in a VOD clip and a test with no
+layout engine cannot see at all. Two were found by reviewing the fix for the
+first.
+
+### Fixed
+- **A Breather cut short no longer snaps the Train back.** A marquee **Breather**
+  clears the **Stage** by fading, "Train and Track together, by a fade, never a
+  slide" — but only when it was allowed to finish. When the **Horizon** emptied
+  on a resolve tick mid-Breather, the Stage's opacity was restored in a single
+  frame. It now finishes the fade upwards over what a natural return would have
+  had left. Measured in a browser: a 0.666 one-frame step becomes 0.001, and at
+  the shipped defaults the Stage is below full opacity for a quarter of every
+  cycle, so the artefact it removes was the whole Train appearing out of
+  nothing. (#88)
+- **An emptied Horizon no longer flashes the Upcoming card over the live Train.**
+  The presence class carries the card layer's only opacity source, so dropping
+  it did not hide the card — it handed the layer the base opacity every element
+  has, painting the card at full opacity over the Train and dissolving it over
+  460 ms. The layer's own opacity is now nothing, declared beside the keyframe
+  that is its presence. It also fails closed: a generated cycle a browser cannot
+  parse now hides the card rather than parking it over the Train. (#90)
+- **The Stage and the card read their phase on the clock their keyframes run
+  on.** Both animations run on the monotonic document timeline; both epochs were
+  wall-clock reads, and an OBS source runs for days past NTP steps, manual clock
+  changes and resumes from suspend. A backward step did not merely degrade the
+  Breather's return, it restored the snap exactly; on the card it moved the
+  appearance window off the **Pass** it is timed against, which is the one thing
+  the choreography exists to prevent. Both now read the mount Document's
+  monotonic clock through a single module.
+
+### Documented
+- **What the roster costs the pages, measured against the deployment rather than
+  localhost** (`docs/research/theme-registry-page-cost.md`): +127 KB on a cold
+  Configurator load and +13 ms, with parse time turning out not to be the cost
+  at all. The landing page's weight is unchanged. Recorded with its negative
+  control, and with two instruments that failed reported as failures rather than
+  as zeros. (#76)
+- **Three traps `node --test` cannot model about a stylesheet**
+  (`docs/agents/environment.md`): `linkedom` does not enforce CSSOM value
+  parsing, it cannot see a class coming off an element as a painted change, and
+  a generated base rule that outranks a presence keyframe kills the feature it
+  was written to protect while the suite stays green.
+
 ## [0.10.0] - 2026-08-10
 
 The Upcoming card learned to fill a live train's downtime — and then learned to
@@ -480,7 +526,8 @@ for an OBS browser source. Static hosting on GitHub Pages, no build step.
 - A cache-first RaidPal client resilient to transient fetch failures, and a GitHub
   Pages landing page with a live deployed-commit stamp in the footer.
 
-[Unreleased]: https://github.com/goproslowyo/RaidTrainOverlay/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/goproslowyo/RaidTrainOverlay/compare/v0.10.1...HEAD
+[0.10.1]: https://github.com/goproslowyo/RaidTrainOverlay/releases/tag/v0.10.1
 [0.10.0]: https://github.com/goproslowyo/RaidTrainOverlay/releases/tag/v0.10.0
 [0.9.1]: https://github.com/goproslowyo/RaidTrainOverlay/releases/tag/v0.9.1
 [0.9.0]: https://github.com/goproslowyo/RaidTrainOverlay/releases/tag/v0.9.0
