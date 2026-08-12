@@ -279,6 +279,196 @@ test('a restart with nothing to show clears the layer and lets the Train back up
   assert.deepEqual(view.breathers, [false], 'the Breather must be switched off, not left standing');
 });
 
+test('an emptied Horizon leaves the retiring card nothing to paint it with', (t) => {
+  // Presence coming off the layer is the layer losing its ONLY source of
+  // opacity, and every element's base is 1 — so with no base of its own the
+  // layer paints the card it is retiring at FULL opacity over the live Train
+  // for the whole of that dissolve. Measured in a browser as 0 -> 1 in one
+  // frame and 460ms of card over a Train, at every empty-Horizon tick outside
+  // a window (#90). What a DOM with no layout engine can hold honest is the
+  // two halves that make it possible: there IS still a card on the layer when
+  // presence goes, and the stylesheet that carries the keyframe carries the
+  // base the layer falls back to. That the flash is gone is the browser's word.
+  const { page, gap, layer } = overlay(t);
+
+  gap.restart(handle(PASS), HORIZON);
+  assert.ok(layer.querySelector('.rt-upcoming-card'), 'no card was mounted, so none can be revealed');
+
+  gap.refresh([]); // one resolve tick with nothing to list
+
+  assert.equal(layer.classList.contains(ON), false, 'presence outlived the Horizon it was for');
+  assert.ok(
+    layer.firstElementChild,
+    'the card left instantly — then there is nothing on the layer to reveal, and no bug',
+  );
+  assert.match(
+    gapSheet(page).unconditional,
+    /#gap-card \{ opacity: 0; \}/,
+    'the layer has no base of its own: dropping presence paints the retiring card over the Train',
+  );
+});
+
+/**
+ * Every top-level at-rule block in `css`, as `{ prelude, body, from, to }`.
+ * Brace-matched rather than pattern-matched, because the thing being asked is
+ * structural: which declarations a viewer gets unconditionally, and which are
+ * behind a condition. Nested at-rules are stepped over with their parent.
+ */
+function atRuleBlocks(css) {
+  const blocks = [];
+  for (let i = 0; i < css.length; i += 1) {
+    if (css[i] !== '@') continue;
+    const open = css.indexOf('{', i);
+    if (open === -1) break;
+    let depth = 0;
+    let end = open;
+    for (; end < css.length; end += 1) {
+      if (css[end] === '{') depth += 1;
+      else if (css[end] === '}' && (depth -= 1) === 0) break;
+    }
+    blocks.push({ prelude: css.slice(i, open).trim(), body: css.slice(open + 1, end), from: i, to: end + 1 });
+    i = end;
+  }
+  return blocks;
+}
+
+/**
+ * The generated sheet, as three things a test can ask about: the whole of it,
+ * the part EVERY viewer gets whatever their settings (`unconditional` — the
+ * sheet with every at-rule block cut out), and the body of the reduced-motion
+ * block. Comments are stripped first, because a comment that quotes a rule is
+ * not that rule, and this module's comments quote both of the rules asserted
+ * below.
+ *
+ * Two things this helper insists on rather than assumes, and both are here
+ * because the first version assumed them and went vacuous under a mutant.
+ *
+ * It was `css.indexOf('@media (prefers-reduced-motion: reduce)')` with an
+ * `at === -1` fallback, which made the split silently optional: spell the query
+ * `prefers-reduced-motion:reduce` — legal CSS, and what any reformat produces —
+ * and the search misses, the base half quietly becomes the WHOLE sheet, the
+ * reduced half becomes empty, and every assertion downstream passes against the
+ * very mutant it was written for. So the block is found by pattern and its
+ * absence is a failure HERE, not a pass downstream.
+ *
+ * And "outside the reduced-motion block" is not the property that matters —
+ * "outside every at-rule" is. Wrapping the base in `@media print { … }` clears
+ * the first bar and still hands a normal viewer no base at all, which is #90
+ * back. So the unconditional half is the sheet with ALL at-rule blocks removed,
+ * not the text before one of them.
+ */
+function gapSheet(page) {
+  const css = (page.getElementById('rt-gap-card-style')?.textContent ?? '')
+    .replace(/\/\*[\s\S]*?\*\//g, '');
+  const blocks = atRuleBlocks(css);
+  const reduced = blocks.find((b) => /prefers-reduced-motion/.test(b.prelude));
+  assert.ok(reduced, 'the generated sheet has no reduced-motion block at all — the accommodation is gone');
+  let unconditional = css;
+  for (const block of [...blocks].reverse()) {
+    unconditional = unconditional.slice(0, block.from) + unconditional.slice(block.to);
+  }
+  return { css, unconditional, reduced: reduced.body };
+}
+
+test('the layer\'s base is unconditional, and never outranks the presence keyframe', (t) => {
+  // A family of mutants, opposite in effect and every one of them green until
+  // now, because the rule was asserted by a substring match on the whole sheet
+  // — which can say a declaration is PRESENT and nothing about where it landed
+  // or how loud it is. Chrome measured each; the suite saw none of them.
+  //
+  // PUT THE BASE BEHIND A CONDITION and every viewer outside that condition
+  // loses it, so the retiring card flashes at opacity 1 over the live Train
+  // again (#90) — Chrome reads presence-off at 1.000, identical to the control
+  // with no base at all. Two spellings of the same mutant got through: inside
+  // the reduced-motion block, and inside `@media print`. Hence `unconditional`
+  // means outside EVERY at-rule, not outside one named one.
+  //
+  // MAKE THE BASE `!important` and the failure inverts: a CSS animation
+  // outranks a normal author declaration whatever its specificity, which is the
+  // only reason an id rule may sit under a class's keyframe — but `!important`
+  // outranks the animation too. The layer is pinned at 0 forever and the
+  // Upcoming card NEVER APPEARS AGAIN (Chrome: mid-window opacity 1.000 -> 0).
+  // That is the larger of the two, and its guard was spelling-bound: it
+  // required a literal space in `#gap-card {`, so adding the minifier spelling
+  // `#gap-card{opacity:0!important}` alongside the shipped base sailed through.
+  // Nothing in this sheet may be `!important` — that is the rule, so that is
+  // what is asserted, rather than one hand-spelled instance of breaking it.
+  const { page, gap } = overlay(t);
+  gap.restart(handle(PASS), HORIZON);
+  const sheet = gapSheet(page);
+
+  assert.match(
+    sheet.unconditional, /#gap-card \{ opacity: 0; \}/,
+    'the base is behind a condition: every viewer outside it gets the #90 flash back',
+  );
+  assert.doesNotMatch(
+    sheet.reduced, /#gap-card\b/,
+    'the reduced-motion block is carrying the layer base, which belongs to every viewer',
+  );
+  assert.doesNotMatch(
+    sheet.css, /!\s*important/i,
+    'an !important declaration here outranks the presence keyframe: the card would never appear again',
+  );
+  // And presence really is a keyframe, so the cascade fact above is the one
+  // that matters: nothing else on the layer sets opacity back up.
+  assert.match(sheet.unconditional, /\.rt-gap-card--on \{ animation: rt-gap-card /);
+});
+
+test('reduced motion drops the card\'s pulse instead of parking it on the Train', (t) => {
+  // The accommodation itself, which nothing asserted: every guard on this sheet
+  // said what must NOT be in the reduced-motion block, and none said the block
+  // must exist or what it must do. Delete it outright and the whole suite stays
+  // green while Chrome, run with --force-prefers-reduced-motion, reads the card
+  // at 1.000 where the shipped build reads 0.000 — the card pulsing in and out
+  // over a live stream for the one viewer who asked it not to. (The renderer's
+  // own reduced-motion coverage is a DIFFERENT stylesheet and does not reach
+  // here.) `gapSheet` now fails outright on a sheet with no such block; this
+  // says what the block has to contain.
+  const { page, gap } = overlay(t);
+  gap.restart(handle(PASS), HORIZON);
+  const sheet = gapSheet(page);
+
+  assert.match(
+    sheet.reduced, /\.rt-gap-card--on\s*\{/,
+    'the reduced-motion block does not address the presence class, so it changes nothing',
+  );
+  assert.match(
+    sheet.reduced, /animation:\s*none/,
+    'the pulse survives reduced motion: the whole occasion IS the motion',
+  );
+  assert.match(
+    sheet.reduced, /opacity:\s*0/,
+    'the animation is dropped without saying where the layer rests: the card parks over the Train',
+  );
+});
+
+test('the layer gets its base before it can ever be holding a card', (t) => {
+  // `setGapStyle` runs only when the plan shows, so the base does not exist
+  // until the first showing apply — and until it does, the layer is at the 1
+  // every element has. What makes that harmless is only that `setGapStyle` runs
+  // BEFORE `renderUpcomingCard`, one statement apart in `apply`. Swap the two
+  // and there is a moment with a card on a layer that has no base yet. Nothing
+  // named or tested that precedence.
+  const { page, gap, layer } = overlay(t);
+  const order = [];
+  const headAppend = page.head.appendChild.bind(page.head);
+  page.head.appendChild = (node) => {
+    if (node.id === 'rt-gap-card-style') order.push('base');
+    return headAppend(node);
+  };
+  const layerAppend = layer.appendChild.bind(layer);
+  layer.appendChild = (node) => { order.push('card'); return layerAppend(node); };
+
+  gap.restart(handle(PASS), HORIZON);
+
+  assert.ok(order.includes('base'), 'the base sheet never reached the Document');
+  assert.ok(order.includes('card'), 'no card was mounted, so there is no order to check');
+  assert.ok(
+    order.indexOf('base') < order.indexOf('card'),
+    'a card was put on the layer before the layer had a base: it paints at full opacity until the sheet lands',
+  );
+});
+
 test('a restart re-seeds the presence keyframe; a refresh never touches it', (t) => {
   // This is the phase rule as an interface: only a render restarts the Train's
   // own keyframe, so only a restart may re-seed the card's. A Horizon change
@@ -331,16 +521,13 @@ test('a refresh that brings the card back starts it in phase with the Pass, not 
   // where it is by now — from the render the Train's own keyframe started at —
   // is the only way to do that without landing the card on a Train.
   const { gap, layer } = overlay(t);
-  // The wall clock is the only way to say how far into the Pass we are, so the
-  // test drives it: five minutes pass between the render and the Horizon.
-  const realNow = Date.now;
-  t.after(() => { Date.now = realNow; });
-  let clock = realNow();
-  Date.now = () => clock;
+  // Five minutes pass between the render and the Horizon, on the clock
+  // `rt-gap-card` is actually timed by — see the fixture below.
+  const time = clock(t);
 
   gap.restart(handle(PASS), []);
   assert.equal(layer.classList.contains(ON), false, 'an empty Horizon put the card on');
-  clock += 300_000;
+  time.pass(300_000);
 
   gap.refresh(HORIZON);
 
@@ -351,13 +538,52 @@ test('a refresh that brings the card back starts it in phase with the Pass, not 
   );
 });
 
-/** A driven wall clock: the seed is a clock read, so a test has to own the clock. */
+/**
+ * A driven clock for the card. The seed is a clock read, so a test has to own
+ * the clock — and the one it has to own is the one `rt-gap-card` itself runs
+ * on. That keyframe is timed by the **document timeline**, which is monotonic
+ * and reached as `performance.now()`; the value this module writes is an
+ * `animation-delay` on it. So the monotonic clock is what `pass` moves, and
+ * `Date.now` is PINNED as a negative control: a build that seeded `seededAt`
+ * from the wall clock sees no time pass at all through any test in this file,
+ * writes a delay of `-0.000s`, and starts the card at the top of a cycle the
+ * Pass is minutes into.
+ *
+ * `stepWallClock` moves the pinned wall clock without moving the real one,
+ * which is the NTP step, the resume from suspend and the manual clock change
+ * all at once. Nothing the card does may notice. Measured in headless Chrome on
+ * the wall-clock build, skew driven at the moment the Horizon refills, as the
+ * share of the Train's time on stage that the card was painted over it: in
+ * phase 0.0%, a -100s step 18.0%, a suspend-resume of -1h 50.7%, +140s 50.3%.
+ *
+ * Both are globals, restored after each test. `linkedom`'s
+ * `defaultView.performance` forwards to the global one — even a property
+ * defined on the view writes through — so this seam cannot tell "this
+ * Document's window" from "the ambient global". That half of the rule needs two
+ * real windows with two `timeOrigin`s and is measured in a browser instead.
+ *
+ * The twin of this fixture lives in test/train-timing.test.js, driving the same
+ * two globals for the Breather. Duplicated on purpose: a fixture that two
+ * suites share is a third thing to keep in step, and the whole of what these
+ * two have in common is nine lines of global-shadowing. Change one and look at
+ * the other.
+ */
 function clock(t) {
-  const real = Date.now;
-  t.after(() => { Date.now = real; });
-  let at = real();
-  Date.now = () => at;
-  return { pass: (ms) => { at += ms; } };
+  // `performance.now` lives on the prototype and is not assignable, so it is
+  // shadowed with an own property and the shadow deleted afterwards.
+  const realDateNow = Date.now;
+  let at = performance.now();
+  let wall = realDateNow();
+  t.after(() => { delete performance.now; Date.now = realDateNow; });
+  Object.defineProperty(performance, 'now', { value: () => at, configurable: true, writable: true });
+  Date.now = () => wall;
+  return {
+    // Only the monotonic clock moves. That is what makes the pin a control
+    // rather than decoration: read the wall clock and every `pass` below is
+    // worth nothing.
+    pass: (ms) => { at += ms; },
+    stepWallClock: (ms) => { wall += ms; },
+  };
 }
 
 test('a Horizon that empties and refills under a Pass keeps the render as the epoch', (t) => {
@@ -378,6 +604,62 @@ test('a Horizon that empties and refills under a Pass keeps the render as the ep
     layer.style.animationDelay, '-90.000s',
     'the card was re-seeded on a period that never restarted — it can now land on a Train',
   );
+});
+
+test('the card\'s phase is read off a monotonic clock, never the wall clock', (t) => {
+  // The same defect as #88, in the module where it matters more. The value this
+  // writes is an `animation-delay` on `rt-gap-card`, which runs on the document
+  // timeline — monotonic. The wall clock is not: an OBS source runs for days
+  // past NTP steps (Windows steps rather than slews once it is 128 ms out),
+  // manual clock changes and resumes from suspend.
+  //
+  // Measured in headless Chrome on the wall-clock build, skew driven at the
+  // moment the Horizon refills, reported as the share of the Train's time on
+  // stage that the card was painted over it — at the shipped defaults, a 900s
+  // Pass with the Train on stage across [885,900) and [0,60):
+  //
+  //   in phase (control)   0.0%    delay -330.046s against a correct -330.000s
+  //   -100s step          18.0%    delay -230.034s
+  //   -1h  (suspend)      50.7%    delay 0s — floored, and 330s out of phase
+  //   +140s step          50.3%    delay -147.533s against a correct -7.500s
+  //   -30s over 20s, 60s Pass    100.0%, at full opacity
+  //
+  // So: the wall clock is stepped back a hundred seconds between the render and
+  // the Horizon arriving, and the card must not notice. The re-phase window is
+  // long — the seed moves only on a render or a returning Breather, while the
+  // re-phase fires whenever an emptied Horizon refills, and under `pass` those
+  // can be hours apart.
+  const { gap, layer } = overlay(t);
+  const time = clock(t);
+
+  gap.restart(handle(PASS), HORIZON);
+  time.pass(330_000);
+  gap.refresh([]);            // the Horizon empties: presence comes off
+  time.stepWallClock(-100_000);
+  gap.refresh(HORIZON);       // and refills: the card re-phases against the Pass
+
+  assert.ok(layer.classList.contains(ON), 'the card never came back when its Horizon returned');
+  assert.equal(
+    layer.style.animationDelay, '-330.000s',
+    'the seed moved with the wall clock: the card is now timed to a Pass that never happened',
+  );
+});
+
+test('a forward wall-clock step cannot move the card off the Pass either', (t) => {
+  // The other direction, and the one that measured worst: +140s wrote
+  // -147.533s where -7.500s was correct, which put a card window over the
+  // traversing Train for 50.3% of its time on stage. A floor cannot help here —
+  // the value is positive and plausible, just wrong.
+  const { gap, layer } = overlay(t);
+  const time = clock(t);
+
+  gap.restart(handle(PASS), HORIZON);
+  time.pass(7_500);
+  gap.refresh([]);
+  time.stepWallClock(140_000);
+  gap.refresh(HORIZON);
+
+  assert.equal(layer.style.animationDelay, '-7.500s', 'a forward step dragged the card off the Pass');
 });
 
 test('a returning Breather re-seeds the card, because it re-seeds the card\'s period', (t) => {
