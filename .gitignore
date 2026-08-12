@@ -8,3 +8,8 @@ docs/adr/
 # Impeccable working artifacts (review screenshots are transient; DESIGN.md and
 # the design.json sidecar ship).
 .impeccable/review/
+# Session scratch — handoffs, probe rigs and ticket drafts staged for filing.
+# Working notes, deliberately not history. Untracked was not enough: a `git add -A`
+# during a history rebuild swept these into a commit, and the reset that followed
+# deleted them from disk.
+.scratch/

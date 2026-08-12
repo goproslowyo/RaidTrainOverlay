@@ -120,12 +120,17 @@ Chrome and a one-frame opacity sweep with the un-fixed build kept as the control
 `gh` must run as **goproslowyo** — two accounts may be authenticated. Check
 `gh auth status` if anything 404s unexpectedly.
 
-`origin` is an SSH URL and SSH auth does not work here. Push over HTTPS with the `gh`
-credential helper:
+`origin` is an SSH URL and **SSH is how you push.** Prime the key first — the first call
+opens a ControlMaster the pushes then reuse, and it answers `Hi goproslowyo!`:
 
 ```
-git -c credential.helper='!gh auth git-credential' push https://github.com/goproslowyo/RaidTrainOverlay.git main:main
+ssh -T -i ~/.ssh/gpsy git@github.com
+git push origin main
 ```
+
+An earlier version of this note claimed SSH auth did not work here and sent pushes over
+HTTPS with `git -c credential.helper='!gh auth git-credential'`. That was wrong; the owner
+tested it. If a push fails, prime the key and try again before reaching for a workaround.
 
 Releases are **tag-only**. Do not create GitHub Release objects; Pages serves from
 `main`.
