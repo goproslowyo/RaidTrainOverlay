@@ -6,6 +6,49 @@ All notable changes to RaidTrainOverlay are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-08-12
+
+The Overlay follows the streamer, not the timetable. It shows the train they are
+actually playing on — from `lead` minutes before their own slot until the moment
+that slot ends — and two trains overlapping stops being an ambiguity, because
+only one of them has a **Turn** on it.
+
+### Fixed
+- **A train the streamer had already raided out of held the screen all morning,
+  and the train they were actually on was rendered nowhere and listed nowhere.**
+  Reported from a real broadcast: an overnight train billed until the afternoon
+  was still running when the next train departed at 7am, and the Overlay stayed
+  on the overnight one. Resolution settled overlaps by the clock — earliest
+  departure won, for as long as it ran — and the **Horizon** it handed the
+  **Upcoming card** was strictly future-*starting*. So the 7am train was
+  invisible twice over: not chosen, because something older was still running,
+  and dropped from the card the instant it departed. It fell into the gap
+  between "not selected" and "no longer upcoming" and stayed there for six
+  hours. Resolution now reads the lineups of the handful of trains that could
+  take the **Stage** and picks by the streamer's own **Turn**: a Turn that is
+  running beats one merely approaching, so nobody is yanked off screen
+  mid-slot, and the Horizon carries every train whose Turn is still ahead —
+  including one that has already departed. When a Turn ends the Stage clears,
+  however many hours the train runs on, which is the same answer to the
+  Overlay still rolling through a set the streamer is no longer part of.
+  Evidence, not certainty: a lineup that cannot be fetched falls back to the
+  whole train (exactly the previous behaviour), while one that reads cleanly
+  and does not name the streamer means that train is not theirs. A **Turn** is
+  a run of back-to-back slots read as one, so a double slot is one continuous
+  turn and not two — and a lineup's *last* slot takes the Event's nominal
+  `slot_duration_mins` rather than inheriting the rest of the train, which
+  would have put someone who played the 10pm hour on screen until 2pm.
+
+### Added
+- **`lead`** — how many minutes before their own slot the Train rolls in
+  (default `60`, max `360`; `lead=0` means exactly on slot). Slots run from
+  thirty minutes to three hours and a streamer with a long one may want more
+  warning. Deliberately URL-only: giving it a Configurator field would put a
+  sentence of explanation in front of everyone to serve a few.
+- **`wholetrain`** — `wholetrain=1` restores the pre-Turn rule, where any
+  running train holds the Stage for its whole run regardless of who is on it.
+  For a source that exists to promote a train rather than to follow one turn.
+
 ## [0.11.0] - 2026-08-12
 
 The Upcoming card is readable from the sofa, the grid under it became an anchor
@@ -579,7 +622,8 @@ for an OBS browser source. Static hosting on GitHub Pages, no build step.
 - A cache-first RaidPal client resilient to transient fetch failures, and a GitHub
   Pages landing page with a live deployed-commit stamp in the footer.
 
-[Unreleased]: https://github.com/goproslowyo/RaidTrainOverlay/compare/v0.11.0...HEAD
+[Unreleased]: https://github.com/goproslowyo/RaidTrainOverlay/compare/v0.12.0...HEAD
+[0.12.0]: https://github.com/goproslowyo/RaidTrainOverlay/releases/tag/v0.12.0
 [0.11.0]: https://github.com/goproslowyo/RaidTrainOverlay/releases/tag/v0.11.0
 [0.10.1]: https://github.com/goproslowyo/RaidTrainOverlay/releases/tag/v0.10.1
 [0.10.0]: https://github.com/goproslowyo/RaidTrainOverlay/releases/tag/v0.10.0
