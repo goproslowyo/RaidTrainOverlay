@@ -24,7 +24,7 @@ const USER_CACHE_PREFIX = 'raidtrainoverlay.cache.user.v1.';
 // Live Link ALWAYS re-resolves (that's its promise), even when refresh=0
 // keeps the inner lineup feed fetch-on-load-only. Default matches the
 // event-feed freshness floor.
-const DEFAULT_RESOLVE_MIN = 15;
+export const DEFAULT_RESOLVE_MIN = 15;
 
 /** localStorage key for a login's last-good user payload (Overlay-side cache). */
 export function userCacheKey(login) {

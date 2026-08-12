@@ -125,6 +125,16 @@ const UPPOS_ANCHORS = ['tl', 'tc', 'tr', 'ml', 'mc', 'mr', 'bl', 'bc', 'br'];
 /** Old Theme keys that map to a current one (the mockup's `neon` → `synthwave`). */
 const THEME_ALIASES = { neon: 'synthwave', smoke: 'highvibes', coltrane: 'jazz', shinkansen: 'bullet', lavalamp: 'lava' };
 
+/**
+ * The longest either Track fade may be asked for. Exported because it is one
+ * half of the margin that keeps the Breather's mid-ramp re-entry unreachable —
+ * the other half is `DEFAULT_RESOLVE_MIN` in src/live-link-feed.js, and the
+ * rule is that the shortest possible gap between two resolve ticks exceeds the
+ * longest possible return ramp. Named rather than repeated so a test can hold
+ * the relationship, which nothing did while it was two literals and a comment.
+ */
+export const MAX_TRACK_FADE_SEC = 120;
+
 export function parseConfig(queryString) {
   const params = new URLSearchParams(queryString);
   const event = (params.get('event') ?? '').trim();
@@ -184,11 +194,15 @@ export function parseConfig(queryString) {
     // on screen with no Train. `always` keeps the rails/scene up the whole time
     // (a persistent lower-third). A pass-Mode concept (no-op for marquee/preview).
     track: oneOf(params.get('track'), ['always', 'periodic'], 'periodic'),
-    // Track fade durations in seconds (track=periodic only): how long the rails
-    // take to fade in before a Pass and out after it. 0 = an instant cut. Both
-    // are clamped to the available gap at render, so a long value degrades gracefully.
-    trackfadein: boundedNumber(params.get('trackfadein'), 0, 120, 15),
-    trackfadeout: boundedNumber(params.get('trackfadeout'), 0, 120, 10),
+    // Track fade durations in seconds, SHARED BY BOTH MODES — not a
+    // track=periodic-only pair, and MAX_TRACK_FADE_SEC above exists for the
+    // marquee half. Under `pass` with track=periodic they are how long the
+    // rails take to fade in before a Pass and out after it; under `marquee`
+    // they are the ramps a Breather fades the whole Stage down and back over,
+    // whatever `track` says. 0 = an instant cut. Both are clamped to the
+    // available gap at render, so a long value degrades gracefully.
+    trackfadein: boundedNumber(params.get('trackfadein'), 0, MAX_TRACK_FADE_SEC, 15),
+    trackfadeout: boundedNumber(params.get('trackfadeout'), 0, MAX_TRACK_FADE_SEC, 10),
     // Size multiplier on the default --train-height. Distinct from
     // `height` (vertical position): `scale` is how big, `height` is where.
     // Bounded 0.5..2 (×28vh baseline = 14..56vh); 1 is the no-op default.
