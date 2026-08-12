@@ -25,7 +25,8 @@ test('parseConfig ignores unknown and malformed params', () => {
   const config = parseConfig('?event=trainwreck-lucky-13&bogus=1&%%%');
   assert.equal(config.event, 'trainwreck-lucky-13');
   assert.deepEqual(Object.keys(config), [
-    'event', 'lineup', 'user', 'trains', 'upcoming', 'uppos', 'upop', 'upcycle', 'upscroll', 'upstyle', 'uponly', 'upgap',
+    'event', 'lineup', 'user', 'trains', 'lead', 'wholetrain',
+    'upcoming', 'uppos', 'upop', 'upcycle', 'upscroll', 'upstyle', 'uponly', 'upgap',
     'lang', 'mode', 'interval', 'speed', 'track', 'trackfadein', 'trackfadeout', 'scale',
     'openslots', 'spotlight', 'tz', 'height', 'hidefinished', 'enginedim', 'refresh', 'theme',
   ]);

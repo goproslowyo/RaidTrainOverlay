@@ -153,6 +153,18 @@ export function parseConfig(queryString) {
     lineup: lineup === '' ? null : lineup,
     user: user === '' ? null : user,
     trains: trains === '' ? null : trains,
+    // How many minutes before the streamer's OWN slot the full Train rolls in.
+    // A URL-only knob, deliberately absent from the Configurator: slots run
+    // from thirty minutes to three hours and a streamer with a long one may
+    // want more warning, but that is a sentence of explanation the settings
+    // pane would have to carry for everyone to serve a few. 0 = no lead at all
+    // (the Train appears exactly on slot). Capped at 6h.
+    lead: boundedNumber(params.get('lead'), 0, 360, 60),
+    // Opt out of slot-aware selection: any running train holds the Stage, and
+    // it keeps it until the train itself ends — the behaviour every Live Link
+    // had before the Overlay learned to read its streamer's own slot. For a
+    // source that exists to promote a train rather than to follow one turn.
+    wholetrain: boolean(params.get('wholetrain')),
     upcoming: upcomingSpec(params.get('upcoming')),
     // The Upcoming card's own knobs (Live Link only, like `upcoming`). `uppos`
     // anchors the card in the scene — deliberately decoupled from the Train's
@@ -260,6 +272,15 @@ export function serializeConfig(config) {
     if (config.upstyle !== 'card') params.set('upstyle', config.upstyle);
     if (config.uponly) params.set('uponly', '1');
     if (config.upgap === false) params.set('upgap', '0');
+    // Slot-aware selection's two knobs. Live Link only — nothing else knows
+    // which train the streamer is on. Emitted on their non-default values so
+    // serialize∘parse stays idempotent, which is what every other param here
+    // is doing too. NOTE: the Configurator builds its links from its own form
+    // state rather than from a parsed URL, and these have no field, so a
+    // hand-tuned `lead=` does NOT survive re-generating a link there. Giving
+    // them fields is the fix if that ever bites.
+    if (config.lead !== 60) params.set('lead', String(config.lead));
+    if (config.wholetrain) params.set('wholetrain', '1');
   } else if (config.event) params.set('event', config.event);
   else if (config.lineup) params.set('lineup', config.lineup);
   // Locale: emit whenever explicitly set. Even `lang=en` is semantically
