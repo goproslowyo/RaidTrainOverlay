@@ -6,6 +6,25 @@ All notable changes to RaidTrainOverlay are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.12.1] - 2026-08-12
+
+### Fixed
+- **The upcoming-only scene hid the very train its streamer was about to play.**
+  v0.12.0 taught the Overlay to follow the streamer's **Turn**, and then skipped
+  reading lineups on `uponly=1` sources — reasoning that a scene which never
+  renders the Train has no use for knowing which train it *would* have rendered.
+  True of the **Stage**, false of the card. Without lineups a train that has
+  departed is just "the live train", and the live train is the one row a
+  **Horizon** deliberately leaves out — so a streamer whose slot is at teatime,
+  on a train that pulled out at dawn, watched an empty card all day. The scene
+  built entirely from the card was the one place the original overlap bug
+  survived. Lineups are now read here too, and this source takes the horizon of
+  every turn still ahead rather than the one with the Stage's train subtracted
+  from it: that subtraction exists to stop a card repeating the Train beside it,
+  and where there is no Train beside it, it only ever removed a row. The cost is
+  the one it should have been all along — a handful of cache-first lineup reads,
+  the same ones the card's own slot lookups were already making.
+
 ## [0.12.0] - 2026-08-12
 
 The Overlay follows the streamer, not the timetable. It shows the train they are
@@ -622,7 +641,8 @@ for an OBS browser source. Static hosting on GitHub Pages, no build step.
 - A cache-first RaidPal client resilient to transient fetch failures, and a GitHub
   Pages landing page with a live deployed-commit stamp in the footer.
 
-[Unreleased]: https://github.com/goproslowyo/RaidTrainOverlay/compare/v0.12.0...HEAD
+[Unreleased]: https://github.com/goproslowyo/RaidTrainOverlay/compare/v0.12.1...HEAD
+[0.12.1]: https://github.com/goproslowyo/RaidTrainOverlay/releases/tag/v0.12.1
 [0.12.0]: https://github.com/goproslowyo/RaidTrainOverlay/releases/tag/v0.12.0
 [0.11.0]: https://github.com/goproslowyo/RaidTrainOverlay/releases/tag/v0.11.0
 [0.10.1]: https://github.com/goproslowyo/RaidTrainOverlay/releases/tag/v0.10.1
