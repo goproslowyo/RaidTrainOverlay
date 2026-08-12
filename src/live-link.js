@@ -57,17 +57,112 @@ export function decodeTrainMap(str) {
 }
 
 /**
+ * Every stretch of an Event during which the streamer is the one playing —
+ * `[{ from, to }]`, in order, empty when the lineup does not name them.
+ *
+ * This is the unit the Overlay actually cares about. A train is a container;
+ * what a viewer's screen should follow is the streamer's own turn inside it,
+ * and the two stopped agreeing the moment trains began to overlap: an overnight
+ * train that runs until 2pm kept the Stage all morning while its streamer had
+ * long since raided out and boarded something else.
+ *
+ * Back-to-back slots MERGE. A streamer who took two consecutive slots is
+ * playing one continuous two-hour turn, and reporting that as two windows would
+ * end their turn — and drop the Train off screen — halfway through it.
+ *
+ * A slot's end is the next slot's departure — the one boundary RaidPal states
+ * exactly. The LAST slot has no such neighbour, so it takes the Event's nominal
+ * `slot_duration_mins` instead, and only falls back to the end of the train
+ * when the Event does not say. Inheriting the train's end unconditionally was
+ * the tempting reading and it is wrong by hours: a lineup's last slot is
+ * routinely followed by scheduled dead air, and a streamer who played the 10pm
+ * hour of a train billed until 2pm would have held the screen until 2pm.
+ *
+ * `names` are the candidate identities (login, display name) — the same list
+ * `mySlot` matches, and matched the same case-insensitive way, because a
+ * disagreement between the two would put a streamer's turn and their Upcoming
+ * card row on different trains.
+ */
+export function myWindows(event, names) {
+  const wanted = (names ?? []).filter(Boolean).map((n) => String(n).toLowerCase());
+  if (!event?.slots || wanted.length === 0) return [];
+  const ordered = [...event.slots].sort((a, b) => a.starttime - b.starttime);
+  const mine = ordered.map((s) => s.occupied
+    && wanted.includes(s.broadcaster?.displayName?.toLowerCase()));
+  const nominalMs = event.slotDurationMins > 0 ? event.slotDurationMins * 60_000 : null;
+  const windows = [];
+  for (let i = 0; i < ordered.length; i += 1) {
+    if (!mine[i]) continue;
+    // Walk the run of consecutive slots forward — that whole stretch is one turn.
+    let last = i;
+    while (mine[last + 1]) last += 1;
+    const next = ordered[last + 1];
+    const end = next
+      ? next.starttime
+      : new Date(nominalMs == null
+        ? event.endtime.getTime()
+        // A slot cannot outlive its train, however the durations were entered.
+        : Math.min(ordered[last].starttime.getTime() + nominalMs, event.endtime.getTime()));
+    windows.push({ from: ordered[i].starttime, to: end });
+    i = last;
+  }
+  return windows;
+}
+
+/**
+ * The stretch of a train the Overlay renders for — the streamer's own turn when
+ * a lineup told us one, and the whole train when nothing did.
+ *
+ * The fallback is not a nicety. RaidPal lineups carry display names only, a
+ * name can be spelled differently on Twitch than on RaidPal, an organiser may
+ * hold no slot at all, and a lineup fetch can simply fail. Every one of those
+ * is "we could not tell", and treating it as "not on this train" would blank an
+ * Overlay that works today. So an ABSENT entry falls back, while an EMPTY one
+ * — a lineup we read that does not name them — is a definite answer: not their
+ * train, never rendered.
+ *
+ * With several turns on one train, the relevant one is whichever is running now,
+ * else the next still ahead; a turn already over is not a candidate for anything.
+ */
+function renderWindow(event, windows, now) {
+  const mine = windows?.[event.slug];
+  if (mine == null) {
+    return now <= event.endtime ? { from: event.starttime, to: event.endtime } : null;
+  }
+  return mine.find((w) => now <= w.to) ?? null;
+}
+
+/**
  * Which train the Live Link shows now. `events` are normalized Event
  * summaries (raidpal-client's normalizeUser output — Date times, ascending
  * or not; sorted here).
  *
- *   live — now ∈ [starttime, endtime] (earliest-started wins an overlap)
- *   lead — the next upcoming train departs within `leadMs` (full render early,
- *          so viewers see the lineup as departure approaches)
- *   idle — nothing to render; `upcoming` carries the future trains for the
+ *   live — the streamer's own turn is running (or, with no lineup to go on, the
+ *          train is)
+ *   lead — that turn begins within `leadMs` (full render early, so viewers see
+ *          the lineup as it approaches)
+ *   idle — nothing to render; `upcoming` carries the trains still ahead for the
  *          opt-in **Upcoming card** (#15)
  *
  * Returns `{ state, train, upcoming }`.
+ *
+ * `options.windows` is `{ [slug]: myWindows(...) }` for whichever trains a
+ * lineup could be read for; absent slugs fall back to the whole train (see
+ * `renderWindow`), which is exactly the behaviour this function had before
+ * lineups entered into it. `options.leadMs` overrides the T-60 default — slots
+ * run anywhere from thirty minutes to three hours, so how much warning is
+ * useful is not a constant anyone can pick centrally.
+ *
+ * Overlaps are settled by the streamer's OWN turn, not by which train departed
+ * first: earliest-started only ever wins between trains we know nothing about.
+ * A turn that is running beats one that is merely approaching, so a streamer
+ * mid-slot is never yanked off screen by the next train's lead window.
+ *
+ * `upcoming` is every OTHER train whose turn is still ahead — including one
+ * that has already departed and is running right now, which the old
+ * `starttime > now` filter silently dropped. That was the bug's second half:
+ * a train that departed while another held the Stage was rendered nowhere and
+ * listed nowhere.
  *
  * `idle` here names THE LINK having no train to show, which is the one sense
  * of the word this project keeps. It is not a name for the card that fills
@@ -76,14 +171,24 @@ export function decodeTrainMap(str) {
  * `IDLE_RELOAD_MS` alone; they are about the Live Link and the page, not the
  * panel.
  */
-export function resolveLiveTrain(events, now, leadMs = LEAD_MS) {
-  const byStart = [...events].sort((a, b) => a.starttime - b.starttime);
-  const upcoming = byStart.filter((e) => e.starttime > now);
-  const live = byStart.find((e) => e.starttime <= now && now <= e.endtime);
-  if (live) return { state: 'live', train: live, upcoming };
-  const next = upcoming[0] ?? null;
-  if (next && next.starttime - now <= leadMs) return { state: 'lead', train: next, upcoming };
-  return { state: 'idle', train: null, upcoming };
+export function resolveLiveTrain(events, now, { leadMs = LEAD_MS, windows = null } = {}) {
+  const candidates = [];
+  for (const event of events) {
+    const window = renderWindow(event, windows, now);
+    if (window != null) candidates.push({ event, window });
+  }
+  candidates.sort((a, b) => a.window.from - b.window.from);
+
+  const live = candidates.find((c) => c.window.from <= now);
+  const chosen = live
+    ?? candidates.find((c) => c.window.from - now <= leadMs)
+    ?? null;
+  const upcoming = candidates
+    .filter((c) => c !== chosen && c.window.from > now)
+    .map((c) => c.event);
+
+  if (chosen == null) return { state: 'idle', train: null, upcoming };
+  return { state: live ? 'live' : 'lead', train: chosen.event, upcoming };
 }
 
 /** Idle for this long since page load → the Overlay reloads itself (JS-leak insurance). */

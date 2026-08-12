@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  LEAD_MS, encodeTrainMap, decodeTrainMap, resolveLiveTrain, effectiveQuery,
+  LEAD_MS, encodeTrainMap, decodeTrainMap, resolveLiveTrain, effectiveQuery, myWindows,
 } from '../src/live-link.js';
 
 const MIN = 60_000;
@@ -85,12 +85,172 @@ test('resolveLiveTrain: no events at all is idle with an empty upcoming list', (
   assert.deepEqual(resolveLiveTrain([], NOW), { state: 'idle', train: null, upcoming: [] });
 });
 
-test('resolveLiveTrain picks the EARLIEST-started live train when two overlap', () => {
+test('resolveLiveTrain picks the EARLIEST-started live train when two overlap and no lineup is known', () => {
   const events = [
     summary('second', '2026-08-07T19:00:00Z', '2026-08-08T02:00:00Z'),
     summary('first', '2026-08-07T18:00:00Z', '2026-08-08T01:00:00Z'),
   ];
   assert.equal(resolveLiveTrain(events, NOW).train.slug, 'first');
+});
+
+// ---- my own slot windows ----
+
+const ME = ['goproflowyo', 'GoProFlowYo'];
+
+/** A normalized Event with a lineup; `names` occupy the slots at the given starts. */
+const lineup = (endtime, slots, slotDurationMins = 60) => ({
+  endtime: at(endtime),
+  slotDurationMins,
+  slots: slots.map(([start, name], order) => ({
+    order,
+    starttime: at(start),
+    occupied: name != null,
+    broadcaster: name == null ? null : { displayName: name },
+  })),
+});
+
+test('myWindows: my slot runs until the next slot starts', () => {
+  const event = lineup('2026-08-08T02:00:00Z', [
+    ['2026-08-07T18:00:00Z', 'SomeoneElse'],
+    ['2026-08-07T19:00:00Z', 'GoProFlowYo'],
+    ['2026-08-07T20:00:00Z', 'Another'],
+  ]);
+  assert.deepEqual(myWindows(event, ME), [
+    { from: at('2026-08-07T19:00:00Z'), to: at('2026-08-07T20:00:00Z') },
+  ]);
+});
+
+test('myWindows: back-to-back slots merge into ONE window', () => {
+  const event = lineup('2026-08-08T02:00:00Z', [
+    ['2026-08-07T18:00:00Z', 'SomeoneElse'],
+    ['2026-08-07T19:00:00Z', 'GoProFlowYo'],
+    ['2026-08-07T20:00:00Z', 'goproflowyo'],
+    ['2026-08-07T21:00:00Z', 'Another'],
+  ]);
+  assert.deepEqual(myWindows(event, ME), [
+    { from: at('2026-08-07T19:00:00Z'), to: at('2026-08-07T21:00:00Z') },
+  ]);
+});
+
+test('myWindows: the LAST slot runs its nominal duration, not to the end of the train', () => {
+  // The train is billed until 02:00 but the lineup stops at 19:00 — playing the
+  // last slot must not put the streamer on screen for another seven hours.
+  const event = lineup('2026-08-08T02:00:00Z', [
+    ['2026-08-07T18:00:00Z', 'SomeoneElse'],
+    ['2026-08-07T19:00:00Z', 'GoProFlowYo'],
+  ]);
+  assert.deepEqual(myWindows(event, ME), [
+    { from: at('2026-08-07T19:00:00Z'), to: at('2026-08-07T20:00:00Z') },
+  ]);
+});
+
+test('myWindows: with no slot duration stated, the last slot falls back to the train end', () => {
+  const event = { ...lineup('2026-08-08T02:00:00Z', [['2026-08-07T19:00:00Z', 'GoProFlowYo']]), slotDurationMins: 0 };
+  assert.deepEqual(myWindows(event, ME), [
+    { from: at('2026-08-07T19:00:00Z'), to: at('2026-08-08T02:00:00Z') },
+  ]);
+});
+
+test('myWindows: a nominal duration never carries a slot past the end of its train', () => {
+  const event = lineup('2026-08-07T19:30:00Z', [['2026-08-07T19:00:00Z', 'GoProFlowYo']]);
+  assert.deepEqual(myWindows(event, ME), [
+    { from: at('2026-08-07T19:00:00Z'), to: at('2026-08-07T19:30:00Z') },
+  ]);
+});
+
+test('myWindows: two separate appearances stay two windows', () => {
+  const event = lineup('2026-08-08T02:00:00Z', [
+    ['2026-08-07T18:00:00Z', 'GoProFlowYo'],
+    ['2026-08-07T19:00:00Z', 'SomeoneElse'],
+    ['2026-08-07T20:00:00Z', 'GoProFlowYo'],
+    ['2026-08-07T21:00:00Z', 'Another'],
+  ]);
+  assert.deepEqual(myWindows(event, ME), [
+    { from: at('2026-08-07T18:00:00Z'), to: at('2026-08-07T19:00:00Z') },
+    { from: at('2026-08-07T20:00:00Z'), to: at('2026-08-07T21:00:00Z') },
+  ]);
+});
+
+test('myWindows: a lineup that does not name me yields no windows', () => {
+  const event = lineup('2026-08-08T02:00:00Z', [
+    ['2026-08-07T18:00:00Z', 'SomeoneElse'],
+    ['2026-08-07T19:00:00Z', null],
+  ]);
+  assert.deepEqual(myWindows(event, ME), []);
+});
+
+// ---- slot-aware resolution (the overnight-overlap bug) ----
+
+// The reported case: an overnight train still running, my slot on it long over,
+// and the train I actually play next departing in 15 minutes.
+const OVERNIGHT = summary('overnight', '2026-08-07T03:00:00Z', '2026-08-08T00:00:00Z');
+const MORNING = summary('morning', '2026-08-07T20:15:00Z', '2026-08-08T02:00:00Z');
+const OVERLAP = [OVERNIGHT, MORNING];
+// My slot on the overnight train ran 04:00–05:00 — sixteen hours ago.
+const PLAYED_OUT = {
+  overnight: [{ from: at('2026-08-07T04:00:00Z'), to: at('2026-08-07T05:00:00Z') }],
+  morning: [{ from: at('2026-08-07T21:00:00Z'), to: at('2026-08-07T22:00:00Z') }],
+};
+
+test('resolveLiveTrain: a train whose slot of mine is over no longer holds the stage', () => {
+  const r = resolveLiveTrain(OVERLAP, NOW, { windows: PLAYED_OUT });
+  assert.notEqual(r.train?.slug, 'overnight');
+});
+
+test('resolveLiveTrain: the train I play next leads, even while another runs', () => {
+  // NOW is 20:00; my morning slot starts 21:00 — inside the 60m lead window.
+  const r = resolveLiveTrain(OVERLAP, NOW, { windows: PLAYED_OUT });
+  assert.equal(r.state, 'lead');
+  assert.equal(r.train.slug, 'morning');
+});
+
+test('resolveLiveTrain: once my slot starts, that train is live', () => {
+  const r = resolveLiveTrain(OVERLAP, at('2026-08-07T21:30:00Z'), { windows: PLAYED_OUT });
+  assert.equal(r.state, 'live');
+  assert.equal(r.train.slug, 'morning');
+});
+
+test('resolveLiveTrain: a train that departed while another runs is NOT swallowed', () => {
+  // The bug: at 20:30 `morning` has departed, so it left the old upcoming list,
+  // while `overnight` held the stage — it was rendered nowhere and listed nowhere.
+  const r = resolveLiveTrain(OVERLAP, at('2026-08-07T20:30:00Z'), { windows: PLAYED_OUT });
+  assert.equal(r.train.slug, 'morning');
+});
+
+test('resolveLiveTrain: after my slot ends there is nothing to render, only the card', () => {
+  const r = resolveLiveTrain(OVERLAP, at('2026-08-07T23:00:00Z'), { windows: PLAYED_OUT });
+  assert.equal(r.state, 'idle');
+  assert.equal(r.train, null);
+});
+
+test('resolveLiveTrain: a live train whose slot of mine is still hours off waits on the card', () => {
+  // Overnight is running and I AM on it, but not for another four hours.
+  const windows = { overnight: [{ from: at('2026-08-08T00:00:00Z'), to: at('2026-08-08T01:00:00Z') }] };
+  const events = [summary('overnight', '2026-08-07T03:00:00Z', '2026-08-08T02:00:00Z')];
+  const r = resolveLiveTrain(events, NOW, { windows });
+  assert.equal(r.state, 'idle');
+  assert.deepEqual(r.upcoming.map((e) => e.slug), ['overnight']);
+});
+
+test('resolveLiveTrain: a train I am definitively not on never takes the stage', () => {
+  const events = [summary('notmine', '2026-08-07T18:00:00Z', '2026-08-08T02:00:00Z')];
+  const r = resolveLiveTrain(events, NOW, { windows: { notmine: [] } });
+  assert.equal(r.state, 'idle');
+  assert.deepEqual(r.upcoming, []);
+});
+
+test('resolveLiveTrain: an unreadable lineup falls back to the whole-train window', () => {
+  // `windows` present but with nothing for this slug = "we could not tell".
+  const events = [summary('unknown', '2026-08-07T18:00:00Z', '2026-08-08T02:00:00Z')];
+  const r = resolveLiveTrain(events, NOW, { windows: {} });
+  assert.equal(r.state, 'live');
+  assert.equal(r.train.slug, 'unknown');
+});
+
+test('resolveLiveTrain: leadMs is tunable', () => {
+  const r = resolveLiveTrain(OVERLAP, NOW, { windows: PLAYED_OUT, leadMs: 30 * MIN });
+  assert.equal(r.state, 'idle'); // my slot is 60m out, beyond a 30m lead
+  assert.deepEqual(r.upcoming.map((e) => e.slug), ['morning']);
 });
 
 // ---- effective settings ----
