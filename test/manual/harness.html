@@ -82,6 +82,7 @@
     import { normalizeEvent } from '../../src/raidpal-client.js';
     import { buildTrain } from '../../src/lineup-engine.js';
     import { renderTrain } from '../../src/train-renderer.js';
+    import { loadAllThemes } from '../../src/themes/registry.js';
     // Share the tz resolver (not parseConfig) so the harness can't drift from
     // the real abbreviation→IANA map.
     import { resolveZone } from '../../src/config.js';
@@ -192,6 +193,10 @@
       ].join('\n');
     }
 
+    // The art is fetched on demand (#89) and renderTrain stays synchronous, so
+    // load before rendering. The harness reaches every Theme by key — including
+    // `starter`, which is off the roster — so it wants the whole lot.
+    await loadAllThemes();
     const first = buildTrain(event, fakeNow(), config);
     const view = renderTrain(first, document.getElementById('train'), config);
     showStatus(first, fakeNow());

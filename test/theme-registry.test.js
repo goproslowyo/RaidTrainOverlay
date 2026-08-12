@@ -1,7 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { THEMES, SHIPPED_THEMES, THEME_KEYS, optionKeyFor } from '../src/themes/registry.js';
+import {
+  THEMES, SHIPPED_THEMES, THEME_KEYS, optionKeyFor, loadAllThemes,
+} from '../src/themes/registry.js';
 import { resolveTheme } from '../src/train-renderer.js';
 import { parseConfig } from '../src/config.js';
 import { THEME_OPTION_KEYS } from '../src/settings-schema.js';
@@ -28,6 +30,11 @@ import starter from '../src/themes/starter/index.js';
 // enum but missing from the map is selectable, survives parseConfig, ships
 // inside a copied OBS browser source, and paints classic. These pin each key to
 // its OWN Theme, which is the only assertion that catches that.
+
+// The art is fetched on demand (#89), so `THEMES` is empty until someone asks.
+// A suite that asserts about the whole roster is exactly the caller that wants
+// all of it — one line, and not one assertion below had to change for it.
+await loadAllThemes();
 
 const read = (rel) => readFileSync(new URL(`../${rel}`, import.meta.url), 'utf8');
 
@@ -107,5 +114,35 @@ test('the preview gallery has a chip for every roster key', () => {
   assert.ok(gallery, 'the preview gallery moved');
   for (const key of THEME_KEYS) {
     assert.match(gallery, new RegExp(`\\['${key}',`), `the preview gallery has no chip for ${key}`);
+  }
+});
+
+/*
+ * ── #89: the art is fetched on demand ──────────────────────────────────────
+ *
+ * `config.js` and `settings-schema.js` import this registry for the roster's
+ * KEYS. While the Theme modules were STATIC imports, asking for sixteen strings
+ * pulled sixteen Themes' worth of art through the wire — a measured +127 KB on
+ * a cold Configurator load, art those pages never paint
+ * (docs/research/theme-registry-page-cost.md).
+ *
+ * The whole saving rests on one property, which is why it gets its own guard:
+ * nothing in registry.js may import a Theme statically. A single `import x from
+ * './x.js'` creeping back in silently restores the old cost — every page that
+ * wants a key pays for all the art again, and no other test in this repo would
+ * notice, because the roster would still be correct.
+ */
+test('the registry declares its Themes lazily, so a page wanting keys pays no art', () => {
+  const src = read('src/themes/registry.js');
+  const staticThemeImport = /^\s*import\s+[^'"]*from\s+'\.\/(?!.*registry)[^']+'/m;
+  assert.doesNotMatch(src, staticThemeImport,
+    'a static Theme import is back in registry.js — that alone restores the +127 KB '
+    + 'every page paid to read sixteen strings. Declare it in THEME_LOADERS instead.');
+  // The specifiers stay written out in full: a bare import() of a template
+  // string is not statically analysable, so nothing — a bundler, a future build
+  // step, a human grepping for who uses a Theme file — could find them.
+  for (const key of THEME_KEYS.filter((k) => k !== 'shuffle')) {
+    assert.match(src, new RegExp(`${key}: \\(\\) => import\\('\\./${key}(\\.js|/index\\.js)'\\)`),
+      `${key} is not declared as a full, greppable import() specifier`);
   }
 });

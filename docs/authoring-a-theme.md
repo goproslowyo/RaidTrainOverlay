@@ -337,11 +337,37 @@ without lag at 20+ Cars, a departed slot stays legible with its PLAYED stamp, an
 
 ## 8. Register it
 
-In JS, a Theme is declared **once**: `import` it in **`src/themes/registry.js`** and add it
-to the `THEMES` map. The `theme` enum in `src/config.js` and the label map in
-`src/settings-schema.js` both derive from that map, so a key cannot be selectable in one
-and unknown to the other. (The starter is registered there too and filtered back out of
-the roster — it's an authoring reference, not a roster Theme.)
+In JS, a Theme is declared **once**: add a line to `THEME_LOADERS` in
+**`src/themes/registry.js`**.
+
+```js
+mytheme: () => import('./mytheme.js'),        // a single-file Theme
+mytheme: () => import('./mytheme/index.js'),  // a Theme that bundles its own assets
+```
+
+It is an `import()` **thunk**, not a static `import`, and that matters. `src/config.js`
+and `src/settings-schema.js` import this registry for the roster's *keys* — the `theme`
+enum and the Configurator's option labels. While the Themes were static imports, asking
+for sixteen strings pulled sixteen Themes' worth of art down the wire: a measured
+**+127 KB** on a cold Configurator load, art those pages never paint
+([the measurement](research/theme-registry-page-cost.md)). Now the art arrives only when
+something is about to paint with it, and the **Overlay in OBS downloads one Theme
+instead of sixteen**.
+
+Write the specifier out in full, as above. A bare `import()` of a template string is not
+statically analysable, so nothing — a future build step, or a human grepping for who uses
+a Theme file — could find it. `test/theme-registry.test.js` fails if a static Theme import
+creeps back in, and if any key is not a full, greppable specifier.
+
+The enum and the label map both still derive from this one literal, so a key cannot be
+selectable in one place and unknown to the other. (The starter is registered here too and
+filtered back out of the roster — it's an authoring reference, not a roster Theme.)
+
+**If you render a Train yourself** — a harness, a test, a gallery — load the art first:
+`await loadTheme(key)`, or `await loadAllThemes()` for the whole roster. `resolveTheme`
+and `renderTrain` stay synchronous on purpose (a render must be one indivisible turn, or
+it can wipe an **Upcoming card** that went up mid-flight), so a roster key whose art has
+not arrived **throws** rather than quietly painting `classic`.
 
 Two things are still written by hand, because the site has no build step:
 
@@ -352,8 +378,10 @@ Two things are still written by hand, because the site has no build step:
   is missing a roster key, so a forgotten one is a failing build rather than a Theme
   nobody can find.
 
-Unknown keys fall back to `classic`, so a half-registered Theme degrades gracefully rather
-than blanking the Overlay.
+Unknown keys — a stale URL naming a Theme that no longer exists — still fall back to
+`classic`, so a half-registered Theme degrades gracefully rather than blanking the
+Overlay. That tolerance is for keys the roster does *not* know; a key it knows but whose
+art nobody loaded is a caller bug, and is loud.
 
 ---
 

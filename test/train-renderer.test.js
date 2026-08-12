@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolveTheme } from '../src/train-renderer.js';
-import { THEMES } from '../src/themes/registry.js';
+import { THEMES, loadAllThemes } from '../src/themes/registry.js';
 import classic from '../src/themes/classic.js';
 import highvibes from '../src/themes/highvibes.js';
 import jazz from '../src/themes/jazz.js';
@@ -12,6 +12,11 @@ import synthwave from '../src/themes/synthwave.js';
 // The Theme strategy interface: config.theme selects a Theme by key;
 // everything else about a Theme stays inside the renderer. These tests pin the
 // dispatch contract (DOM-free); the SVG art is verified headless on a live Event.
+
+// The art is fetched on demand (#89), so resolveTheme's LOOKUP has something to
+// find only once it has been asked for. `resolveTheme` is deliberately not the
+// thing that asks — see its own note.
+await loadAllThemes();
 
 test('resolveTheme returns the Theme registered under its key', () => {
   assert.equal(resolveTheme('classic'), classic);

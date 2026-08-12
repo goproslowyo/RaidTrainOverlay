@@ -10,6 +10,11 @@ import { nextPollDelayMs } from '../src/backoff.js';
 import { buildTrain } from '../src/lineup-engine.js';
 import { normalizeEvent } from '../src/raidpal-client.js';
 import { makeEventPayload } from './fixtures/event-payload.js';
+import { loadAllThemes } from '../src/themes/registry.js';
+
+// The art is fetched on demand (#89) and `renderTrain` stays synchronous, so a
+// suite that renders must load first. One line; no assertion below changed.
+await loadAllThemes();
 
 // What a render hands BACK. The Stage choreography needs two facts from the
 // renderer — which kind of empty stretch this Mode has, and the switch for the

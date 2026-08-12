@@ -18,7 +18,7 @@ import { renderUpcomingCard, retireUpcomingCard } from './upcoming-card.js';
 import { createGapCard } from './gap-card.js';
 import { buildTrain } from './lineup-engine.js';
 import { renderTrain } from './train-renderer.js';
-import { SHIPPED_THEMES } from './themes/registry.js';
+import { SHIPPED_THEMES, isThemeLoaded, loadTheme } from './themes/registry.js';
 import { DEMO_SLUG, DEMO_SPOTLIGHT, makeDemoEvent } from './demo-event.js';
 import { decodeLineup } from './lineup-codec.js';
 import { makeManualEvent } from './manual-lineup.js';
@@ -30,6 +30,22 @@ const LOADED_AT = Date.now(); // page age, for the Live Link idle self-reload
 // Configurator's live preview and for screenshotting an overlay. Read raw so it
 // stays out of the URL schema (parseConfig) and the Configurator's copied link.
 config.preview = ['1', 'true', 'on', 'yes'].includes((new URLSearchParams(window.location.search).get('preview') ?? '').toLowerCase());
+
+// theme=shuffle: cycle the roster pseudo-randomly. A shuffle bag draws every
+// Theme once before any repeat, reshuffles when empty, and never repeats across
+// the seam — fair exposure, no obvious loop. `shownTheme` is the real Theme on
+// screen; `config.theme` stays 'shuffle' as the mode marker.
+//
+// This sits ABOVE the locale await below because of the line under it: the art
+// is only fetched when someone asks (#89), and asking here puts the request in
+// parallel with the catalog and every fetch the feed will make, rather than
+// queued behind them. Measured at 7 ms on loopback, where a round trip costs
+// nothing — on a real link it is a whole one, at first paint. Not awaited:
+// `render` copes if the art has not landed, so this only ever decides whether
+// the first paint waits in parallel or in series.
+const bag = makeShuffleBag(SHIPPED_THEMES);
+let shownTheme = config.theme === 'shuffle' ? bag.next() : config.theme;
+loadTheme(shownTheme).catch(() => {}); // the real report is in `render`'s deferral
 
 // Resolve the display locale once and bind a translator onto config: the engine
 // and every Theme read their words through config.t / config.locale. ?lang= wins,
@@ -66,13 +82,14 @@ if (!config.event && !config.lineup && !config.user) {
   // The other trains, while one is running — the between-Pass card's material.
   let liveHorizon = [];
 
-  // theme=shuffle: cycle the roster pseudo-randomly. A shuffle bag draws every
-  // Theme once before any repeat, reshuffles when empty, and never repeats across
-  // the seam — fair exposure, no obvious loop. `shownTheme` is the real Theme on
-  // screen; `config.theme` stays 'shuffle' as the mode marker.
-  const bag = makeShuffleBag(SHIPPED_THEMES);
-  let shownTheme = config.theme === 'shuffle' ? bag.next() : config.theme;
   let cycleTimer = null;
+
+  // A Theme's art failing to arrive is a network fault like any other: say so
+  // once and leave what is on the Stage alone. An OBS source must never show
+  // broken UI, so it must never show a half-torn-down one either.
+  const reportArt = (key) => (err) => console.error(
+    `RaidTrainOverlay: the "${key}" Theme's art could not be loaded — leaving the Stage as it is.`, err,
+  );
 
   const render = () => {
     if (!current) return;
@@ -82,6 +99,18 @@ if (!config.event && !config.lineup && !config.user) {
     const cfg = config.theme === 'shuffle'
       ? { ...config, theme: shownTheme, shuffleRoll: true }
       : config;
+    // The art is fetched on demand (#89). If it has not arrived, this render
+    // DEFERS — and defers through its own front door, so the retry re-checks
+    // `current` (and the Theme showing by then) in the same turn it paints in.
+    // Nothing has been torn down at this point: the container still shows
+    // whatever it showed, and if the feed goes idle while the art is in flight,
+    // the retry's `if (!current) return` stops the stale paint dead. That is
+    // exactly the property an `await` inside renderTrain would destroy — see
+    // resolveTheme's note.
+    if (!isThemeLoaded(cfg.theme)) {
+      loadTheme(cfg.theme).then(render, reportArt(cfg.theme));
+      return;
+    }
     current.view = renderTrain(buildTrain(current.event, new Date(), cfg), container, cfg);
     // A render re-seeded the Train's own keyframe, so the card's is re-seeded
     // with it — the handle carries both the timing it must share and the
@@ -93,6 +122,9 @@ if (!config.event && !config.lineup && !config.user) {
     if (config.theme !== 'shuffle') return;
     shownTheme = bag.next();
     render();
+    // Warm the NEXT Theme while this one is on screen, so the swap itself never
+    // waits on the network — the deferral above is the safety net, not the plan.
+    loadTheme(bag.peek()).catch(() => {});
   };
   // When to swap to the next Theme. A swap that rides an animation boundary lets the
   // fresh Theme roll all the way in; a timer suits a Train that isn't traversing:
@@ -264,18 +296,27 @@ if (!config.event && !config.lineup && !config.user) {
 function makeShuffleBag(items) {
   let bag = [];
   let last = null;
+  const refill = () => {
+    if (bag.length > 0) return;
+    bag = items.slice();
+    for (let i = bag.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [bag[i], bag[j]] = [bag[j], bag[i]];
+    }
+    if (bag[0] === last && bag.length > 1) [bag[0], bag[1]] = [bag[1], bag[0]];
+  };
   return {
     next() {
-      if (bag.length === 0) {
-        bag = items.slice();
-        for (let i = bag.length - 1; i > 0; i -= 1) {
-          const j = Math.floor(Math.random() * (i + 1));
-          [bag[i], bag[j]] = [bag[j], bag[i]];
-        }
-        if (bag[0] === last && bag.length > 1) [bag[0], bag[1]] = [bag[1], bag[0]];
-      }
+      refill();
       last = bag.shift();
       return last;
+    },
+    /** Which Theme `next()` would draw — so the art can be warmed before the
+     *  swap needs it. Refills first, so a peek at an empty bag is still an
+     *  answer and not a null the caller has to special-case. */
+    peek() {
+      refill();
+      return bag[0];
     },
   };
 }

@@ -1,5 +1,26 @@
 # What the Theme roster costs the landing page and the Configurator
 
+> **Acted on 2026-08-12 (#89).** The static Theme imports this measures are gone:
+> `src/themes/registry.js` now declares `THEME_LOADERS`, a literal of `import()` thunks,
+> and the art is fetched only when something is about to paint with it. The roster's
+> *keys* — which is all `config.js` and `settings-schema.js` ever wanted — cost nothing
+> now. Re-measured locally as an A/B against this tree, uncompressed
+> (`decodedBodySize`, a local server with no gzip, so these are larger than the
+> over-the-wire figures below):
+>
+> | cold load | before | after | requests |
+> |---|---|---|---|
+> | `configurator.html` | 856,760 B | 495,953 B | 49 → 31 |
+> | `overlay.html?event=demo&theme=wood` | 611,272 B | 287,187 B | 39 → 24 |
+> | `index.html` | 511,197 B | 145,107 B | 33 → 15 |
+>
+> Theme art specifically: 372,579 B → 0 on the Configurator and the landing page, and
+> 369,960 B → 33,623 B on the Overlay (one Theme plus its two shared helpers, in place of
+> all sixteen). The **Overlay in OBS now downloads the Theme it paints, not the roster** —
+> the part of this that reaches streamers rather than the settings page.
+>
+> The numbers below stand as the record of what the cost WAS, and of the method.
+
 Measurement record for [#76](https://github.com/goproslowyo/RaidTrainOverlay/issues/76). [#70](https://github.com/goproslowyo/RaidTrainOverlay/issues/70) made `src/config.js` and `src/settings-schema.js` import `src/themes/registry.js`, which statically imports all 16 **Theme** modules. `overlay.html` already paid for that art because it paints **Train**s; `index.html` and `configurator.html` want the roster's keys and labels and now parse the art to reach them. That is exactly what #70 specified, so this is not a defect report. It is the number nobody had.
 
 Run 2026-08-11 against the Pages deployment at `8227b06`. `index.html`, `configurator.html`, `src/config.js` and `src/themes/registry.js` were fetched from Pages and are byte-identical (`shasum`) to the tree measured, so the deployment is the tree.

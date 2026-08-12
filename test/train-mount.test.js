@@ -2,10 +2,14 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parseHTML } from 'linkedom';
 import { renderTrain } from '../src/train-renderer.js';
-import { THEMES } from '../src/themes/registry.js';
+import { THEMES, loadAllThemes } from '../src/themes/registry.js';
 import { buildTrain } from '../src/lineup-engine.js';
 import { normalizeEvent } from '../src/raidpal-client.js';
 import { makeEventPayload } from './fixtures/event-payload.js';
+
+// The art is fetched on demand (#89) and `renderTrain` stays synchronous, so a
+// suite that renders must load first. One line; no assertion below changed.
+await loadAllThemes();
 
 // Where a Train LANDS. The renderer takes its Document from the mount, and so
 // does every Theme — the Stage, the Track, the Cars, and the Theme's own

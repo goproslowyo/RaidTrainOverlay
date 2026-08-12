@@ -14,13 +14,40 @@
  * by hand (no build step, by design); test/theme-registry.test.js holds those
  * honest.
  */
-import { THEMES } from './themes/registry.js';
+import { THEMES, THEME_LOADERS } from './themes/registry.js';
 import { breatherCycle } from './gap-choreography.js';
 import { stageClock } from './stage-clock.js';
 
-/** config.theme → Theme, falling back to classic for unknown/unshipped keys. */
+/**
+ * config.theme → Theme, falling back to classic for unknown/unshipped keys.
+ *
+ * Synchronous, and deliberately so. The art arrives over the network now (#89),
+ * but FETCHING is `loadTheme`'s job and the caller's moment to choose; resolving
+ * is a lookup. Keeping it a lookup is what keeps `renderTrain` synchronous, and
+ * keeping THAT synchronous is what makes a render one indivisible turn — the
+ * property the whole shape rests on. With an `await` in here, `renderTrain`
+ * clears the container AFTER the await, past the last point any caller can
+ * interpose, so a render decided before the feed goes idle destroys the
+ * **Upcoming card** the shell put up in the meantime. That was measured against
+ * a negative control, not reasoned about.
+ *
+ * A key the roster KNOWS but nobody loaded throws, rather than quietly painting
+ * classic. That throw is load-bearing pessimism: silently painting classic for a
+ * Theme the user actually chose is precisely the failure #70 closed, and lazy
+ * loading would otherwise re-open it along a new axis — not "the roster drifted"
+ * but "the art had not arrived yet". A caller that has not loaded its art has a
+ * bug, and a bug should be loud. Unknown keys still fall back, because that is a
+ * runtime condition (a stale URL from an older release) rather than a caller bug.
+ */
 export function resolveTheme(key) {
-  return THEMES[key] ?? THEMES.classic;
+  if (THEME_LOADERS[key] && !Object.hasOwn(THEMES, key)) {
+    throw new Error(`RaidTrainOverlay: Theme "${key}" has not been loaded — await loadTheme(${JSON.stringify(key)}) before rendering.`);
+  }
+  const theme = THEMES[key] ?? THEMES.classic;
+  if (!theme) {
+    throw new Error('RaidTrainOverlay: no Theme has been loaded — await loadTheme(config.theme) before rendering.');
+  }
+  return theme;
 }
 
 /**
