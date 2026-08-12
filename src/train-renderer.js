@@ -16,6 +16,7 @@
  */
 import { THEMES } from './themes/registry.js';
 import { breatherCycle } from './gap-choreography.js';
+import { stageClock } from './stage-clock.js';
 
 /** config.theme → Theme, falling back to classic for unknown/unshipped keys. */
 export function resolveTheme(key) {
@@ -172,8 +173,9 @@ function ensureBaseStyles(doc) {
       .rt-car, .rt-wheel, .rt-smoke > *, .rt-now-bob { animation: none !important; }
       .rt-smoke > * { opacity: 0; }
       /* The Breather clears the stage on a cycle; with reduced motion the
-         Train simply stays put rather than fading away and back. */
-      .rt-stage--breather { animation: none !important; }
+         Train simply stays put rather than fading away and back — and a Stage
+         that never faded has nothing to be eased back from. */
+      .rt-stage--breather, .rt-stage--breather-return { animation: none !important; }
     }
   `;
   doc.head.appendChild(style);
@@ -312,6 +314,23 @@ function applyMode(doc, track, config, buildCopy) {
           100% { opacity: 1; }
         }
         .rt-stage--breather { animation: rt-breather ${cycle.cycleSec}s linear infinite; }
+        /* Switched OFF mid-Breather, the Stage must not cut back: this one-shot
+           ramp carries it from wherever the fade had got to up to full opacity,
+           at the Breather's own fade-in RATE. Caught mid-fade-in, what is left
+           to run is exactly what a natural return would have had left. Caught
+           mid-fade-OUT, or anywhere across the empty stretch, it is deliberately
+           SHORTER than that: the Breather is over, so there is nothing left to
+           finish fading down for, and the Stage comes straight back up at the
+           rate it would have come back at. A negative animation-delay starts it
+           partway up — the same trick the card's layer uses. Its own keyframe
+           NAME, because a rule that merely re-timed the Breather's own would
+           seek the animation already running instead of starting one.
+           At trackfadein=0 this ramp is 0s, so the return IS a cut. Named
+           rather than fixed: 0 is a legal setting documented as "an instant
+           cut", and the Breather's own return is a cut at that setting too, so
+           easing here would be the one fade that setting did not switch off. */
+        @keyframes rt-breather-return { from { opacity: 0; } to { opacity: 1; } }
+        .rt-stage--breather-return { animation: rt-breather-return ${cycle.fadeInSec}s linear 1; }
       `;
     }
     // The keyframes are generated here; the CLASS is not applied. The renderer
@@ -393,6 +412,48 @@ function applyMode(doc, track, config, buildCopy) {
 }
 
 /**
+ * What `rt-breather` paints `elapsedSec` into its cycle: full opacity through
+ * the crawl, down across the fade-out, nothing across the empty stretch, back
+ * up across the fade-in. The same four numbers that keyframe is generated from,
+ * read as a value rather than as percentages — which is what lets a Breather
+ * switched off mid-fade be eased back from where it actually is instead of cut.
+ * It mirrors the keyframe above and moves with it.
+ *
+ * Pure — no DOM and no clock, so the one clock read stays at the switch and
+ * this stays a rule a test can ask directly.
+ */
+export function breatherOpacityAt(elapsedSec, { cycleSec, crawlSec, fadeOutSec, fadeInSec } = {}) {
+  if (!(cycleSec > 0)) return 1;
+  // No floor, because a floor here was a no-op that read as a safeguard. It
+  // used to say `Math.max(0, elapsedSec)`, and `crawlSec` is never below
+  // MIN_CRAWL_SEC (60), so every negative already fell into the crawl branch
+  // below and answered 1 with or without it — deleting it left all 502 tests
+  // green, including one whose message named it.
+  //
+  // What matters is what that 1 MEANS for a negative: full opacity is the
+  // branch that applies no ramp at all, so a backward step reads as "nothing to
+  // ease" and the Stage cuts. On a wall clock that was the MECHANISM by which
+  // #88 came back, not a guard against it (a -100s step measured 0.6674,
+  // against 0.66742 for ripping the class off outright). Nothing arithmetic
+  // here can fix that. What fixes it is the caller's epoch being monotonic —
+  // see src/stage-clock.js — so elapsedSec cannot run backwards in the first
+  // place.
+  const at = elapsedSec % cycleSec;
+  if (at <= crawlSec) return 1;
+  if (at < crawlSec + fadeOutSec) return 1 - (at - crawlSec) / fadeOutSec;
+  const fadeInFrom = cycleSec - fadeInSec;
+  if (at <= fadeInFrom) return 0;
+  return (at - fadeInFrom) / fadeInSec;
+}
+
+/*
+ * The clock this module's epoch is read on lives in src/stage-clock.js, because
+ * src/gap-card.js phases its own generated keyframe on the same timeline and
+ * neither module may own the other's clock. See that module for the whole
+ * argument and the measurements.
+ */
+
+/**
  * Render the Train into `container`, replacing previous content. The selected
  * Theme builds the art; this host wires up the Stage/Track and the Mode. Built
  * once; the returned handle updates time state in place (per copy) so a timer
@@ -457,6 +518,12 @@ export function renderTrain(train, container, config) {
   stage.appendChild(track);
   container.appendChild(stage);
   const timing = applyMode(doc, track, config, buildCopy);
+  // Resolved once, from THIS Stage's Document, so the epoch and the read that
+  // measures against it can never turn out to be two different clocks.
+  const now = stageClock(doc);
+  // When `rt-stage--breather` last landed, which IS when `rt-breather` started,
+  // so the cycle's phase is known without reading a frame back out of the Stage.
+  let breatherFrom = 0;
   // The post-attach pass — every Theme's shrink-to-fit (fitAll) and the lead badge.
   // NEVER defer this to requestAnimationFrame. rAF only runs at a rendering
   // opportunity, so in a document that is never painted the callback sits queued and
@@ -493,9 +560,96 @@ export function renderTrain(train, container, config) {
      * card to put in one depends on the Horizon, which the caller owns — so the
      * caller has the last word, and this keeps the DOM detail on this side of the
      * seam. A no-op when this render has no Breather.
+     *
+     * Off is not the mirror image of on. A Breather ENDS by fading the Stage
+     * back — "Train and Track together, by a fade, never a slide" — so the
+     * switch thrown mid-Breather (the **Horizon** empties on one resolve tick)
+     * must end it the same way rather than restoring full opacity in one frame,
+     * which measured a 0.67 jump on a single frame (#88). The Stage is handed
+     * the one-shot return keyframe instead, seeded by its phase: the fade it was
+     * in is finished upwards, and only then is the Stage plain again.
      */
     setBreather(on) {
-      if (timing.kind === 'breather') stage.classList.toggle('rt-stage--breather', Boolean(on));
+      if (timing.kind !== 'breather') return;
+      const classes = stage.classList;
+      if (on) {
+        // Already running: nothing here may be re-run. Every resolve tick that
+        // finds the Horizon still full asks for the Breather again, and without
+        // this the class would be re-added — restarting a three-minute
+        // `rt-breather` from 0% — and the epoch would move with it, so the
+        // Stage's phase would become the phase of whichever tick last fired.
+        // That is #85's subject, on this side of the seam.
+        if (classes.contains('rt-stage--breather')) return;
+        // A return still easing back is over. `rt-breather` opens at 0%, which
+        // is FULL opacity, so taking the Stage back mid-ramp steps it up from
+        // wherever the ramp had got to — the review that found this measured 0.949
+        // in one frame, larger
+        // than the cut #88 fixed. It is held out of reach rather than handled,
+        // and what holds it there starts with a cadence constant three modules
+        // away: the Live Link resolve tick is floored at 15 minutes
+        // (DEFAULT_RESOLVE_MIN in src/live-link-feed.js, and `refreshMinutes`
+        // in src/config.js floors any value a streamer chooses to 15 as well),
+        // while this ramp lasts at most `trackfadein`, capped at 120s. So the
+        // Horizon does not empty and refill inside one ramp. The one thing that
+        // emits twice within a tick — annotateMySlots painting cache-first and
+        // then refining — cannot do it either, because it preserves the row
+        // count, so an empty emit is never followed by a full one. Shorten that
+        // cadence below the ramp and this becomes reachable; nothing nearer
+        // than those three facts guards it, and all three are now asserted in
+        // test/train-timing.test.js rather than only described here — the
+        // cadence at its JITTERED floor (765s, not the nominal 900), the cap,
+        // and the row count. The one residual the three do not close: a
+        // window-spec Horizon re-filters per emit against a fresh `now`, so its
+        // edge can admit a train between the two emits of one tick. Arithmetic
+        // rather than impossibility, and vanishingly improbable.
+        classes.remove('rt-stage--breather-return');
+        stage.style.animationDelay = '';
+        // The class landing is the cycle's epoch — one clock read, at the one
+        // moment it moves, and the same moment the card re-seeds against (#85).
+        // The two epochs never have to agree with EACH OTHER: they feed two
+        // different keyframes (`rt-breather` here, `rt-gap-card` in
+        // src/gap-card.js) and neither module reads the other's. What each must
+        // agree with is the timeline its OWN keyframe runs on — and both now
+        // do, because both take their clock from src/stage-clock.js. An earlier
+        // note here read that independence as licence for the card to stay on
+        // `Date.now()`. It was not: the question a shared epoch would raise is
+        // not the question either epoch has to answer.
+        breatherFrom = now();
+        classes.add('rt-stage--breather');
+        return;
+      }
+      // Already off, or already easing back: neither has a fade to finish, and
+      // this guard is the only thing that says so. It is reached constantly —
+      // gap-card's `clear()` throws the switch off on every empty-Horizon tick,
+      // and `restart` throws it off again on a handle swap — so without it a
+      // redundant off-call reads an epoch that has gone stale, lands in a fade
+      // phase it was never in, and ramps a Stage that never faded up from
+      // nothing. Deleting the line was invisible to the suite until the case
+      // was written down; it is red now, in test/train-timing.test.js's
+      // "switching the Breather OFF when it is already off changes nothing".
+      if (!classes.contains('rt-stage--breather')) return;
+      classes.remove('rt-stage--breather');
+      const opacity = breatherOpacityAt((now() - breatherFrom) / 1000, timing);
+      // Between the fades, at full opacity — and ONLY there. Nothing to ease,
+      // and the class coming off is invisible. The threshold is full opacity
+      // rather than anything below it because every opacity under 1 is a Stage
+      // mid-fade, and cutting one of those back is exactly #88.
+      if (opacity >= 1) {
+        stage.style.animationDelay = '';
+        return;
+      }
+      // The class and this inline delay outlive the one-shot — nothing clears
+      // them when it ends, because clearing would want a listener this design
+      // deliberately has none of. The linger is bounded, though: the next
+      // `setBreather(true)` removes the class and blanks this delay before it
+      // does anything else, and any re-render builds a fresh Stage. So the
+      // exposure is a Stage that never gets another Breather, not every Stage.
+      // Harmless only while `.rt-stage--breather-return` is the ONLY
+      // rule that puts an `animation` on `.rt-stage`: an inline LONGHAND beats
+      // a stylesheet SHORTHAND, so a future `animation:` on `.rt-stage` would
+      // silently inherit this stale negative seed. Add one and clear this here.
+      stage.style.animationDelay = `-${(opacity * timing.fadeInSec).toFixed(3)}s`;
+      classes.add('rt-stage--breather-return');
     },
   };
 }
