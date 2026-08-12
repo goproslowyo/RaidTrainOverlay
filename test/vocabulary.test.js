@@ -91,6 +91,15 @@ test('Stage is defined — Track visibility and Breather both lean on it', () =>
   assert.match(entry('Stage'), /\*\*Breather\*\*/, 'a Breather is the thing that clears the Stage');
 });
 
+test('Turn is defined, and the Live Link says it is what it follows', () => {
+  // The Overlay follows its streamer, not the timetable. Whenever that slips
+  // back into "the live (or next) train" the overlap bug is describable again.
+  const turn = entry('Turn');
+  assert.match(turn, /\*\*Live Link\*\*/, 'a Turn must say whose unit it is');
+  assert.match(turn, /\*\*Stage\*\*/, 'must say what ending a Turn does');
+  assert.match(entry('Live Link'), /\*\*Turn\*\*/, 'the Live Link must say it follows the Turn');
+});
+
 test('Cell is defined — the rule confining the card to its anchor', () => {
   assert.match(entry('Cell'), /`uppos`/, 'the anchors the Cells belong to are not named');
 });

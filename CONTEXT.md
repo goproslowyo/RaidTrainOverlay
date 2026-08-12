@@ -98,7 +98,7 @@ The rule that the **Train** and the **Upcoming card** never share the **Stage**,
 _Avoid_: sync, scheduling, timing (each names a mechanism; this names the guarantee)
 
 **Upcoming card**:
-The panel that lists what raid trains are coming up. What the Overlay shows when no Train is live — a **Live Link** concept, since resolving "next" needs a **Profile** — and it also takes the pauses while one is running: the gap between **Passes**, or a marquee **Breather**. Deliberately unthemed: a sodium departure-board slab that sits on any scene, never the active **Theme**'s art. Distinct from **Upcoming**, the Train lifecycle state: that is a Train waiting at the station, this is the card on screen when there is no Train at all.
+The panel that lists what raid trains are coming up. What the Overlay shows when no **Turn** of the streamer's is running — a **Live Link** concept, since resolving "next" needs a **Profile** — and it also takes the pauses while one is: the gap between **Passes**, or a marquee **Breather**. Deliberately unthemed: a sodium departure-board slab that sits on any scene, never the active **Theme**'s art. Distinct from **Upcoming**, the Train lifecycle state: that is a Train waiting at the station, this is the card on screen when there is no Train at all.
 _Avoid_: idle card, next-up widget, banner (the code's `idle*` naming is older and inconsistent; the domain word is the card)
 
 **Horizon**:
@@ -191,8 +191,12 @@ That last one is the rename guard, and it is the load-bearing one. RaidPal has n
 The streamer is told after the fact by a standing notice with a *Keep them* button (an in-memory restore, suppressed for the rest of the session so the next read does not undo their choice). There is no setting for any of this — a setting would put the question to every streamer forever, which is the friction the feature exists to remove.
 _Avoid_: garbage collection, expiry, auto-delete (the last two name what #31 rejected, which this is not)
 
+**Turn**:
+The stretch of an Event during which the streamer themselves is playing: their own slot in the lineup, or a run of back-to-back slots, which is one Turn and not several. The unit a **Live Link** actually follows — the Overlay renders the train a Turn is running on (or is about to, `lead` minutes out) and clears the **Stage** when that Turn ends, however many hours the train itself runs on. Read from the Event's lineup, so it is evidence rather than a certainty: a lineup that cannot be fetched falls back to the whole train, while one that reads cleanly and does not name the streamer means that train is not theirs and never takes the **Stage**. Two trains overlapping is therefore an ordinary Tuesday, not an ambiguity — only one of them has a Turn on it.
+_Avoid_: slot (a slot is RaidPal's row; a Turn may be several), shift, my window (the code's `myWindows` is the plural of this, not a second idea)
+
 **Live Link**:
-An Overlay URL keyed to a Profile's username rather than one Event: the Overlay resolves the currently-live (or next) Event from the RaidPal user endpoint at load. Set once in OBS, never edited per train. Carries its settings — including any per-Event mappings — encoded in the URL itself; it never reads the Configurator's localStorage.
+An Overlay URL keyed to a Profile's username rather than one Event: the Overlay resolves which Event to show from the RaidPal user endpoint, following the streamer's own **Turn** rather than whichever train happens to be running. Set once in OBS, never edited per train. Carries its settings — including any per-Event mappings — encoded in the URL itself; it never reads the Configurator's localStorage. `wholetrain=1` opts out, restoring the pre-Turn rule where any running train holds the **Stage** for its whole run.
 _Avoid_: magic URL (in code; fine in prose)
 
 **One-off link**:

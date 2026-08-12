@@ -74,6 +74,14 @@ instead of `event`, plus its own params — all written by the Configurator:
 | `upscroll` | Seconds for one full lap of the scrolling view (default `34`; higher is slower). |
 | `uponly` | Upcoming-trains-only source for a separate OBS scene: always the listing, never the train — even while one is live. |
 | `upgap` | On by default: while a train is live, the listing also pops up briefly in the pauses — between passes, or in a marquee's breathers — never over the train itself. `upgap=0` turns that off, leaving the listing to appear only between trains. |
+| `lead` | Minutes before **your own slot** that the train rolls in (default `60`, max `360`). `lead=0` means it appears exactly as you go on. |
+| `wholetrain` | `wholetrain=1` goes back to showing any train that's running, for as long as it runs, regardless of whether you're on it. |
+
+The overlay follows **you**, not the timetable: it shows the train you're playing on,
+from `lead` minutes before your slot until the moment your slot ends — then it clears
+and the upcoming listing takes over. Two trains overlapping is fine; the one you're
+actually on wins. If a lineup can't be read, or doesn't name you, that train falls back
+to being shown for its whole run.
 
 ## Self-hosting on GitHub Pages
 
