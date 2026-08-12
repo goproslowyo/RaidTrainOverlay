@@ -43,6 +43,44 @@ const AMBER = '#FFC578';
 const INK = '#EDF1F7';
 
 /**
+ * The floor no role may sit below. A stream is not read at monitor distance,
+ * and an OBS source can be scaled DOWN inside a scene, so the smallest role is
+ * the first thing to stop reading — with no fallback beneath it.
+ */
+export const MIN_TYPE_PX = 12.5;
+
+/**
+ * The card's type scale, in px, authored at 1080p OBS scale — the size the
+ * panel paints ON STREAM. The Configurator's preview is NOT bound to these:
+ * that mock draws its own skin at a deliberately-oversize cartoon scale (see
+ * `PREVIEW_ZOOM` in configurator.html), because a true 1:1 miniature of this
+ * card inside a ~440px stage clips to a row and a half.
+ *
+ * Stated as one object because these are a ranked SCALE rather than nine
+ * independent numbers: the panel reads because the name outranks its departure
+ * time, which outranks the UTC footnote. Raising one role and leaving the rest
+ * behind flattens the panel instead of enlarging it — which is what the guards
+ * in test/upcoming-card.test.js pin, alongside the floor.
+ *
+ * Raised once already, on the owner's report that the card read on a monitor
+ * and not from across a room. The scrolling view runs a notch below the card
+ * view throughout: it is one line inside the same **Cell**, so every px it
+ * spends on height is a px of scroll window it does not have.
+ *
+ * `scrolling.eyebrow` is the one number here that is load-bearing elsewhere and
+ * must not move casually: the 1709px breakpoint in `ensureStyles` is calibrated
+ * to the English eyebrow's rendered width at exactly this size.
+ */
+export const TYPE = {
+  card: {
+    eyebrow: 14, page: 13.5, when: 17, name: 20, utc: 13.5,
+  },
+  scrolling: {
+    eyebrow: 13, when: 15, name: 17.5, utc: 12.5,
+  },
+};
+
+/**
  * What the rows are built from: the locale, and the streamer's first `tz`
  * zone when set — pinning the card to a chosen zone even when the OBS
  * machine's clock lives elsewhere — else the machine's own.
@@ -89,10 +127,13 @@ function panelSignature(trains, config) {
 }
 
 /**
- * The **Cell** rule, in the owner's words: picture the scene as three columns
- * and three rows. The nine `uppos` anchors are those nine cells, and an item at
- * one anchor must not bleed into another column or row. So the cell is a third
- * of the scene on each axis — stated here, once, in the whole codebase.
+ * The **Cell**: picture the scene as three columns and three rows. The nine
+ * `uppos` anchors are those nine cells — a third of the scene on each axis,
+ * stated here, once, in the whole codebase.
+ *
+ * A Cell is where an anchor SITS. It is no longer the whole of what an anchor
+ * may take: see `cellSpan` for the ceiling, which the owner relaxed once the
+ * card's type grew.
  *
  * The unit is the caller's because the surface is: the **Stage** measures
  * itself in VIEWPORT units and never in JS, since OBS browser sources and our
@@ -104,16 +145,55 @@ function panelSignature(trains, config) {
 export const cellThird = (unit) => `33.3333${unit}`;
 
 /**
+ * How many Cells wide (or tall) an anchor's ceiling is, on one axis, given that
+ * axis's position letter.
+ *
+ * The rule the owner stated, in their words: take the 3×3 grid as a suggested
+ * ANCHOR POINT, and it is fine if the card overflows into the neighbours it is
+ * next to — a top-centre card that grows wide may run into the left and right
+ * cells. So the ceiling is the anchor's own Cell plus every neighbour it can
+ * grow toward on that axis: **3 for a centre position** (a neighbour on each
+ * side), **2 for an edge** (one neighbour, inward).
+ *
+ * This replaces the stricter "must not bleed into another column or row". What
+ * survives of that rule is the part that was load-bearing: there is still a
+ * ceiling, and it is still anchor-dependent, so the scrolling view cannot go
+ * back to spanning the whole screen from a corner the way it once did.
+ */
+export const cellSpan = (pos) => (pos === 'l' || pos === 'r' || pos === 't' || pos === 'b' ? 2 : 3);
+
+/**
  * The whole box budget, in one place because its three parts are one thing:
- * the `cell` an anchor may fill, the `pad` holding the panel off the screen
- * edge (which comes OUT of the cell, never adds to it), and the `floor` below
- * which the card view stops shrinking — when the cell can afford it.
+ * the `cell` an anchor is placed in, the `pad` holding the panel off the screen
+ * edge (which comes OUT of the budget, never adds to it), and the `floor` below
+ * which the card view stops shrinking — when the budget can afford it.
  *
  * Sized for a 1080p OBS scene. The Configurator's **Preview** shares the cell
  * and passes its own pad and floor: those two are pixel quantities, so they
  * are genuinely scale-dependent, and its stage is a fraction of a scene.
  */
 const BUDGET = { cell: { w: cellThird('vw'), h: cellThird('vh') }, pad: 24, floor: '340px' };
+
+/**
+ * One Cell's width with the insets already taken out — the scrolling view's own
+ * ceiling, which does NOT follow `cellSpan`.
+ *
+ * The relaxed ceiling exists for a panel whose width is decided by its
+ * CONTENTS: the card view asks for the room three titles need at the new type
+ * scale, and stops. The scrolling view's content is the whole **Horizon** on
+ * one line — longer than any screen — so it does not ask for a width, it takes
+ * whatever it is handed. Handed a 3-Cell span it goes back to being a bar
+ * across the entire scene at every anchor, which is the exact complaint the
+ * budget was introduced to answer. So the one-line **Footprint** keeps the
+ * Cell it already had. Its eyebrow breakpoint depends on this too — 1709px is
+ * calibrated to the English eyebrow inside a one-third cell.
+ *
+ * Exported because the Configurator's **Preview** needs the same number in its
+ * own unit. A Preview may be dishonest about scale, never about where the card
+ * lands — and a mock scrolling view spreading across the whole preview stage
+ * while the Overlay's holds one Cell is exactly that kind of lie.
+ */
+export const oneCellWidth = ({ cell, pad } = BUDGET) => `calc(${cell.w} - ${pad * 2}px)`;
 
 /**
  * Anchor key → the whole box budget for a panel at that anchor: where it sits
@@ -141,14 +221,16 @@ export function anchorStyle(key, budget = {}) {
     : h === 'r' ? `right:${pad}px;justify-content:flex-end`
       : 'left:50%;justify-content:center';
   const shift = [centre && 'translateX(-50%)', mid && 'translateY(-50%)'].filter(Boolean);
-  // The inset that holds the panel off the screen edge comes OUT of the cell
-  // rather than adding to it, so no anchor can reach past its column or row.
+  // The ceiling on each axis: the anchor's Cell plus the neighbours it may grow
+  // into (see `cellSpan`). The inset that holds the panel off the screen edge
+  // comes OUT of that budget rather than adding to it, so even a 3-Cell span
+  // stops short of the screen edge instead of touching it.
+  const wide = `calc(${cell.w} * ${cellSpan(h)} - ${pad * 2}px)`;
+  const tall = `calc(${cell.h} * ${cellSpan(v)} - ${pad * 2}px)`;
   // The floor is a `min()` against that same budget — a hard 340px is wider
-  // than a third of a 960-wide scene, which is the bleed the rule exists to
-  // prevent.
-  const box = `max-width:calc(${cell.w} - ${pad * 2}px)`
-    + `;max-height:calc(${cell.h} - ${pad * 2}px)`
-    + `;min-width:min(${floor}, ${cell.w} - ${pad * 2}px)`;
+  // than a third of a 960-wide scene, so a floor that could out-vote the
+  // ceiling would put the panel off the edge of a small scene.
+  const box = `max-width:${wide};max-height:${tall};min-width:min(${floor}, ${wide})`;
   return `position:absolute;display:flex;pointer-events:none;${box};${vert};${horz}`
     + (shift.length ? `;transform:${shift.join(' ')}` : '');
 }
@@ -216,27 +298,27 @@ function panelCss(config) {
   ].join(';');
 }
 
-/** The amber mono eyebrow both footprints open with. */
-function panelLabel(doc, config) {
+/** The amber mono eyebrow both footprints open with, at the caller's scale. */
+function panelLabel(doc, config, scale) {
   const label = doc.createElement('span');
   label.textContent = config.t('overlay.upcoming');
-  label.style.cssText = `font-family:${FONT_MONO};font-size:13px;font-weight:700;letter-spacing:0.2em;text-transform:uppercase;color:${AMBER};white-space:nowrap`;
+  label.style.cssText = `font-family:${FONT_MONO};font-size:${scale.eyebrow}px;font-weight:700;letter-spacing:0.2em;text-transform:uppercase;color:${AMBER};white-space:nowrap`;
   return label;
 }
 
 /**
- * A built row's moment as [zoned time (amber mono), UTC anchor (dim mono)].
- * Which moment that is — the streamer's own slot start where the lineup knows
- * it, the train's departure otherwise — is `upcomingRows`' rule, not this
- * file's; here it is only type.
+ * A built row's moment as [zoned time (amber mono), UTC anchor (dim mono)], at
+ * the calling view's scale. Which moment that is — the streamer's own slot
+ * start where the lineup knows it, the train's departure otherwise — is
+ * `upcomingRows`' rule, not this file's; here it is only type.
  */
-function timePair(doc, row) {
+function timePair(doc, row, scale) {
   const when = doc.createElement('span');
   when.textContent = row.when;
-  when.style.cssText = `font-family:${FONT_MONO};font-size:15px;color:${AMBER};white-space:nowrap;flex:none`;
+  when.style.cssText = `font-family:${FONT_MONO};font-size:${scale.when}px;color:${AMBER};white-space:nowrap;flex:none`;
   const utc = doc.createElement('span');
   utc.textContent = row.utc;
-  utc.style.cssText = `font-family:${FONT_MONO};font-size:12.5px;color:rgba(237,241,247,0.45);white-space:nowrap;flex:none`;
+  utc.style.cssText = `font-family:${FONT_MONO};font-size:${scale.utc}px;color:rgba(237,241,247,0.45);white-space:nowrap;flex:none`;
   return [when, utc];
 }
 
@@ -249,16 +331,16 @@ function renderCard(doc, trains, config) {
   // the panel is the flex child that fills it. `overflow:hidden` makes the
   // cell's height a real ceiling on a short scene rather than a nominal one —
   // rows are clipped by the slab instead of spilling out of it.
-  card.style.cssText = `${panelCss(config)};flex:1 1 auto;min-width:0;overflow:hidden;padding:14px 18px`;
+  card.style.cssText = `${panelCss(config)};flex:1 1 auto;min-width:0;overflow:hidden;padding:15px 20px`;
 
   const head = doc.createElement('div');
-  head.style.cssText = 'display:flex;align-items:baseline;gap:14px;padding-bottom:9px;margin-bottom:7px;border-bottom:1px solid rgba(255,255,255,0.07)';
-  head.appendChild(panelLabel(doc, config));
+  head.style.cssText = 'display:flex;align-items:baseline;gap:14px;padding-bottom:10px;margin-bottom:8px;border-bottom:1px solid rgba(255,255,255,0.07)';
+  head.appendChild(panelLabel(doc, config, TYPE.card));
   let pageMark = null;
   const pages = upcomingPages(trains);
   if (pages > 1) {
     pageMark = doc.createElement('span');
-    pageMark.style.cssText = `margin-left:auto;font-family:${FONT_MONO};font-size:12.5px;color:#71808F;letter-spacing:0.06em;font-variant-numeric:tabular-nums;white-space:nowrap`;
+    pageMark.style.cssText = `margin-left:auto;font-family:${FONT_MONO};font-size:${TYPE.card.page}px;color:#71808F;letter-spacing:0.06em;font-variant-numeric:tabular-nums;white-space:nowrap`;
     head.appendChild(pageMark);
   }
   card.appendChild(head);
@@ -275,19 +357,19 @@ function renderCard(doc, trains, config) {
     if (pageMark) pageMark.textContent = `${(((page % pages) + pages) % pages) + 1} / ${pages}`;
     list.replaceChildren();
     for (const row of upcomingRows(visibleUpcoming(trains, page), rowOptions(config))) {
-      const [when, utc] = timePair(doc, row);
+      const [when, utc] = timePair(doc, row, TYPE.card);
       const name = doc.createElement('span');
       name.textContent = row.title;
       // min-width:0 makes the ellipsis real (a grid item's min-width defaults
       // to its content); the soft shadow lifts the name off any scene behind
       // the panel's translucency.
-      name.style.cssText = 'min-width:0;font-size:17px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'
+      name.style.cssText = `min-width:0;font-size:${TYPE.card.name}px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;`
         + 'text-shadow:0 1px 2px rgba(0,0,0,0.85), 0 0 8px rgba(0,0,0,0.5)';
       // Every cell on a fresh page is an entering cell; the shared soft rise
       // makes the swap read as the list moving on, not the card blinking.
       for (const cell of [when, name, utc]) {
         cell.classList.add('rt-upcoming-row-enter');
-        cell.style.padding = '4px 0';
+        cell.style.padding = '5px 0';
       }
       list.append(when, name, utc);
     }
@@ -335,14 +417,15 @@ function renderCard(doc, trains, config) {
 function renderScrollingView(doc, trains, config) {
   const panel = doc.createElement('div');
   panel.className = 'rt-upcoming-ticker';
-  // `flex:1 1 auto;min-width:0` is the same fill rule the card view uses: the
+  // `flex:1 1 auto;min-width:0` is the same fill rule the card view uses — the
   // panel takes the budget `anchorStyle` set and no more. It used to be the
-  // whole width rule, which is why one line spanned whole screens — its
-  // content is one very long line, so with no ceiling above it there was
-  // nothing to shrink against.
-  panel.style.cssText = `${panelCss(config)};border-radius:999px;padding:11px 22px;display:flex;align-items:center;gap:16px;flex:1 1 auto;min-width:0`;
+  // whole width rule, which is why one line spanned whole screens: its content
+  // is one very long line, so with no ceiling above it there was nothing to
+  // shrink against. The extra `max-width` is what keeps that closed now that
+  // the anchor's own ceiling spans neighbouring Cells — see `oneCell`.
+  panel.style.cssText = `${panelCss(config)};border-radius:999px;padding:12px 24px;display:flex;align-items:center;gap:16px;flex:1 1 auto;min-width:0;max-width:${oneCellWidth()}`;
 
-  const label = panelLabel(doc, config);
+  const label = panelLabel(doc, config, TYPE.scrolling);
   // The eyebrow yields to the trains. It is a fixed ~209px at every scene size
   // (13px mono, wide tracking), so inside a cell it is a caption eating the
   // content's room: 35% of the budget at 1920, 55% at 1280, and everything at
@@ -363,10 +446,8 @@ function renderScrollingView(doc, trains, config) {
 
   const entry = (row) => {
     const item = doc.createElement('span');
-    item.style.cssText = 'display:inline-flex;align-items:baseline;gap:9px;font-size:15.5px;font-weight:600';
-    const [when, utc] = timePair(doc, row);
-    when.style.fontSize = '13.5px';
-    utc.style.fontSize = '11.5px';
+    item.style.cssText = `display:inline-flex;align-items:baseline;gap:9px;font-size:${TYPE.scrolling.name}px;font-weight:600`;
+    const [when, utc] = timePair(doc, row, TYPE.scrolling);
     // Sheds below the eyebrow's breakpoint: the UTC anchor is the least of the
     // three parts, and dropping it buys the name ~80px of the scroll window.
     utc.className = 'rt-upcoming-ticker-utc';

@@ -1,5 +1,7 @@
 # The Cell rule, measured as painted — nine anchors, both Footprints
 
+> **The rule this measures was relaxed on 2026-08-12 — the numbers below are a record, not the current contract.** The owner restated the 3×3 grid as a *suggested anchor point*: a card may overflow into the neighbours it sits next to, so the ceiling is now the anchor's own **Cell** plus every neighbour it can grow toward on that axis (three for a centre position, two for an edge). The **card view** uses that room, because the **Upcoming card**'s type was raised for legibility at stream distance and three titles no longer fit a third of a 1080p scene. The **scrolling view** still keeps a single Cell — see `oneCellWidth` in `src/upcoming-card.js` for why. What is still true here, and was the point of the sweep: the ceiling is real, it is anchor-dependent, and the pad comes out of it rather than adding to it.
+
 Measurement record for [#79](https://github.com/goproslowyo/RaidTrainOverlay/issues/79)'s browser-sweep criterion: *"both **Footprint**s land in the same **Cell** as before, at every anchor"*. That criterion cannot be reached by `node --test` — no DOM implementation has a layout engine — so it lived unticked until this sweep.
 
 Run 2026-08-10, against the tree that landed #78–#84.

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { parseHTML } from 'linkedom';
 import {
-  anchorStyle, cellThird, pageFadeMs, renderUpcomingCard,
+  anchorStyle, cellThird, cellSpan, pageFadeMs, renderUpcomingCard, TYPE, MIN_TYPE_PX,
 } from '../src/upcoming-card.js';
 
 // The anchor grammar is the pure part and gets unit coverage here. The DOM
@@ -29,16 +29,47 @@ test('anchorStyle places each of the nine anchors on its own edge pair', () => {
   assert.match(anchorStyle('bc'), /justify-content:center/);
 });
 
-// The cell rule: the scene is three columns and three rows, the nine anchors
-// are its nine cells, and an item at one anchor must not bleed into another
-// column or row. Both views of the card are budgeted by this one function, so
-// these assertions are the rule's only guard outside a browser.
+// The **Cell** places an anchor; `cellSpan` ceilings it. The owner relaxed the
+// old "must not bleed into another column or row" once the card's type grew:
+// the 3×3 grid is a suggested ANCHOR POINT, and a card may overflow into the
+// neighbours it is next to. What survives is that a ceiling exists and depends
+// on the anchor — which is what stops the scrolling view going back to
+// spanning the whole screen from a corner. Both views are budgeted by this one
+// function, so these assertions are the rule's only guard outside a browser.
 
-test('every anchor is ceilinged at one third of the scene, both axes', () => {
+test('a centre position may grow into the neighbour on each side; an edge into one', () => {
+  // Three cells for a centre (a neighbour either way), two for an edge (one
+  // neighbour, inward). Applied per axis, from that axis's own letter.
+  assert.equal(cellSpan('c'), 3, 'horizontal centre');
+  assert.equal(cellSpan('m'), 3, 'vertical middle');
+  for (const edge of ['l', 'r', 't', 'b']) assert.equal(cellSpan(edge), 2, edge);
+});
+
+test('every anchor is ceilinged by its own span, both axes', () => {
+  const wide = (n) => new RegExp(`max-width:calc\\(33\\.3333vw \\* ${n} - 48px\\)`);
+  const tall = (n) => new RegExp(`max-height:calc\\(33\\.3333vh \\* ${n} - 48px\\)`);
+  // A corner grows inward on both axes; the middle-centre may take everything.
+  assert.match(anchorStyle('tl'), wide(2));
+  assert.match(anchorStyle('tl'), tall(2));
+  assert.match(anchorStyle('br'), wide(2));
+  assert.match(anchorStyle('br'), tall(2));
+  // Bottom-centre — the default — is free across the width and pinned in height.
+  assert.match(anchorStyle('bc'), wide(3));
+  assert.match(anchorStyle('bc'), tall(2));
+  assert.match(anchorStyle('ml'), wide(2));
+  assert.match(anchorStyle('ml'), tall(3));
+  assert.match(anchorStyle('mc'), wide(3));
+  assert.match(anchorStyle('mc'), tall(3));
+});
+
+test('no anchor is left without a ceiling on either axis', () => {
+  // The relaxation is a bigger number, never the absence of one: an unbounded
+  // scrolling view spanning the whole screen from every anchor is the bug this
+  // budget was introduced to close, and it must stay closed.
   for (const key of ANCHORS) {
     const css = anchorStyle(key);
-    assert.match(css, /max-width:calc\(33\.3333vw - 48px\)/, key);
-    assert.match(css, /max-height:calc\(33\.3333vh - 48px\)/, key);
+    assert.match(css, /max-width:calc\(33\.3333vw \* [23] - 48px\)/, key);
+    assert.match(css, /max-height:calc\(33\.3333vh \* [23] - 48px\)/, key);
   }
 });
 
@@ -52,17 +83,24 @@ test('the cell comes from viewport units, never a measured scene', () => {
   }
 });
 
-test('the pad comes out of the cell, so a bigger inset never widens the box', () => {
-  assert.match(anchorStyle('tl', { pad: 40 }), /max-width:calc\(33\.3333vw - 80px\)/);
-  assert.match(anchorStyle('tl', { pad: 40 }), /max-height:calc\(33\.3333vh - 80px\)/);
+test('the pad comes out of the budget, so a bigger inset never widens the box', () => {
+  // Even a 3-cell span stops short of the screen edge rather than touching it.
+  assert.match(anchorStyle('tl', { pad: 40 }), /max-width:calc\(33\.3333vw \* 2 - 80px\)/);
+  assert.match(anchorStyle('tl', { pad: 40 }), /max-height:calc\(33\.3333vh \* 2 - 80px\)/);
+  assert.match(anchorStyle('mc', { pad: 40 }), /max-width:calc\(33\.3333vw \* 3 - 80px\)/);
 });
 
-test('the minimum width yields to the cell on a narrow scene', () => {
-  // A hard 340px floor is wider than a third of a 960-wide scene, which is
-  // exactly the bleed the rule exists to prevent — so the floor is a min()
-  // against the same budget, not a number that can out-vote it.
+test('the minimum width yields to the budget on a narrow scene', () => {
+  // A hard 340px floor is wider than a third of a 960-wide scene, so a floor
+  // that could out-vote the ceiling would put the panel off the edge — the
+  // floor is a min() against the same budget, not a number that beats it.
   for (const key of ANCHORS) {
-    assert.match(anchorStyle(key), /min-width:min\(340px, 33\.3333vw - 48px\)/, key);
+    const span = ['l', 'r'].includes(key[1]) ? 2 : 3;
+    assert.match(
+      anchorStyle(key),
+      new RegExp(`min-width:min\\(340px, calc\\(33\\.3333vw \\* ${span} - 48px\\)\\)`),
+      key,
+    );
   }
 });
 
@@ -94,12 +132,14 @@ test('the cell third is stated once, and reads in whichever unit its surface use
 test('the anchor grammar composes the third with a per-surface pad and floor', () => {
   // The preview's stage is not the viewport, so it passes the SAME third in its
   // own unit alongside its own pad and floor — the two scale-dependent parts.
+  // The span is the grammar's, not the surface's, so the preview shows the same
+  // overflow into neighbours the Stage will.
   const css = anchorStyle('bl', {
     pad: 12, cell: { w: cellThird('%'), h: cellThird('%') }, floor: '210px',
   });
-  assert.match(css, /max-width:calc\(33\.3333% - 24px\)/);
-  assert.match(css, /max-height:calc\(33\.3333% - 24px\)/);
-  assert.match(css, /min-width:min\(210px, 33\.3333% - 24px\)/);
+  assert.match(css, /max-width:calc\(33\.3333% \* 2 - 24px\)/);
+  assert.match(css, /max-height:calc\(33\.3333% \* 2 - 24px\)/);
+  assert.match(css, /min-width:min\(210px, calc\(33\.3333% \* 2 - 24px\)\)/);
 });
 
 test('anchorStyle falls back to bottom-centre for a missing key', () => {
@@ -137,6 +177,10 @@ test('the Configurator preview fills its budget the same way this module does', 
     'both views must fill the budget rather than declare a width of their own');
   assert.match(preview, /\.up\.ticker \.lbl \{[^}]*max-width: 40%/,
     'the eyebrow must yield to the trains here too');
+  assert.match(preview, /max-width:\$\{oneCellWidth\(PREVIEW_BUDGET\)\}/,
+    'the mock scrolling view must take its one-Cell cap from this module — without it '
+    + 'the preview spreads across its whole stage while the Overlay holds one Cell, '
+    + 'which is the one thing a Preview may never misstate');
   assert.match(anchorStyle('bl'), /min-width:min\(340px/, 'the floor still yields via min()');
 });
 
@@ -171,4 +215,79 @@ test('the card mounts into the Document its container came from, and lays a row 
     cells.filter((_, i) => i % 3 === 1).map((cell) => cell.textContent),
     TRAINS.map((train) => train.title),
   );
+});
+
+/**
+ * The type scale. This is the one part of the card's appearance a DOM-only
+ * runner CAN see: font-size is authored as an inline style, so it survives
+ * into the painted node without a cascade or a layout engine. What these
+ * guard is the FLOOR and the RANKING — the two properties the owner's report
+ * was about ("legible on a monitor, not from across a room"), and the two a
+ * later tweak to one role can silently break.
+ *
+ * They deliberately do not assert a specific px value in the abstract; TYPE is
+ * the statement, and the painted-node tests below are what tie the statement
+ * to the panel. A test that only re-typed the numbers would pass a card that
+ * never applied them.
+ */
+const ROLES = [...Object.entries(TYPE.card), ...Object.entries(TYPE.scrolling)];
+
+test('no role in either view falls below the stream-distance floor', () => {
+  // An OBS source can be scaled DOWN in a scene, and the smallest role is the
+  // first thing to stop reading when it is. There is no fallback below this.
+  for (const [role, px] of ROLES) {
+    assert.ok(px >= MIN_TYPE_PX, `${role} is ${px}px, under the ${MIN_TYPE_PX}px floor`);
+  }
+});
+
+test('each view is a ranked scale, not five independent numbers', () => {
+  // The panel reads because the roles are ordered: the name is what you are
+  // there to read, the departure time supports it, the UTC anchor is a
+  // footnote. Bumping one role and leaving the others behind flattens that.
+  for (const [view, scale] of Object.entries(TYPE)) {
+    assert.ok(scale.name > scale.when, `${view}: the name must outrank its departure time`);
+    assert.ok(scale.when > scale.utc, `${view}: the departure time must outrank the UTC anchor`);
+    assert.ok(scale.eyebrow >= scale.utc, `${view}: the eyebrow must not sink below the footnote`);
+  }
+});
+
+/** Every `font-size:Npx` an element's inline style declares, as numbers. */
+const sizesIn = (el) => [...el.style.cssText.matchAll(/font-size:\s*([\d.]+)px/g)]
+  .map((m) => Number(m[1]));
+
+test('the painted card view carries the scale it declares', () => {
+  const { document: page } = parseHTML('<!doctype html><html><head></head><body><div id="train"></div></body></html>');
+  const container = page.getElementById('train');
+  renderUpcomingCard(container, TRAINS, CONFIG);
+
+  const card = container.querySelector('.rt-upcoming-card');
+  const [head, list] = card.children;
+  assert.deepEqual(sizesIn(head.firstElementChild), [TYPE.card.eyebrow], 'the eyebrow');
+  const [when, name, utc] = [...list.children];
+  assert.deepEqual(sizesIn(when), [TYPE.card.when], 'the departure time');
+  assert.deepEqual(sizesIn(name), [TYPE.card.name], 'the train name');
+  assert.deepEqual(sizesIn(utc), [TYPE.card.utc], 'the UTC anchor');
+});
+
+test('the painted scrolling view carries its own, tighter scale', () => {
+  // The scrolling view is one line inside the same cell, so it runs a notch
+  // below the card view — and its eyebrow stays put, because the 1709px
+  // breakpoint in this module's stylesheet is calibrated to that exact width.
+  const { document: page } = parseHTML('<!doctype html><html><head></head><body><div id="train"></div></body></html>');
+  const container = page.getElementById('train');
+  renderUpcomingCard(container, TRAINS, { ...CONFIG, upstyle: 'ticker' });
+
+  const panel = container.querySelector('.rt-upcoming-ticker');
+  // The one-line footprint keeps ONE Cell even though its anchor may now span
+  // three: its content is longer than any screen, so an unceilinged panel does
+  // not grow to fit — it becomes a bar across the whole scene at every anchor.
+  assert.match(panel.style.cssText, /max-width:calc\(33\.3333vw - 48px\)/,
+    'the scrolling view must not inherit the relaxed, neighbour-spanning ceiling');
+  assert.deepEqual(sizesIn(panel.querySelector('.rt-upcoming-ticker-label')),
+    [TYPE.scrolling.eyebrow], 'the eyebrow');
+  const entry = panel.querySelector('.rt-upcoming-ticker-run span span');
+  assert.deepEqual(sizesIn(entry), [TYPE.scrolling.name], 'the entry, which the name inherits');
+  const [when, , utc] = [...entry.children];
+  assert.equal(Number(when.style.fontSize.replace('px', '')), TYPE.scrolling.when, 'the departure time');
+  assert.equal(Number(utc.style.fontSize.replace('px', '')), TYPE.scrolling.utc, 'the UTC anchor');
 });

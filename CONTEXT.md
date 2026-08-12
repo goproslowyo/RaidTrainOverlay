@@ -82,7 +82,9 @@ Everything this browser source paints, on one full-screen surface: the **Train**
 _Avoid_: canvas, scene, layer
 
 **Cell**:
-One ninth of the **Stage** — three columns by three rows — and all the room an **Upcoming card** at one of the nine `uppos` anchors may take. An item at one anchor must not bleed into another column or row, whichever **Footprint** it wears and whatever size the scene is. At 1920×1080 a Cell is 640×360. Nine anchors, nine Cells, one rule.
+One ninth of the **Stage** — three columns by three rows. The nine `uppos` anchors are the nine Cells, and a Cell is where an **Upcoming card** *sits*. At 1920×1080 a Cell is 640×360.
+
+A Cell is no longer all the room the card may *take*. The owner's rule, restated once the card's type grew: the grid is a suggested anchor point, and a card may overflow into the neighbours it is next to — so the ceiling is the anchor's own Cell plus every neighbour it can grow toward on that axis, three Cells for a centre position and two for an edge. There is still always a ceiling, and it still depends on the anchor: that is the part that keeps the **scrolling view** from spanning the whole **Stage** from a corner. The one-line **Footprint** keeps a single Cell regardless, because its content is longer than any scene and so takes any room it is given rather than asking for what it needs.
 _Avoid_: quadrant, zone, region, box
 
 **Track visibility**:
@@ -112,7 +114,7 @@ One scrolling view's worth of the **Horizon** — the whole list carried past on
 _Avoid_: loop, cycle, scroll, rotation
 
 **Footprint**:
-How much room the **Upcoming card** takes — one card, two views. The **card view** (`upstyle=card`, the default) is a small slab showing three trains at a time, paging through the **Horizon** a **Page** at a time. The **scrolling view** (`upstyle=ticker`) is a single line carrying the whole **Horizon** past on one seamless **Lap**. The param is `upstyle`; the Configurator calls the axis *How much room it takes → Card / One line*. Either view is confined to its anchor's **Cell**. The scrolling view is never "a marquee", even though it scrolls: that word names a **Mode**, which is the *Train*'s axis and not the card's. `mode=marquee` does not turn the card into the scrolling view, and `upstyle=ticker` does not change how the Train moves. The param *value* stays `ticker`, because it ships inside copied OBS browser sources; the words for it do not.
+How much room the **Upcoming card** takes — one card, two views. The **card view** (`upstyle=card`, the default) is a small slab showing three trains at a time, paging through the **Horizon** a **Page** at a time. The **scrolling view** (`upstyle=ticker`) is a single line carrying the whole **Horizon** past on one seamless **Lap**. The param is `upstyle`; the Configurator calls the axis *How much room it takes → Card / One line*. Either view is ceilinged from its anchor's **Cell** — the card view may spread into the neighbours it is next to, the scrolling view keeps the single **Cell**. The scrolling view is never "a marquee", even though it scrolls: that word names a **Mode**, which is the *Train*'s axis and not the card's. `mode=marquee` does not turn the card into the scrolling view, and `upstyle=ticker` does not change how the Train moves. The param *value* stays `ticker`, because it ships inside copied OBS browser sources; the words for it do not.
 _Avoid_: marquee (for the card), ticker (as a name for the view — it is only a param value), style, size
 
 **Card view**:

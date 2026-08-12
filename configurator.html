@@ -937,7 +937,9 @@
     isSetupDone, markSetupDone, restoreTrainConfigs,
   } from './src/profiles.js';
   import { filterUpcoming, upcomingPages, visibleUpcoming, upcomingRows, mySlot, CARD_MAX_ROWS } from './src/live-link.js';
-  import { anchorStyle, cellThird, pageFadeMs } from './src/upcoming-card.js';
+  import {
+    anchorStyle, cellThird, oneCellWidth, pageFadeMs,
+  } from './src/upcoming-card.js';
   import { loadMyRaidTrains, loadEventDetails, refreshEventDetail, userCacheKey } from './src/my-raid-trains.js';
   import { readVerdict, planCleanup } from './src/feed-verdict.js';
   import { buildLiveLink, baseSettings } from './src/live-link-url.js';
@@ -2014,8 +2016,13 @@
       // pad) so the -50% loop is seamless — the same discipline as the real
       // scrolling view in upcoming-card.js.
       const lapHtml = `<span class="ticklap">${run}<span class="tsep">•</span></span>`;
+      // The anchor's ceiling now spans neighbouring cells, but the one-line
+      // view keeps a single one — its content is longer than any scene, so
+      // handed more room it just takes it. Same cap the Overlay applies, from
+      // the same function: a Preview may be dishonest about scale, never about
+      // where the card lands.
       return `<div style="zoom:${PREVIEW_ZOOM};${anchorStyle(v.uppos, PREVIEW_BUDGET)}">
-        <div class="up ticker" style="--upop:${esc(v.upop)};--tickdur:${esc(v.upscroll)}s">
+        <div class="up ticker" style="max-width:${oneCellWidth(PREVIEW_BUDGET)};--upop:${esc(v.upop)};--tickdur:${esc(v.upscroll)}s">
           <span class="lbl">${te('overlay.upcoming')}</span>
           <span class="tickwrap"><span class="tickrun">${lapHtml}${lapHtml}</span></span>
         </div></div>`;
@@ -2117,7 +2124,12 @@
           </div>
           <div style="display:grid;gap:3px;min-width:0">
             <span style="font:650 13px/1.2 var(--rt-font-ui)">${posLabel ? te(posLabel[1]) : ''}</span>
-            <span class="cap dim">${te('configurator.posHint')}</span>
+            <!-- Translated UNESCAPED here (t, not te — no backticks in this
+                 comment, it sits inside a template literal): the hint names the
+                 OTHER position setting, the Train's own under Look, in bold,
+                 because nothing else on this panel says the grid moves only the
+                 card. -->
+            <span class="cap dim">${t('configurator.posHint')}</span>
           </div>
         </div>
       </div>
